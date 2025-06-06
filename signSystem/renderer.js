@@ -399,14 +399,17 @@ function runAnimationSequence() {
     setTimeout(() => {
       animationImage.style.transition = "transform 2s ease";
       
-      // 🔸 用紙サイズに応じて移動距離を調整
+      // 🔸 用紙サイズに応じて移動距離を調整（ウィンドウ下部を完全に通過）
       let moveDistance;
+      const windowHeight = window.innerHeight || 1000; // ウィンドウ高さを取得
+      const extraDistance = 500; // さらに500px下まで移動
+      
       if (currentPaperSize === "poster") {
-        moveDistance = -2080; // ポスター：-1680px + 400px = -2080px
-        console.log("📦 ポスターモード：移動距離 -2080px");
+        moveDistance = -(windowHeight + extraDistance); // ウィンドウ高さ + 500px
+        console.log(`📦 ポスターモード：移動距離 ${moveDistance}px（ウィンドウ高さ: ${windowHeight}px）`);
       } else {
-        moveDistance = -1680; // A4：従来通り -1680px
-        console.log("📦 A4モード：移動距離 -1680px");
+        moveDistance = -(windowHeight + extraDistance); // ウィンドウ高さ + 500px  
+        console.log(`📦 A4モード：移動距離 ${moveDistance}px（ウィンドウ高さ: ${windowHeight}px）`);
       }
       
       // 🔸 下方向への移動
