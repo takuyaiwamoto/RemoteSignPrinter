@@ -135,10 +135,10 @@ function redrawCanvas(withBackground = true) {
         drawHeight = canvas.height * 0.92;
         console.log("🔍 背景1のA4サイズ調整: 0.92倍");
       } else if (lastBackgroundSrc && lastBackgroundSrc.includes('back2')) {
-        // 背景2のA4はベースより4%小さく
-        drawWidth = canvas.width * 0.96;
-        drawHeight = canvas.height * 0.96;
-        console.log("🔍 背景2のA4サイズ調整: 0.96倍");
+        // 背景2のA4はベースより12%小さく
+        drawWidth = canvas.width * 0.88;
+        drawHeight = canvas.height * 0.88;
+        console.log("🔍 背景2のA4サイズ調整: 0.88倍");
       }
     }
     
