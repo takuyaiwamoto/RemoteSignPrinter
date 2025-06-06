@@ -96,7 +96,18 @@ function redrawCanvas(withBackground = true) {
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2); // 中心に移動
     ctx.rotate(Math.PI); // 180度回転
-    ctx.drawImage(backgroundImage, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+    
+    // 🔸 ポスターモードで背景1の場合、サイズを調整
+    let drawWidth = canvas.width;
+    let drawHeight = canvas.height;
+    
+    if (currentPaperSize === "poster" && lastBackgroundSrc && lastBackgroundSrc.includes('back1')) {
+      // 背景1のポスターは背景2より少し小さく（0.9倍）
+      drawWidth = canvas.width * 0.9;
+      drawHeight = canvas.height * 0.9;
+    }
+    
+    ctx.drawImage(backgroundImage, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
     ctx.restore();
   }
   
