@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>送信側1.2</title>
+  <style>
+    canvas {
+      border: 1px solid black;
+      display: block;
+      margin-bottom: 10px;
+    }
+    button {
+      margin-right: 5px;
+      margin-bottom: 5px;
+    }
+    .button-group {
+      margin-bottom: 10px;
+    }
+    .button-group label {
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    #countdown {
+      font-size: 24px;
+      color: red;
+      margin-top: 10px;
+    }
+    .selected {
+      background-color: #4CAF50;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+<canvas id="drawCanvas" width="842" height="595"></canvas>
+
+<div class="button-group">
+  <label>背景:</label>
+  <button onclick="setBackground('./back1.png')">背景1</button>
+  <button onclick="setBackground('./back2.png')">背景2</button>
+  <button onclick="setBackground(null)">白</button>
+</div>
+
+<div class="button-group">
+  <label>用紙サイズ:</label>
+  <button id="a4Btn" class="selected" onclick="setPaperSize('A4')">A4</button>
+  <button id="posterBtn" onclick="setPaperSize('poster')">ポスター</button>
+</div>
+
+<div class="button-group">
+  <button onclick="clearCanvas()">Clear</button>
+  <button onclick="sendPrintCommand()">送信</button>
+</div>
+
+<div id="countdown"></div>
+
+<script>
+const canvas = document.getElementById("drawCanvas");
+const ctx = canvas.getContext("2d");
+let drawing = false;
+let socket = new WebSocket("wss://realtime-sign-server.onrender.com");
+let backgroundImage = null;
+let currentPaperSize = "A4"; // 現在の用紙サイズ
+socket.onopen = () => console.log("✅ WebSocket接続完了（送信側）");
+
+// 🔸 用紙サイズ設定関数
+function setPaperSize(size) {
+  currentPaperSize = size;
+  
+  // ボタンの選択状態を更新
+  document.getElementById("a4Btn").classList.remove("selected");
+  document.getElementById("posterBtn").classList.remove("selected");
+  
+  if (size === "A4") {
+    document.getElementById("a4Btn").classList.add("selected");
+    console.log("📄 用紙サイズをA4に設定");
+  } else if (size === "poster") {
+    document.getElementById("posterBtn").classList.add("selected");
+    console.log("📄 用紙サイズをポスターに設定");
+  }
+  
+  // 受信側に用紙サイズ情報を送信
+  socket.send(JSON.stringify({ 
+    type: "paperSize", 
+    size: size 
+  }));
+}
+
+// 🔸 キャンバスサイズ変更関数を追加
+function setCanvasToPortraitSize() {
+  // 縦長サイズ（A4縦）に変更
+  canvas.width = 595;  // A4縦の幅
+  canvas.height = 842; // A4縦の高さ
+  
+  // 🔸 HTML要素のサイズも変更
+  canvas.setAttribute('width', '595');
+  canvas.setAttribute('height', '842');
+  canvas.style.width = '595px';
+  canvas.style.height = '842px';
+  
+  console.log(`書き手側キャンバスを縦長に変更: ${canvas.width} x ${canvas.height}`);
+}
+
+function resetCanvasToNormalSize() {
+  // 通常サイズ（A4横）に戻す
+  canvas.width = 842;  // 元のサイズ
+  canvas.height = 595; // 元のサイズ
+  
+  // 🔸 HTML要素のサイズも変更
+  canvas.setAttribute('width', '842');
+  canvas.setAttribute('height', '595');
+  canvas.style.width = '842px';
+  canvas.style.height = '595px';
+  
+  console.log(`書き手側キャンバスを通常サイズに変更: ${canvas.width} x ${canvas.height}`);
+}
+
+function setBackground(src) {
+  if (src === null) {
+    backgroundImage = null;
+    
+    // 🔸 白背景の場合は通常サイズに戻す
+    resetCanvasToNormalSize();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    socket.send(JSON.stringify({ type: "background", src: "white" }));
+  } else {
+    const img = new Image();
+    img.src = src;
+    img.onload = () => {
+      backgroundImage = img;
+      
+      // 🔸 back2の場合は縦長に変更
+      if (src.includes('back2')) {
+        setCanvasToPortraitSize();
+      } else {
+        resetCanvasToNormalSize();
+      }
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+      socket.send(JSON.stringify({ type: "background", src: src }));
+    };
+  }
+}
+
+function sendPrintCommand() {
+  if (socket.readyState === WebSocket.OPEN) {
+    // 🔸 印刷コマンドに用紙サイズ情報を含める
+    socket.send(JSON.stringify({ 
+      type: "print",
+      paperSize: currentPaperSize 
+    }));
+    startCountdown();
+  }
+}
+
+function startCountdown() {
+  const countdownEl = document.getElementById("countdown");
+  
+  // 🔸 用紙サイズに応じてカウントダウン時間を調整
+  let totalSeconds;
+  if (currentPaperSize === "poster") {
+    totalSeconds = 8; // ポスター：3秒短縮（11秒→8秒）
+  } else {
+    totalSeconds = 11; // A4：従来通り11秒
+  }
+  
+  let seconds = totalSeconds;
+  countdownEl.textContent = `お渡しまで：${seconds}秒`;
+  
+  const timer = setInterval(() => {
+    seconds--;
+    if (seconds >= 0) {
+      countdownEl.textContent = `お渡しまで：${seconds}秒`;
+    } else {
+      clearInterval(timer);
+      countdownEl.textContent = "";
+      // ✅ カウントダウン終了後、筆跡のみ削除（背景維持）
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (backgroundImage) {
+        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+      }
+      // ✅ 背景の同期送信
+      const bgSrc = backgroundImage ? backgroundImage.src : "white";
+      socket.send(JSON.stringify({ type: "clear" }));
+      socket.send(JSON.stringify({ type: "background", src: bgSrc }));
+    }
+  }, 1000);
+}
+
+function clearCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (backgroundImage) {
+    ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+  }
+  socket.send(JSON.stringify({ type: "clear" }));
+}
+
+canvas.addEventListener("mousedown", (e) => {
+  drawing = true;
+  const x = e.offsetX;
+  const y = e.offsetY;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  socket.send(JSON.stringify({ type: "start", x, y }));
+});
+
+canvas.addEventListener("mouseup", () => {
+  drawing = false;
+  // 🔸 不要な"end"メッセージを削除（受信側で処理していないため）
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  if (!drawing) return;
+  const x = e.offsetX;
+  const y = e.offsetY;
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#000";
+  ctx.lineTo(x, y);
+  ctx.stroke();
+  socket.send(JSON.stringify({ type: "draw", x, y }));
+});
+
+// 🔸 スマホ対応：タッチイベントを追加
+canvas.addEventListener("touchstart", (e) => {
+  e.preventDefault(); // スクロールを防止
+  drawing = true;
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const x = touch.clientX - rect.left;
+  const y = touch.clientY - rect.top;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  socket.send(JSON.stringify({ type: "start", x, y }));
+});
+
+canvas.addEventListener("touchend", (e) => {
+  e.preventDefault();
+  drawing = false;
+});
+
+canvas.addEventListener("touchmove", (e) => {
+  e.preventDefault(); // スクロールを防止
+  if (!drawing) return;
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const x = touch.clientX - rect.left;
+  const y = touch.clientY - rect.top;
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#000";
+  ctx.lineTo(x, y);
+  ctx.stroke();
+  socket.send(JSON.stringify({ type: "draw", x, y }));
+});
+</script>
+</body>
+</html>
