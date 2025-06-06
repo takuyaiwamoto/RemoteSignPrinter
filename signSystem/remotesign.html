@@ -49,6 +49,7 @@
 <div class="button-group">
   <button onclick="clearCanvas()">Clear</button>
   <button onclick="sendPrintCommand()">送信</button>
+  <button onclick="playVideo()" style="background-color: #FF6B6B; color: white;">📹 ビデオ再生</button>
 </div>
 
 <div id="countdown"></div>
@@ -252,6 +253,16 @@ canvas.addEventListener("touchmove", (e) => {
   ctx.stroke();
   socket.send(JSON.stringify({ type: "draw", x, y }));
 });
+
+// 🔸 ビデオ再生関数
+function playVideo() {
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ type: "playVideo" }));
+    console.log("📹 ビデオ再生指示を送信");
+  } else {
+    console.error("❌ WebSocket接続なし");
+  }
+}
 </script>
 </body>
 </html>

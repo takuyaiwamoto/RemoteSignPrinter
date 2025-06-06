@@ -34,8 +34,8 @@ function createWindow() {
   mainWindow.setSize(windowWidth, windowHeight);
   mainWindow.center(); // 画面中央に配置
  
-  // 公開URLを読み込み
-  mainWindow.loadURL("https://takuyaiwamoto.github.io/RemoteSignPrinter/signSystem/remotesign.html");
+  // 受信側HTMLを読み込み
+  mainWindow.loadFile("index.html");
  
   // 🔸 準備完了後に表示
   mainWindow.once('ready-to-show', () => {

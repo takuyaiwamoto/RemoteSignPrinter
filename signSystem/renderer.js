@@ -224,6 +224,10 @@ function handleMessage(data) {
     ctx.stroke();
     
     ctx.restore();
+  } else if (data.type === "playVideo") {
+    // 🔸 ビデオ再生処理
+    console.log("📹 ビデオ再生指示を受信");
+    playVideoFullscreen();
   }
 }
 
@@ -389,4 +393,59 @@ function runAnimationSequence() {
     }, 2600); // 🔸 回転開始から2.6秒後に移動開始（1.5秒回転 + 1.1秒待機）
 
   }, animationStartDelay); // 🔸 用紙サイズに応じた遅延時間
+}
+
+// 🔸 ビデオフルスクリーン再生関数
+function playVideoFullscreen() {
+  try {
+    console.log("📹 ビデオフルスクリーン再生開始");
+    
+    // 既存のビデオ要素があれば削除
+    const existingVideo = document.getElementById('fullscreenVideo');
+    if (existingVideo) {
+      existingVideo.remove();
+    }
+    
+    // ビデオ要素を作成
+    const video = document.createElement('video');
+    video.id = 'fullscreenVideo';
+    video.src = resolveImagePath('signVideo.mp4');
+    video.autoplay = true;
+    video.controls = false;
+    video.style.position = 'fixed';
+    video.style.top = '0';
+    video.style.left = '0';
+    video.style.width = '100vw';
+    video.style.height = '100vh';
+    video.style.objectFit = 'cover';
+    video.style.zIndex = '9999';
+    video.style.backgroundColor = 'black';
+    
+    // キャンバスを隠す
+    canvas.style.display = 'none';
+    
+    // ビデオをDOMに追加
+    document.body.appendChild(video);
+    
+    // ビデオ終了時の処理
+    video.addEventListener('ended', () => {
+      console.log("📹 ビデオ再生終了");
+      video.remove();
+      canvas.style.display = 'block';
+      redrawCanvas();
+    });
+    
+    // エラー処理
+    video.addEventListener('error', (e) => {
+      console.error("❌ ビデオ再生エラー:", e);
+      video.remove();
+      canvas.style.display = 'block';
+      alert('ビデオファイルが見つかりません: signVideo.mp4');
+    });
+    
+    console.log("✅ ビデオフルスクリーン再生設定完了");
+    
+  } catch (error) {
+    console.error("❌ ビデオ再生に失敗:", error);
+  }
 }
