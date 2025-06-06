@@ -106,19 +106,85 @@ ipcMain.on("save-pdf", (event, data) => {
     }
     console.log("✅ PNG保存完了:", savePath);
     
-    // 🔸 正確なプリンター名で修正
-    let printCommand = `mspaint /pt "${savePath}" "Brother MFC-J6983CDW Printer"`;
+    // 🔸 ダイアログなしで印刷（PowerShellを使用）
+    const printerName = "Brother MFC-J6983CDW Printer";
+    const printCommand = `powershell -Command "Start-Process -FilePath '${savePath}' -Verb PrintTo -ArgumentList '${printerName}' -WindowStyle Hidden"`;
     
-    console.log(`🖨 正確なプリンター名で印刷: ${printCommand}`);
+    console.log(`🖨 ダイアログなしで印刷: ${printCommand}`);
     
-    exec(printCommand, (error, stdout, stderr) => {
+    exec(printCommand, { windowsHide: true }, (error, stdout, stderr) => {
       console.log("📋 stdout:", stdout);
       console.log("📋 stderr:", stderr);
       if (error) {
         console.error("❌ 印刷エラー:", error);
+        // フォールバック：従来の方法
+        console.log("🔄 フォールバック印刷を試行");
+        const fallbackCommand = `mspaint /pt "${savePath}" "${printerName}"`;
+        exec(fallbackCommand, (fbError, fbStdout, fbStderr) => {
+          if (fbError) {
+            console.error("❌ フォールバック印刷エラー:", fbError);
+          } else {
+            console.log(`✅ フォールバック印刷完了`);
+          }
+        });
       } else {
-        console.log(`✅ Brother印刷完了`);
+        console.log(`✅ Brother印刷完了（ダイアログなし）`);
       }
     });
   });
-  }); // ← この閉じ括弧が足りませんでした
+});
+
+// 透過画像印刷処理（ダイアログなし）
+ipcMain.on("print-transparent-image", (event, data) => {
+  console.log("🖨️ 透過画像印刷要求を受信");
+  
+  const base64Data = data.imageData.replace(/^data:image\/png;base64,/, "");
+  const pngBuffer = Buffer.from(base64Data, "base64");
+  
+  const now = new Date();
+  const fileName = `transparent_${now.getFullYear()}${(now.getMonth() + 1)
+    .toString().padStart(2, "0")}${now.getDate().toString().padStart(2, "0")}_${now
+    .getHours().toString().padStart(2, "0")}${now.getMinutes().toString().padStart(2, "0")}${now
+    .getSeconds().toString().padStart(2, "0")}.png`;
+  
+  const savePath = path.join(require('os').homedir(), 'Documents', 'AutoPrint', fileName);
+  
+  const saveDir = path.dirname(savePath);
+  if (!fs.existsSync(saveDir)) {
+    fs.mkdirSync(saveDir, { recursive: true });
+  }
+  
+  fs.writeFile(savePath, pngBuffer, (err) => {
+    if (err) {
+      console.error("❌ 透過PNG保存エラー:", err);
+      return;
+    }
+    console.log("✅ 透過PNG保存完了:", savePath);
+    
+    // 🔸 透過画像もダイアログなしで印刷
+    const printerName = "Brother MFC-J6983CDW Printer";
+    const printCommand = `powershell -Command "Start-Process -FilePath '${savePath}' -Verb PrintTo -ArgumentList '${printerName}' -WindowStyle Hidden"`;
+    
+    console.log(`🖨️ 透過画像ダイアログなしで印刷: ${printCommand}`);
+    
+    exec(printCommand, { windowsHide: true }, (error, stdout, stderr) => {
+      console.log("📋 stdout:", stdout);
+      console.log("📋 stderr:", stderr);
+      if (error) {
+        console.error("❌ 透過画像印刷エラー:", error);
+        // フォールバック：従来の方法
+        console.log("🔄 透過画像フォールバック印刷を試行");
+        const fallbackCommand = `mspaint /pt "${savePath}" "${printerName}"`;
+        exec(fallbackCommand, (fbError, fbStdout, fbStderr) => {
+          if (fbError) {
+            console.error("❌ 透過画像フォールバック印刷エラー:", fbError);
+          } else {
+            console.log(`✅ 透過画像フォールバック印刷完了`);
+          }
+        });
+      } else {
+        console.log(`✅ 透過画像印刷完了（ダイアログなし）: ${fileName}`);
+      }
+    });
+  });
+});
