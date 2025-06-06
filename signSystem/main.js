@@ -26,16 +26,9 @@ function createWindow() {
   const { screen } = require('electron');
   const allDisplays = screen.getAllDisplays();
   
-  // サブモニターがあるかチェック
-  let targetDisplay = screen.getPrimaryDisplay(); // デフォルトはメインモニター
-  
-  if (allDisplays.length > 1) {
-    // 複数モニターがある場合、2番目のモニター（サブモニター）を使用
-    targetDisplay = allDisplays[1];
-    console.log(`サブモニターに表示: ${targetDisplay.bounds.width} x ${targetDisplay.bounds.height}`);
-  } else {
-    console.log(`メインモニターに表示: ${targetDisplay.bounds.width} x ${targetDisplay.bounds.height}`);
-  }
+  // 常にメインモニターを使用
+  let targetDisplay = screen.getPrimaryDisplay();
+  console.log(`メインモニターに表示: ${targetDisplay.bounds.width} x ${targetDisplay.bounds.height}`);
   
   const { width: screenWidth, height: screenHeight } = targetDisplay.workAreaSize;
   const { x: screenX, y: screenY } = targetDisplay.bounds;
@@ -46,7 +39,7 @@ function createWindow() {
  
   mainWindow.setSize(windowWidth, windowHeight);
   
-  // サブモニターの中央に配置
+  // メインモニターの中央に配置
   const centerX = screenX + (screenWidth - windowWidth) / 2;
   const centerY = screenY + (screenHeight - windowHeight) / 2;
   mainWindow.setPosition(Math.floor(centerX), Math.floor(centerY));
