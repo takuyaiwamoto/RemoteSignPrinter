@@ -130,10 +130,10 @@ function redrawCanvas(withBackground = true) {
     } else if (currentPaperSize === "A4") {
       // A4モードでの背景サイズ調整
       if (lastBackgroundSrc && lastBackgroundSrc.includes('back1')) {
-        // 背景1のA4は15%大きく
-        drawWidth = canvas.width * 1.15;
-        drawHeight = canvas.height * 1.15;
-        console.log("🔍 背景1のA4サイズ調整: 1.15倍");
+        // 背景1のA4はベースより8%小さく
+        drawWidth = canvas.width * 0.92;
+        drawHeight = canvas.height * 0.92;
+        console.log("🔍 背景1のA4サイズ調整: 0.92倍");
       } else if (lastBackgroundSrc && lastBackgroundSrc.includes('back2')) {
         // 背景2のA4は20%大きく
         drawWidth = canvas.width * 1.2;
