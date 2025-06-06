@@ -108,21 +108,33 @@ ipcMain.on("save-pdf", (event, data) => {
     }
     console.log("✅ PNG保存完了:", savePath);
     
-    // 🔸 Windows Print Spoolerを使用してサイレント印刷
+    // 🔸 Windowsで最も確実な印刷方法を試行
     const printerName = "Brother MFC-J6983CDW Printer";
     
-    // Windows Print Spooler コマンド（rundll32を使用）
-    const printCommand = `rundll32.exe shimgvw.dll,ImageView_PrintTo /pt "${savePath}" "${printerName}"`;
+    // 方法1: Windows Photo Viewerを使用
+    const photoViewerCommand = `rundll32.exe "C:\\Program Files\\Windows Photo Viewer\\PhotoViewer.dll",ImageView_PrintTo /pt "${savePath}" "${printerName}"`;
     
-    console.log(`🖨 Windows Print Spoolerで印刷: ${printCommand}`);
+    console.log(`🖨 Windows Photo Viewerで印刷: ${photoViewerCommand}`);
     
-    exec(printCommand, { windowsHide: true }, (error, stdout, stderr) => {
+    exec(photoViewerCommand, { windowsHide: true }, (error, stdout, stderr) => {
       if (error) {
-        console.error("❌ Windows Print Spooler印刷エラー:", error);
-        // フォールバック：PowerShell印刷
-        fallbackPowerShellPrint(savePath, printerName);
+        console.error("❌ Windows Photo Viewer印刷エラー:", error);
+        
+        // 方法2: mspaint with /pt （最も確実）
+        console.log("🔄 mspaint /ptに切り替え");
+        const mspaintCommand = `mspaint /pt "${savePath}" "${printerName}"`;
+        
+        exec(mspaintCommand, { windowsHide: true }, (error2, stdout2, stderr2) => {
+          if (error2) {
+            console.error("❌ mspaint印刷エラー:", error2);
+            // 最終フォールバック：PowerShell印刷
+            fallbackPowerShellPrint(savePath, printerName);
+          } else {
+            console.log(`✅ Brother印刷完了（mspaint）`);
+          }
+        });
       } else {
-        console.log(`✅ Brother印刷完了（Windows Print Spooler）`);
+        console.log(`✅ Brother印刷完了（Windows Photo Viewer）`);
       }
     });
   });
@@ -180,21 +192,33 @@ ipcMain.on("print-transparent-image", (event, data) => {
     }
     console.log("✅ 透過PNG保存完了:", savePath);
     
-    // 🔸 透過画像もWindows Print Spoolerを使用してサイレント印刷
+    // 🔸 透過画像も確実な印刷方法を試行
     const printerName = "Brother MFC-J6983CDW Printer";
     
-    // Windows Print Spooler コマンド（rundll32を使用）
-    const printCommand = `rundll32.exe shimgvw.dll,ImageView_PrintTo /pt "${savePath}" "${printerName}"`;
+    // 方法1: Windows Photo Viewerを使用
+    const photoViewerCommand = `rundll32.exe "C:\\Program Files\\Windows Photo Viewer\\PhotoViewer.dll",ImageView_PrintTo /pt "${savePath}" "${printerName}"`;
     
-    console.log(`🖨️ 透過画像をWindows Print Spoolerで印刷: ${printCommand}`);
+    console.log(`🖨️ 透過画像をWindows Photo Viewerで印刷: ${photoViewerCommand}`);
     
-    exec(printCommand, { windowsHide: true }, (error, stdout, stderr) => {
+    exec(photoViewerCommand, { windowsHide: true }, (error, stdout, stderr) => {
       if (error) {
-        console.error("❌ 透過画像Windows Print Spooler印刷エラー:", error);
-        // フォールバック：PowerShell印刷
-        fallbackPowerShellPrint(savePath, printerName);
+        console.error("❌ 透過画像Windows Photo Viewer印刷エラー:", error);
+        
+        // 方法2: mspaint with /pt （最も確実）
+        console.log("🔄 透過画像mspaint /ptに切り替え");
+        const mspaintCommand = `mspaint /pt "${savePath}" "${printerName}"`;
+        
+        exec(mspaintCommand, { windowsHide: true }, (error2, stdout2, stderr2) => {
+          if (error2) {
+            console.error("❌ 透過画像mspaint印刷エラー:", error2);
+            // 最終フォールバック：PowerShell印刷
+            fallbackPowerShellPrint(savePath, printerName);
+          } else {
+            console.log(`✅ 透過画像印刷完了（mspaint）: ${fileName}`);
+          }
+        });
       } else {
-        console.log(`✅ 透過画像印刷完了（Windows Print Spooler）: ${fileName}`);
+        console.log(`✅ 透過画像印刷完了（Windows Photo Viewer）: ${fileName}`);
       }
     });
   });
