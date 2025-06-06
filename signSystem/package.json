@@ -11,7 +11,6 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "printer": "^0.4.0"
   },
   "devDependencies": {
     "electron": "^32.2.6"
