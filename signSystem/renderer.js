@@ -440,8 +440,6 @@ function playVideoWithSize() {
       video.style.width = `${currentVideoSize}vw`;
       video.style.height = `${currentVideoSize}vh`;
       video.style.objectFit = 'contain';
-      video.style.border = '3px solid #FF6B6B';
-      video.style.borderRadius = '10px';
     }
     
     // キャンバスを隠す
