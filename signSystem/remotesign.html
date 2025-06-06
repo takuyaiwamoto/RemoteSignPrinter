@@ -47,6 +47,13 @@
 </div>
 
 <div class="button-group">
+  <label>ビデオサイズ:</label>
+  <button id="size100Btn" class="selected" onclick="setVideoSize(100)">100%</button>
+  <button id="size90Btn" onclick="setVideoSize(90)">90%</button>
+  <button id="size80Btn" onclick="setVideoSize(80)">80%</button>
+</div>
+
+<div class="button-group">
   <button onclick="clearCanvas()">Clear</button>
   <button onclick="sendPrintCommand()">送信</button>
   <button onclick="playVideo()" style="background-color: #FF6B6B; color: white;">📹 ビデオ再生</button>
@@ -61,6 +68,7 @@ let drawing = false;
 let socket = new WebSocket("wss://realtime-sign-server.onrender.com");
 let backgroundImage = null;
 let currentPaperSize = "A4"; // 現在の用紙サイズ
+let currentVideoSize = 100; // 現在のビデオサイズ（デフォルト100%）
 socket.onopen = () => console.log("✅ WebSocket接続完了（送信側）");
 
 // 🔸 用紙サイズ設定関数
@@ -254,11 +262,36 @@ canvas.addEventListener("touchmove", (e) => {
   socket.send(JSON.stringify({ type: "draw", x, y }));
 });
 
+// 🔸 ビデオサイズ設定関数
+function setVideoSize(size) {
+  currentVideoSize = size;
+  
+  // ボタンの選択状態を更新
+  document.getElementById("size100Btn").classList.remove("selected");
+  document.getElementById("size90Btn").classList.remove("selected");
+  document.getElementById("size80Btn").classList.remove("selected");
+  
+  document.getElementById(`size${size}Btn`).classList.add("selected");
+  
+  console.log(`📐 ビデオサイズを${size}%に設定`);
+  
+  // 受信側にサイズ情報を送信
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ 
+      type: "videoSize", 
+      size: size 
+    }));
+  }
+}
+
 // 🔸 ビデオ再生関数
 function playVideo() {
   if (socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ type: "playVideo" }));
-    console.log("📹 ビデオ再生指示を送信");
+    socket.send(JSON.stringify({ 
+      type: "playVideo",
+      size: currentVideoSize
+    }));
+    console.log(`📹 ビデオ再生指示を送信（サイズ: ${currentVideoSize}%）`);
   } else {
     console.error("❌ WebSocket接続なし");
   }

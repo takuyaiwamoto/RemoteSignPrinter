@@ -24,6 +24,7 @@ let backgroundImage = null;
 let drawingData = [];
 let lastBackgroundSrc = null;
 let currentPaperSize = "A4"; // 🔸 現在の用紙サイズ（デフォルトはA4）
+let currentVideoSize = 100; // 🔸 現在のビデオサイズ（デフォルト100%）
 
 let socket = new WebSocket("wss://realtime-sign-server.onrender.com");
 socket.onopen = () => console.log("✅ WebSocket接続完了（Electron受信側）");
@@ -226,8 +227,15 @@ function handleMessage(data) {
     ctx.restore();
   } else if (data.type === "playVideo") {
     // 🔸 ビデオ再生処理
-    console.log("📹 ビデオ再生指示を受信");
-    playVideoFullscreen();
+    console.log(`📹 ビデオ再生指示を受信（サイズ: ${data.size || 100}%）`);
+    if (data.size) {
+      currentVideoSize = data.size;
+    }
+    playVideoWithSize();
+  } else if (data.type === "videoSize") {
+    // 🔸 ビデオサイズ変更
+    currentVideoSize = data.size;
+    console.log(`📐 ビデオサイズを${data.size}%に設定`);
   }
 }
 
@@ -395,31 +403,46 @@ function runAnimationSequence() {
   }, animationStartDelay); // 🔸 用紙サイズに応じた遅延時間
 }
 
-// 🔸 ビデオフルスクリーン再生関数
-function playVideoFullscreen() {
+// 🔸 ビデオサイズ対応再生関数
+function playVideoWithSize() {
   try {
-    console.log("📹 ビデオフルスクリーン再生開始");
+    console.log(`📹 ビデオ再生開始（サイズ: ${currentVideoSize}%）`);
     
     // 既存のビデオ要素があれば削除
-    const existingVideo = document.getElementById('fullscreenVideo');
+    const existingVideo = document.getElementById('resizableVideo');
     if (existingVideo) {
       existingVideo.remove();
     }
     
     // ビデオ要素を作成
     const video = document.createElement('video');
-    video.id = 'fullscreenVideo';
+    video.id = 'resizableVideo';
     video.src = resolveImagePath('signVideo.mp4');
     video.autoplay = true;
     video.controls = false;
     video.style.position = 'fixed';
-    video.style.top = '0';
-    video.style.left = '0';
-    video.style.width = '100vw';
-    video.style.height = '100vh';
-    video.style.objectFit = 'cover';
     video.style.zIndex = '9999';
     video.style.backgroundColor = 'black';
+    
+    // サイズに応じて配置を変更
+    if (currentVideoSize === 100) {
+      // 100%: フルスクリーン
+      video.style.top = '0';
+      video.style.left = '0';
+      video.style.width = '100vw';
+      video.style.height = '100vh';
+      video.style.objectFit = 'cover';
+    } else {
+      // 90%, 80%: ウィンドウ中央に配置、縮小表示
+      video.style.top = '50%';
+      video.style.left = '50%';
+      video.style.transform = 'translate(-50%, -50%)';
+      video.style.width = `${currentVideoSize}vw`;
+      video.style.height = `${currentVideoSize}vh`;
+      video.style.objectFit = 'contain';
+      video.style.border = '3px solid #FF6B6B';
+      video.style.borderRadius = '10px';
+    }
     
     // キャンバスを隠す
     canvas.style.display = 'none';
@@ -443,7 +466,7 @@ function playVideoFullscreen() {
       alert('ビデオファイルが見つかりません: signVideo.mp4');
     });
     
-    console.log("✅ ビデオフルスクリーン再生設定完了");
+    console.log(`✅ ビデオ再生設定完了（${currentVideoSize}%）`);
     
   } catch (error) {
     console.error("❌ ビデオ再生に失敗:", error);
