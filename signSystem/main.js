@@ -22,17 +22,32 @@ function createWindow() {
 
   // 🔸 画面サイズに合わせて調整
   const { screen } = require('electron');
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
- 
-  console.log(`画面サイズ: ${screenWidth} x ${screenHeight}`);
+  const allDisplays = screen.getAllDisplays();
+  
+  // サブモニターがあるかチェック
+  let targetDisplay = screen.getPrimaryDisplay(); // デフォルトはメインモニター
+  
+  if (allDisplays.length > 1) {
+    // 複数モニターがある場合、2番目のモニター（サブモニター）を使用
+    targetDisplay = allDisplays[1];
+    console.log(`サブモニターに表示: ${targetDisplay.bounds.width} x ${targetDisplay.bounds.height}`);
+  } else {
+    console.log(`メインモニターに表示: ${targetDisplay.bounds.width} x ${targetDisplay.bounds.height}`);
+  }
+  
+  const { width: screenWidth, height: screenHeight } = targetDisplay.workAreaSize;
+  const { x: screenX, y: screenY } = targetDisplay.bounds;
  
   // 画面に収まるサイズに調整
   const windowWidth = Math.min(1080, screenWidth - 100);
   const windowHeight = Math.min(1920, screenHeight - 100);
  
   mainWindow.setSize(windowWidth, windowHeight);
-  mainWindow.center(); // 画面中央に配置
+  
+  // サブモニターの中央に配置
+  const centerX = screenX + (screenWidth - windowWidth) / 2;
+  const centerY = screenY + (screenHeight - windowHeight) / 2;
+  mainWindow.setPosition(Math.floor(centerX), Math.floor(centerY));
  
   // 受信側HTMLを読み込み（絶対パスで指定）
   mainWindow.loadFile(path.join(__dirname, "index.html"));
