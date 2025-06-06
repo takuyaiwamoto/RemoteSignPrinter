@@ -3,6 +3,16 @@ const path = require("path");
 const fs = require("fs");
 const { exec } = require("child_process");
 
+// node-printerライブラリを追加
+let printer;
+try {
+  printer = require("printer");
+  console.log("✅ node-printer ライブラリ読み込み完了");
+} catch (error) {
+  console.error("❌ node-printer ライブラリ読み込みエラー:", error);
+  console.log("🔄 フォールバック: PowerShell印刷を使用");
+}
+
 let mainWindow;
 
 function createWindow() {
@@ -106,33 +116,71 @@ ipcMain.on("save-pdf", (event, data) => {
     }
     console.log("✅ PNG保存完了:", savePath);
     
-    // 🔸 ダイアログなしで印刷（PowerShellを使用）
-    const printerName = "Brother MFC-J6983CDW Printer";
-    const printCommand = `powershell -Command "Start-Process -FilePath '${savePath}' -Verb PrintTo -ArgumentList '${printerName}' -WindowStyle Hidden"`;
-    
-    console.log(`🖨 ダイアログなしで印刷: ${printCommand}`);
-    
-    exec(printCommand, { windowsHide: true }, (error, stdout, stderr) => {
-      console.log("📋 stdout:", stdout);
-      console.log("📋 stderr:", stderr);
-      if (error) {
-        console.error("❌ 印刷エラー:", error);
-        // フォールバック：従来の方法
-        console.log("🔄 フォールバック印刷を試行");
-        const fallbackCommand = `mspaint /pt "${savePath}" "${printerName}"`;
-        exec(fallbackCommand, (fbError, fbStdout, fbStderr) => {
-          if (fbError) {
-            console.error("❌ フォールバック印刷エラー:", fbError);
-          } else {
-            console.log(`✅ フォールバック印刷完了`);
+    // 🔸 node-printerを使用してダイアログなしで印刷
+    if (printer) {
+      try {
+        const printerName = "Brother MFC-J6983CDW Printer";
+        
+        // 利用可能なプリンターを確認
+        const printers = printer.getPrinters();
+        console.log("📋 利用可能なプリンター:", printers.map(p => p.name));
+        
+        // Brother プリンターを検索
+        const brotherPrinter = printers.find(p => p.name.includes("Brother") || p.name.includes("MFC-J6983CDW"));
+        const targetPrinter = brotherPrinter ? brotherPrinter.name : printerName;
+        
+        console.log(`🖨 node-printerで印刷開始: ${targetPrinter}`);
+        
+        // 画像ファイルを直接印刷
+        printer.printFile({
+          filename: savePath,
+          printer: targetPrinter,
+          success: function(jobID) {
+            console.log(`✅ Brother印刷完了（ダイアログなし）- Job ID: ${jobID}`);
+          },
+          error: function(err) {
+            console.error("❌ node-printer印刷エラー:", err);
+            // フォールバック：PowerShell印刷
+            fallbackPowerShellPrint(savePath, targetPrinter);
           }
         });
-      } else {
-        console.log(`✅ Brother印刷完了（ダイアログなし）`);
+        
+      } catch (error) {
+        console.error("❌ node-printer使用エラー:", error);
+        // フォールバック：PowerShell印刷
+        fallbackPowerShellPrint(savePath, "Brother MFC-J6983CDW Printer");
       }
-    });
+    } else {
+      // node-printerが利用できない場合：PowerShell印刷
+      fallbackPowerShellPrint(savePath, "Brother MFC-J6983CDW Printer");
+    }
   });
 });
+
+// フォールバック：PowerShell印刷関数
+function fallbackPowerShellPrint(filePath, printerName) {
+  const printCommand = `powershell -Command "Start-Process -FilePath '${filePath}' -Verb PrintTo -ArgumentList '${printerName}' -WindowStyle Hidden"`;
+  
+  console.log(`🔄 PowerShellフォールバック印刷: ${printCommand}`);
+  
+  exec(printCommand, { windowsHide: true }, (error, stdout, stderr) => {
+    if (error) {
+      console.error("❌ PowerShell印刷エラー:", error);
+      // 最終フォールバック：mspaint
+      const fallbackCommand = `mspaint /pt "${filePath}" "${printerName}"`;
+      console.log(`🔄 mspaint最終フォールバック: ${fallbackCommand}`);
+      exec(fallbackCommand, (fbError, fbStdout, fbStderr) => {
+        if (fbError) {
+          console.error("❌ mspaint印刷エラー:", fbError);
+        } else {
+          console.log(`✅ mspaint印刷完了`);
+        }
+      });
+    } else {
+      console.log(`✅ PowerShell印刷完了`);
+    }
+  });
+}
 
 // 透過画像印刷処理（ダイアログなし）
 ipcMain.on("print-transparent-image", (event, data) => {
@@ -161,30 +209,40 @@ ipcMain.on("print-transparent-image", (event, data) => {
     }
     console.log("✅ 透過PNG保存完了:", savePath);
     
-    // 🔸 透過画像もダイアログなしで印刷
-    const printerName = "Brother MFC-J6983CDW Printer";
-    const printCommand = `powershell -Command "Start-Process -FilePath '${savePath}' -Verb PrintTo -ArgumentList '${printerName}' -WindowStyle Hidden"`;
-    
-    console.log(`🖨️ 透過画像ダイアログなしで印刷: ${printCommand}`);
-    
-    exec(printCommand, { windowsHide: true }, (error, stdout, stderr) => {
-      console.log("📋 stdout:", stdout);
-      console.log("📋 stderr:", stderr);
-      if (error) {
-        console.error("❌ 透過画像印刷エラー:", error);
-        // フォールバック：従来の方法
-        console.log("🔄 透過画像フォールバック印刷を試行");
-        const fallbackCommand = `mspaint /pt "${savePath}" "${printerName}"`;
-        exec(fallbackCommand, (fbError, fbStdout, fbStderr) => {
-          if (fbError) {
-            console.error("❌ 透過画像フォールバック印刷エラー:", fbError);
-          } else {
-            console.log(`✅ 透過画像フォールバック印刷完了`);
+    // 🔸 透過画像もnode-printerを使用してダイアログなしで印刷
+    if (printer) {
+      try {
+        const printerName = "Brother MFC-J6983CDW Printer";
+        
+        // 利用可能なプリンターを確認
+        const printers = printer.getPrinters();
+        const brotherPrinter = printers.find(p => p.name.includes("Brother") || p.name.includes("MFC-J6983CDW"));
+        const targetPrinter = brotherPrinter ? brotherPrinter.name : printerName;
+        
+        console.log(`🖨️ 透過画像をnode-printerで印刷開始: ${targetPrinter}`);
+        
+        // 透過画像ファイルを直接印刷
+        printer.printFile({
+          filename: savePath,
+          printer: targetPrinter,
+          success: function(jobID) {
+            console.log(`✅ 透過画像印刷完了（ダイアログなし）- Job ID: ${jobID}`);
+          },
+          error: function(err) {
+            console.error("❌ 透過画像node-printer印刷エラー:", err);
+            // フォールバック：PowerShell印刷
+            fallbackPowerShellPrint(savePath, targetPrinter);
           }
         });
-      } else {
-        console.log(`✅ 透過画像印刷完了（ダイアログなし）: ${fileName}`);
+        
+      } catch (error) {
+        console.error("❌ 透過画像node-printer使用エラー:", error);
+        // フォールバック：PowerShell印刷
+        fallbackPowerShellPrint(savePath, "Brother MFC-J6983CDW Printer");
       }
-    });
+    } else {
+      // node-printerが利用できない場合：PowerShell印刷
+      fallbackPowerShellPrint(savePath, "Brother MFC-J6983CDW Printer");
+    }
   });
 });
