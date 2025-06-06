@@ -43,7 +43,7 @@
 <div class="button-group">
   <label>用紙サイズ:</label>
   <button id="a4Btn" class="selected" onclick="setPaperSize('A4')">A4</button>
-  <button id="posterBtn" onclick="setPaperSize('poster')">ポスター</button>
+  <button id="posterBtn" onclick="setPaperSize('poster')">ポストカード</button>
 </div>
 
 <div class="button-group">
@@ -84,7 +84,7 @@ function setPaperSize(size) {
     console.log("📄 用紙サイズをA4に設定");
   } else if (size === "poster") {
     document.getElementById("posterBtn").classList.add("selected");
-    console.log("📄 用紙サイズをポスターに設定");
+    console.log("📄 用紙サイズをポストカードに設定");
   }
   
   // 受信側に用紙サイズ情報を送信
