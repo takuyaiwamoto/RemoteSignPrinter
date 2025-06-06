@@ -1,8 +1,8 @@
 const { ipcRenderer } = require("electron");
 const path = require("path");
 
-// 🔸 拡大率を設定 (デフォルト2.8倍、ポスター時は2.0倍)
-let SCALE_FACTOR = 2.8;
+// 🔸 拡大率を設定 (デフォルト4.0倍、ポスター時は3.5倍)
+let SCALE_FACTOR = 4.0;
 
 const canvas = document.getElementById("drawCanvas");
 const ctx = canvas.getContext("2d");
@@ -158,11 +158,11 @@ function handleMessage(data) {
     
     // 🔸 用紙サイズに応じて拡大率を変更
     if (data.size === "poster") {
-      SCALE_FACTOR = 2.0;
-      console.log("🔍 拡大率を2.0倍に変更（ポスターモード）");
+      SCALE_FACTOR = 3.5;
+      console.log("🔍 拡大率を3.5倍に変更（ポスターモード）");
     } else {
-      SCALE_FACTOR = 2.8;
-      console.log("🔍 拡大率を2.8倍に変更（A4モード）");
+      SCALE_FACTOR = 4.0;
+      console.log("🔍 拡大率を4.0倍に変更（A4モード）");
     }
     
     // 🔸 キャンバスサイズを再計算
