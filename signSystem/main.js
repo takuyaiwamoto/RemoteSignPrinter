@@ -43,7 +43,7 @@ function createWindow() {
     console.log(`ウィンドウサイズ: ${windowWidth} x ${windowHeight}`);
   });
  
-  mainWindow.webContents.openDevTools();
+  // mainWindow.webContents.openDevTools(); // デバッグツール非表示
 }
 
 app.whenReady().then(() => {
