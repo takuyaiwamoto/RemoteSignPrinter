@@ -34,8 +34,8 @@ function createWindow() {
   mainWindow.setSize(windowWidth, windowHeight);
   mainWindow.center(); // 画面中央に配置
  
-  // 受信側HTMLを読み込み
-  mainWindow.loadFile("index.html");
+  // 受信側HTMLを読み込み（絶対パスで指定）
+  mainWindow.loadFile(path.join(__dirname, "index.html"));
  
   // 🔸 準備完了後に表示
   mainWindow.once('ready-to-show', () => {
