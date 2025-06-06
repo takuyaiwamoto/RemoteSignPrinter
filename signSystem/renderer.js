@@ -97,7 +97,7 @@ function redrawCanvas(withBackground = true) {
     ctx.translate(canvas.width / 2, canvas.height / 2); // 中心に移動
     ctx.rotate(Math.PI); // 180度回転
     
-    // 🔸 ポスターモードで背景1の場合、サイズを調整
+    // 🔸 背景画像のサイズを調整
     let drawWidth = canvas.width;
     let drawHeight = canvas.height;
     
@@ -105,6 +105,17 @@ function redrawCanvas(withBackground = true) {
       // 背景1のポスターは背景2より少し小さく（0.9倍）
       drawWidth = canvas.width * 0.9;
       drawHeight = canvas.height * 0.9;
+    } else if (currentPaperSize === "A4") {
+      // A4モードでの背景サイズ調整
+      if (lastBackgroundSrc && lastBackgroundSrc.includes('back1')) {
+        // 背景1のA4は15%大きく
+        drawWidth = canvas.width * 1.15;
+        drawHeight = canvas.height * 1.15;
+      } else if (lastBackgroundSrc && lastBackgroundSrc.includes('back2')) {
+        // 背景2のA4は25%大きく
+        drawWidth = canvas.width * 1.25;
+        drawHeight = canvas.height * 1.25;
+      }
     }
     
     ctx.drawImage(backgroundImage, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
