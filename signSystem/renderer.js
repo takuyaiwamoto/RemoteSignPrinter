@@ -423,6 +423,7 @@ function playVideoWithSize() {
     video.style.position = 'fixed';
     video.style.zIndex = '9999';
     video.style.backgroundColor = 'black';
+    video.style.transform = 'rotate(180deg)';
     
     // サイズに応じて配置を変更
     if (currentVideoSize === 100) {
@@ -436,7 +437,7 @@ function playVideoWithSize() {
       // 90%, 80%: ウィンドウ中央に配置、縮小表示
       video.style.top = '50%';
       video.style.left = '50%';
-      video.style.transform = 'translate(-50%, -50%)';
+      video.style.transform = 'translate(-50%, -50%) rotate(180deg)';
       video.style.width = `${currentVideoSize}vw`;
       video.style.height = `${currentVideoSize}vh`;
       video.style.objectFit = 'contain';
