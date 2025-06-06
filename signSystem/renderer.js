@@ -1,7 +1,7 @@
 const { ipcRenderer } = require("electron");
 const path = require("path");
 
-// 🔸 拡大率を設定 (デフォルト4.0倍、ポスター時は3.5倍)
+// 🔸 拡大率を設定 (デフォルト4.0倍、ポスター時は2.4倍=A4の60%)
 let SCALE_FACTOR = 4.0;
 
 const canvas = document.getElementById("drawCanvas");
@@ -158,8 +158,8 @@ function handleMessage(data) {
     
     // 🔸 用紙サイズに応じて拡大率を変更
     if (data.size === "poster") {
-      SCALE_FACTOR = 3.5;
-      console.log("🔍 拡大率を3.5倍に変更（ポスターモード）");
+      SCALE_FACTOR = 2.4; // A4の4.0倍の60% = 2.4倍
+      console.log("🔍 拡大率を2.4倍に変更（ポスターモード - A4の60%サイズ）");
     } else {
       SCALE_FACTOR = 4.0;
       console.log("🔍 拡大率を4.0倍に変更（A4モード）");
