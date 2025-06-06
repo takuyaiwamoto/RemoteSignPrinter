@@ -58,8 +58,19 @@ function setCanvasToPortraitSize() {
   const portraitWidth = 595;  // A4縦の幅
   const portraitHeight = 842; // A4縦の高さ
   
-  canvas.width = Math.floor(portraitWidth * SCALE_FACTOR);
-  canvas.height = Math.floor(portraitHeight * SCALE_FACTOR);
+  // A4モードの場合はキャンバスサイズを大きくして背景画像の見切れを防ぐ
+  let widthMultiplier = SCALE_FACTOR;
+  let heightMultiplier = SCALE_FACTOR;
+  
+  if (currentPaperSize === "A4") {
+    // A4モードでは背景2が大きくなるため、キャンバスも大きくする
+    widthMultiplier = SCALE_FACTOR * 1.6; // 60%大きく
+    heightMultiplier = SCALE_FACTOR * 1.6; // 60%大きく
+    console.log(`A4モード: キャンバスサイズを1.6倍に拡大`);
+  }
+  
+  canvas.width = Math.floor(portraitWidth * widthMultiplier);
+  canvas.height = Math.floor(portraitHeight * heightMultiplier);
   
   console.log(`キャンバスを縦長に変更: ${canvas.width} x ${canvas.height}`);
 }
@@ -69,8 +80,19 @@ function resetCanvasToNormalSize() {
   const normalWidth = 1050;  // A4横の幅
   const normalHeight = 743;  // A4横の高さ
   
-  canvas.width = Math.floor(normalWidth * SCALE_FACTOR);
-  canvas.height = Math.floor(normalHeight * SCALE_FACTOR);
+  // A4モードの場合はキャンバスサイズを大きくして背景画像の見切れを防ぐ
+  let widthMultiplier = SCALE_FACTOR;
+  let heightMultiplier = SCALE_FACTOR;
+  
+  if (currentPaperSize === "A4") {
+    // A4モードでは背景1が大きくなるため、キャンバスも少し大きくする
+    widthMultiplier = SCALE_FACTOR * 1.3; // 30%大きく
+    heightMultiplier = SCALE_FACTOR * 1.3; // 30%大きく
+    console.log(`A4モード: キャンバスサイズを1.3倍に拡大`);
+  }
+  
+  canvas.width = Math.floor(normalWidth * widthMultiplier);
+  canvas.height = Math.floor(normalHeight * heightMultiplier);
   
   console.log(`キャンバスを通常サイズに変更: ${canvas.width} x ${canvas.height}`);
 }
