@@ -13,9 +13,9 @@ const originalHeight = canvas.height;
 canvas.width = Math.floor(originalWidth * SCALE_FACTOR);
 canvas.height = Math.floor(originalHeight * SCALE_FACTOR);
 
-// 🔸 キャンバスの位置を最上部から30px下に移動（180度回転は削除）
+// 🔸 キャンバスの位置を最上部から60px下に移動（画像の上切れ防止）
 canvas.style.position = "absolute";
-canvas.style.top = "30px";
+canvas.style.top = "60px";
 canvas.style.left = "50%";
 canvas.style.transform = "translateX(-50%)"; // 180度回転を削除
 canvas.style.zIndex = "1";
@@ -112,9 +112,9 @@ function redrawCanvas(withBackground = true) {
         drawWidth = canvas.width * 1.15;
         drawHeight = canvas.height * 1.15;
       } else if (lastBackgroundSrc && lastBackgroundSrc.includes('back2')) {
-        // 背景2のA4は25%大きく
-        drawWidth = canvas.width * 1.25;
-        drawHeight = canvas.height * 1.25;
+        // 背景2のA4は20%大きく
+        drawWidth = canvas.width * 1.20;
+        drawHeight = canvas.height * 1.20;
       }
     }
     
