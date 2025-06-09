@@ -146,20 +146,24 @@ function redrawCanvas(withBackground = true) {
     ctx.restore();
   }
   
-  // 🔸 筆跡描画（背景と同じ180度回転を適用）
+  // 🔸 筆跡描画（背景と同じ180度回転を適用 + 左上にオフセット）
   ctx.save();
   ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
   ctx.rotate(Math.PI); // 180度回転（背景と同じ）
   ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
   
+  // 🔸 左上にオフセット
+  const offsetX = -50; // 左に50px
+  const offsetY = -50; // 上に50px
+  
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       ctx.beginPath();
-      ctx.moveTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
+      ctx.moveTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
     } else if (cmd.type === "draw") {
       ctx.lineWidth = 4 * SCALE_FACTOR;
       ctx.strokeStyle = "#000";
-      ctx.lineTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
+      ctx.lineTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
       ctx.stroke();
     }
   });
@@ -247,29 +251,37 @@ function handleMessage(data) {
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
     drawingData.push({ ...data });
     
-    // 🔸 リアルタイム描画（背景と同じ180度回転を適用）
+    // 🔸 リアルタイム描画（背景と同じ180度回転を適用 + 左上にオフセット）
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
+    // 🔸 左上にオフセット
+    const offsetX = -50; // 左に50px
+    const offsetY = -50; // 上に50px
+    
     ctx.beginPath();
-    ctx.moveTo(data.x * SCALE_FACTOR, data.y * SCALE_FACTOR);
+    ctx.moveTo((data.x * SCALE_FACTOR) + offsetX, (data.y * SCALE_FACTOR) + offsetY);
     
     ctx.restore();
   } else if (data.type === "draw") {
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
     drawingData.push({ ...data });
     
-    // 🔸 リアルタイム描画（背景と同じ180度回転を適用）
+    // 🔸 リアルタイム描画（背景と同じ180度回転を適用 + 左上にオフセット）
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
+    // 🔸 左上にオフセット
+    const offsetX = -50; // 左に50px
+    const offsetY = -50; // 上に50px
+    
     ctx.lineWidth = 4 * SCALE_FACTOR;
     ctx.strokeStyle = "#000";
-    ctx.lineTo(data.x * SCALE_FACTOR, data.y * SCALE_FACTOR);
+    ctx.lineTo((data.x * SCALE_FACTOR) + offsetX, (data.y * SCALE_FACTOR) + offsetY);
     ctx.stroke();
     
     ctx.restore();
@@ -294,20 +306,24 @@ function sendCanvasToMainProcess() {
   tmpCanvas.height = canvas.height;
   const tmpCtx = tmpCanvas.getContext("2d");
 
-  // 🔸 印刷用キャンバス（背景と同じ180度回転を適用）
+  // 🔸 印刷用キャンバス（背景と同じ180度回転を適用 + 左上にオフセット）
   tmpCtx.save();
   tmpCtx.translate(tmpCanvas.width / 2, tmpCanvas.height / 2); // キャンバス中心に移動
   tmpCtx.rotate(Math.PI); // 180度回転（背景と同じ）
   tmpCtx.translate(-tmpCanvas.width / 2, -tmpCanvas.height / 2); // 元の位置に戻す
   
+  // 🔸 左上にオフセット
+  const offsetX = -50; // 左に50px
+  const offsetY = -50; // 上に50px
+  
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       tmpCtx.beginPath();
-      tmpCtx.moveTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
+      tmpCtx.moveTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
     } else if (cmd.type === "draw") {
       tmpCtx.lineWidth = 4 * SCALE_FACTOR;
       tmpCtx.strokeStyle = "#000";
-      tmpCtx.lineTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
+      tmpCtx.lineTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
       tmpCtx.stroke();
     }
   });
