@@ -123,13 +123,13 @@ function redrawCanvas(withBackground = true) {
     let drawWidth = canvas.width;
     let drawHeight = canvas.height;
     
-    if (currentPaperSize === "poster" && lastBackgroundSrc && lastBackgroundSrc.includes('back1')) {
+    if (currentPaperSize === "poster" && lastBackgroundSrc && lastBackgroundSrc.includes('back3')) {
       // 背景1のポストカードは背景2より少し小さく（0.9倍）
       drawWidth = canvas.width * 0.9;
       drawHeight = canvas.height * 0.9;
     } else if (currentPaperSize === "A4") {
       // A4モードでの背景サイズ調整
-      if (lastBackgroundSrc && lastBackgroundSrc.includes('back1')) {
+      if (lastBackgroundSrc && lastBackgroundSrc.includes('back3')) {
         // 背景1のA4はベースより8%小さく
         drawWidth = canvas.width * 0.92;
         drawHeight = canvas.height * 0.92;
