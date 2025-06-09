@@ -150,7 +150,7 @@ function redrawCanvas(withBackground = true) {
   ctx.save();
   
   // 🔸 左上にオフセット（受信側から見て）
-  const offsetX = 500; // 右に500px（180度回転後は左になる）
+  const offsetX = -550; // 左に550px（書き手右端が受信側左端550pxに来るのを0pxに調整）
   const offsetY = 200; // 下に200px（180度回転後は上になる）
   
   ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
@@ -290,7 +290,7 @@ function handleMessage(data) {
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
     // 🔸 左上にオフセット（受信側から見て）
-    const offsetX = 500; // 右に500px（180度回転後は左になる）
+    const offsetX = -550; // 左に550px（書き手右端が受信側左端550pxに来るのを0pxに調整）
     const offsetY = 200; // 下に200px（180度回転後は上になる）
     
     ctx.beginPath();
@@ -308,7 +308,7 @@ function handleMessage(data) {
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
     // 🔸 左上にオフセット（受信側から見て）
-    const offsetX = 500; // 右に500px（180度回転後は左になる）
+    const offsetX = -550; // 左に550px（書き手右端が受信側左端550pxに来るのを0pxに調整）
     const offsetY = 200; // 下に200px（180度回転後は上になる）
     
     ctx.lineWidth = 4 * SCALE_FACTOR;
