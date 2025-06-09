@@ -344,9 +344,9 @@ function sendCanvasToMainProcess() {
   tmpCtx.rotate(Math.PI); // 180度回転（背景と同じ）
   tmpCtx.translate(-tmpCanvas.width / 2, -tmpCanvas.height / 2); // 元の位置に戻す
   
-  // 🔸 左上にオフセット（表示用と同じ値）
-  const offsetX = 990; // 左に990px移動（表示と同じ）
-  const offsetY = 350; // 下に移動（表示と同じ）
+  // 🔸 印刷時の追加90度回転を補正したオフセット
+  const offsetX = -350; // 時計回りに90度回転補正: 元Y座標の負の値
+  const offsetY = 990; // 時計回りに90度回転補正: 元X座標
   
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
