@@ -153,8 +153,8 @@ function redrawCanvas(withBackground = true) {
   ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
   
   // 🔸 左上にオフセット
-  const offsetX = -50; // 左に50px
-  const offsetY = -50; // 上に50px
+  const offsetX = -100; // 左に100px
+  const offsetY = -100; // 上に100px
   
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
@@ -313,8 +313,8 @@ function sendCanvasToMainProcess() {
   tmpCtx.translate(-tmpCanvas.width / 2, -tmpCanvas.height / 2); // 元の位置に戻す
   
   // 🔸 左上にオフセット
-  const offsetX = -50; // 左に50px
-  const offsetY = -50; // 上に50px
+  const offsetX = -100; // 左に100px
+  const offsetY = -100; // 上に100px
   
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
