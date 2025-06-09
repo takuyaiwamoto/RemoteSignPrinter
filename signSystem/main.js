@@ -102,20 +102,36 @@ ipcMain.on("save-pdf", (event, data) => {
     console.log("✅ PNG保存完了:", savePath);
     
     // 🔸 Windowsで最も確実で簡潔な印刷方法
-    const printerName = "Brother MFC-J6983CDW Printer";
+    const printerName = "Brother MFC-J6983CDW";
+    
+    // 🔸 メインモニターの位置情報を取得
+    const { screen } = require('electron');
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { x: primaryX, y: primaryY, width: primaryWidth, height: primaryHeight } = primaryDisplay.bounds;
     
     // 方法1: mspaint /pt （最も確実で互換性が高い）
     const mspaintCommand = `mspaint /pt "${savePath}" "${printerName}"`;
     
     console.log(`🖨 mspaintで印刷: ${mspaintCommand}`);
+    console.log(`📍 メインモニター位置: ${primaryX}, ${primaryY} (${primaryWidth}x${primaryHeight})`);
     
-    exec(mspaintCommand, { windowsHide: true }, (error, stdout, stderr) => {
+    // 🔸 ダイアログがメインモニターに表示されるようにウィンドウ位置を設定
+    process.env.DISPLAY_X = primaryX.toString();
+    process.env.DISPLAY_Y = primaryY.toString();
+    
+    exec(mspaintCommand, { 
+      windowsHide: true,
+      env: { ...process.env, DISPLAY_X: primaryX.toString(), DISPLAY_Y: primaryY.toString() }
+    }, (error, stdout, stderr) => {
       if (error) {
         console.error("❌ mspaint印刷エラー:", error);
+        console.error("❌ エラー詳細:", error.message);
         // フォールバック：PowerShell印刷
         fallbackPowerShellPrint(savePath, printerName);
       } else {
         console.log(`✅ Brother印刷完了（mspaint - ダイアログ抑制）`);
+        console.log("📋 stdout:", stdout);
+        console.log("📋 stderr:", stderr);
       }
     });
   });
@@ -123,17 +139,27 @@ ipcMain.on("save-pdf", (event, data) => {
 
 // フォールバック：PowerShell印刷関数
 function fallbackPowerShellPrint(filePath, printerName) {
+  // 🔸 メインモニターの位置情報を取得
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { x: primaryX, y: primaryY } = primaryDisplay.bounds;
+  
   const printCommand = `powershell -Command "Start-Process -FilePath '${filePath}' -Verb PrintTo -ArgumentList '${printerName}' -WindowStyle Hidden"`;
   
   console.log(`🔄 PowerShellフォールバック印刷: ${printCommand}`);
   
-  exec(printCommand, { windowsHide: true }, (error, stdout, stderr) => {
+  exec(printCommand, { 
+    windowsHide: true,
+    env: { ...process.env, DISPLAY_X: primaryX.toString(), DISPLAY_Y: primaryY.toString() }
+  }, (error, stdout, stderr) => {
     if (error) {
       console.error("❌ PowerShell印刷エラー:", error);
       // 最終フォールバック：mspaint
       const fallbackCommand = `mspaint /pt "${filePath}" "${printerName}"`;
       console.log(`🔄 mspaint最終フォールバック: ${fallbackCommand}`);
-      exec(fallbackCommand, (fbError, fbStdout, fbStderr) => {
+      exec(fallbackCommand, {
+        env: { ...process.env, DISPLAY_X: primaryX.toString(), DISPLAY_Y: primaryY.toString() }
+      }, (fbError, fbStdout, fbStderr) => {
         if (fbError) {
           console.error("❌ mspaint印刷エラー:", fbError);
         } else {
@@ -174,14 +200,23 @@ ipcMain.on("print-transparent-image", (event, data) => {
     console.log("✅ 透過PNG保存完了:", savePath);
     
     // 🔸 透過画像も確実で簡潔な印刷方法
-    const printerName = "Brother MFC-J6983CDW Printer";
+    const printerName = "Brother MFC-J6983CDW";
+    
+    // 🔸 メインモニターの位置情報を取得
+    const { screen } = require('electron');
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { x: primaryX, y: primaryY } = primaryDisplay.bounds;
     
     // 方法1: mspaint /pt （最も確実で互換性が高い）
     const mspaintCommand = `mspaint /pt "${savePath}" "${printerName}"`;
     
     console.log(`🖨️ 透過画像をmspaintで印刷: ${mspaintCommand}`);
+    console.log(`📍 透過画像印刷 - メインモニター位置: ${primaryX}, ${primaryY}`);
     
-    exec(mspaintCommand, { windowsHide: true }, (error, stdout, stderr) => {
+    exec(mspaintCommand, { 
+      windowsHide: true,
+      env: { ...process.env, DISPLAY_X: primaryX.toString(), DISPLAY_Y: primaryY.toString() }
+    }, (error, stdout, stderr) => {
       if (error) {
         console.error("❌ 透過画像mspaint印刷エラー:", error);
         // フォールバック：PowerShell印刷
