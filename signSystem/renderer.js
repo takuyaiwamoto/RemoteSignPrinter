@@ -344,9 +344,9 @@ function sendCanvasToMainProcess() {
   tmpCtx.rotate(Math.PI); // 180度回転（背景と同じ）
   tmpCtx.translate(-tmpCanvas.width / 2, -tmpCanvas.height / 2); // 元の位置に戻す
   
-  // 🔸 左上にオフセット
-  const offsetX = -500; // 左に500px
-  const offsetY = -200; // 上に200px
+  // 🔸 左上にオフセット（表示用と同じ値）
+  const offsetX = 990; // 左に990px移動（表示と同じ）
+  const offsetY = 350; // 下に移動（表示と同じ）
   
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
