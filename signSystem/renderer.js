@@ -150,8 +150,8 @@ function redrawCanvas(withBackground = true) {
   ctx.save();
   
   // 🔸 左上にオフセット（受信側から見て）
-  const offsetX = 800; // 左に800px移動（700 + 100）
-  const offsetY = 450; // 上に450px移動（正の値に修正）
+  const offsetX = 860; // 左に860px移動（800 + 60）
+  const offsetY = 400; // 下に50px移動（450 - 50）
   
   ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
   ctx.rotate(Math.PI); // 180度回転（背景と同じ）
@@ -290,8 +290,8 @@ function handleMessage(data) {
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
     // 🔸 左上にオフセット（受信側から見て）
-    const offsetX = 800; // 左に800px移動（700 + 100）
-    const offsetY = 450; // 上に450px移動（正の値に修正）
+    const offsetX = 860; // 左に860px移動（800 + 60）
+    const offsetY = 400; // 下に50px移動（450 - 50）
     
     ctx.beginPath();
     ctx.moveTo((data.x * SCALE_FACTOR) + offsetX, (data.y * SCALE_FACTOR) + offsetY);
@@ -308,8 +308,8 @@ function handleMessage(data) {
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
     // 🔸 左上にオフセット（受信側から見て）
-    const offsetX = 800; // 左に800px移動（700 + 100）
-    const offsetY = 450; // 上に450px移動（正の値に修正）
+    const offsetX = 860; // 左に860px移動（800 + 60）
+    const offsetY = 400; // 下に50px移動（450 - 50）
     
     ctx.lineWidth = 4 * SCALE_FACTOR;
     ctx.strokeStyle = "#000";
