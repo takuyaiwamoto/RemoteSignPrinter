@@ -113,6 +113,30 @@ function updateCanvasSize() {
 function redrawCanvas(withBackground = true) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
+  // 🔸 50pxごとの格子線を描画（デバッグ用）
+  ctx.save();
+  ctx.strokeStyle = "#FF0000"; // 赤色
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.3; // 半透明
+  
+  // 縦線
+  for (let x = 0; x <= canvas.width; x += 50) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+  
+  // 横線
+  for (let y = 0; y <= canvas.height; y += 50) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+  
+  ctx.restore();
+  
   // 🔸 背景画像を180度回転して描画
   if (withBackground && backgroundImage) {
     ctx.save();
