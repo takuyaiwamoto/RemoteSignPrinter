@@ -146,12 +146,12 @@ function redrawCanvas(withBackground = true) {
     ctx.restore();
   }
   
-  // 🔸 上下左右反転を適用（書き手と受け手が向かい合って見ている状況）
+  // 🔸 筆跡描画（背景と同じ180度回転を適用）
   ctx.save();
-  ctx.scale(-1, -1); // 左右反転 + 上下反転
-  ctx.translate(-canvas.width, -canvas.height); // 座標を調整
+  ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
+  ctx.rotate(Math.PI); // 180度回転（背景と同じ）
+  ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
   
-  // 🔸 筆跡描画
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       ctx.beginPath();
@@ -164,7 +164,7 @@ function redrawCanvas(withBackground = true) {
     }
   });
   
-  ctx.restore(); // 座標変換をリセット
+  ctx.restore();
 }
 
 socket.onmessage = (event) => {
@@ -247,10 +247,11 @@ function handleMessage(data) {
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
     drawingData.push({ ...data });
     
-    // 🔸 リアルタイム描画で上下左右反転を適用
+    // 🔸 リアルタイム描画（背景と同じ180度回転を適用）
     ctx.save();
-    ctx.scale(-1, -1); // 左右反転 + 上下反転
-    ctx.translate(-canvas.width, -canvas.height); // 座標を調整
+    ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
+    ctx.rotate(Math.PI); // 180度回転（背景と同じ）
+    ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
     ctx.beginPath();
     ctx.moveTo(data.x * SCALE_FACTOR, data.y * SCALE_FACTOR);
@@ -260,10 +261,11 @@ function handleMessage(data) {
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
     drawingData.push({ ...data });
     
-    // 🔸 リアルタイム描画で上下左右反転を適用
+    // 🔸 リアルタイム描画（背景と同じ180度回転を適用）
     ctx.save();
-    ctx.scale(-1, -1); // 左右反転 + 上下反転
-    ctx.translate(-canvas.width, -canvas.height); // 座標を調整
+    ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
+    ctx.rotate(Math.PI); // 180度回転（背景と同じ）
+    ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
     ctx.lineWidth = 4 * SCALE_FACTOR;
     ctx.strokeStyle = "#000";
@@ -292,11 +294,12 @@ function sendCanvasToMainProcess() {
   tmpCanvas.height = canvas.height;
   const tmpCtx = tmpCanvas.getContext("2d");
 
-  // 🔸 印刷用キャンバスでも座標変換を適用（上下左右反転）
+  // 🔸 印刷用キャンバス（背景と同じ180度回転を適用）
   tmpCtx.save();
-  tmpCtx.scale(-1, -1); // 左右反転 + 上下反転
-  tmpCtx.translate(-tmpCanvas.width, -tmpCanvas.height); // 座標を調整
-
+  tmpCtx.translate(tmpCanvas.width / 2, tmpCanvas.height / 2); // キャンバス中心に移動
+  tmpCtx.rotate(Math.PI); // 180度回転（背景と同じ）
+  tmpCtx.translate(-tmpCanvas.width / 2, -tmpCanvas.height / 2); // 元の位置に戻す
+  
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       tmpCtx.beginPath();
@@ -309,7 +312,7 @@ function sendCanvasToMainProcess() {
     }
   });
   
-  tmpCtx.restore(); // 座標変換をリセット
+  tmpCtx.restore();
 
   const imageDataUrl = tmpCanvas.toDataURL("image/png");
   // 🔸 印刷時に用紙サイズ情報も送信
