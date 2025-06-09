@@ -395,7 +395,16 @@ function runAnimationSequence() {
       playAudio();
     }, 1500);
 
-    // 🔸 回転完了後1.1秒待機してから移動開始（回転開始から2.6秒後）
+    // 🔸 回転完了後の待機時間を用紙サイズに応じて調整
+    let rotationWaitTime;
+    if (currentPaperSize === "A4") {
+      rotationWaitTime = 5100; // A4：5.1秒待機（1.1秒 + 4秒）
+      console.log("⏰ A4モード：回転後5.1秒待機してから移動開始");
+    } else {
+      rotationWaitTime = 1100; // ポスター：従来通り1.1秒
+      console.log("⏰ ポスターモード：回転後1.1秒待機してから移動開始");
+    }
+    
     setTimeout(() => {
       animationImage.style.transition = "transform 2s ease";
       
@@ -447,7 +456,7 @@ function runAnimationSequence() {
         }
       }, waitTime); // 🔸 用紙サイズに応じた待機時間
 
-    }, 2600); // 🔸 回転開始から2.6秒後に移動開始（1.5秒回転 + 1.1秒待機）
+    }, rotationWaitTime + 1500); // 🔸 回転完了（1.5秒）+ 用紙サイズに応じた待機時間
 
   }, animationStartDelay); // 🔸 用紙サイズに応じた遅延時間
 }
