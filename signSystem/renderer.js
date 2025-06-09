@@ -113,30 +113,6 @@ function updateCanvasSize() {
 function redrawCanvas(withBackground = true) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
-  // 🔸 50pxごとの格子線を描画（デバッグ用）
-  ctx.save();
-  ctx.strokeStyle = "#FF0000"; // 赤色
-  ctx.lineWidth = 1;
-  ctx.globalAlpha = 0.3; // 半透明
-  
-  // 縦線
-  for (let x = 0; x <= canvas.width; x += 50) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, canvas.height);
-    ctx.stroke();
-  }
-  
-  // 横線
-  for (let y = 0; y <= canvas.height; y += 50) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(canvas.width, y);
-    ctx.stroke();
-  }
-  
-  ctx.restore();
-  
   // 🔸 背景画像を180度回転して描画
   if (withBackground && backgroundImage) {
     ctx.save();
@@ -177,8 +153,8 @@ function redrawCanvas(withBackground = true) {
   ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
   
   // 🔸 左上にオフセット
-  const offsetX = -100; // 左に100px
-  const offsetY = -100; // 上に100px
+  const offsetX = -500; // 左に500px
+  const offsetY = -200; // 上に200px
   
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
@@ -191,6 +167,30 @@ function redrawCanvas(withBackground = true) {
       ctx.stroke();
     }
   });
+  
+  ctx.restore();
+  
+  // 🔸 50pxごとの格子線を描画（最上面、デバッグ用）
+  ctx.save();
+  ctx.strokeStyle = "#FF0000"; // 赤色
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.3; // 半透明
+  
+  // 縦線
+  for (let x = 0; x <= canvas.width; x += 50) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+  
+  // 横線
+  for (let y = 0; y <= canvas.height; y += 50) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
   
   ctx.restore();
 }
@@ -337,8 +337,8 @@ function sendCanvasToMainProcess() {
   tmpCtx.translate(-tmpCanvas.width / 2, -tmpCanvas.height / 2); // 元の位置に戻す
   
   // 🔸 左上にオフセット
-  const offsetX = -100; // 左に100px
-  const offsetY = -100; // 上に100px
+  const offsetX = -500; // 左に500px
+  const offsetY = -200; // 上に200px
   
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
