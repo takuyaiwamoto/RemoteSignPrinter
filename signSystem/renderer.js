@@ -146,24 +146,32 @@ function redrawCanvas(withBackground = true) {
     ctx.restore();
   }
   
-  // 🔸 筆跡描画（背景と同じ180度回転を適用 + 左上にオフセット）
+  // 🔸 筆跡描画（オフセットを先に適用してから180度回転）
   ctx.save();
+  
+  // 🔸 左上にオフセット（受信側から見て）
+  const offsetX = 500; // 右に500px（180度回転後は左になる）
+  const offsetY = 200; // 下に200px（180度回転後は上になる）
+  
   ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
   ctx.rotate(Math.PI); // 180度回転（背景と同じ）
   ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
   
-  // 🔸 左上にオフセット
-  const offsetX = -500; // 左に500px
-  const offsetY = -200; // 上に200px
+  console.log(`🔍 描画オフセット: X=${offsetX}, Y=${offsetY}`);
   
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       ctx.beginPath();
-      ctx.moveTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
+      const drawX = (cmd.x * SCALE_FACTOR) + offsetX;
+      const drawY = (cmd.y * SCALE_FACTOR) + offsetY;
+      console.log(`📍 Start: 元座標(${cmd.x}, ${cmd.y}) → 描画座標(${drawX}, ${drawY})`);
+      ctx.moveTo(drawX, drawY);
     } else if (cmd.type === "draw") {
       ctx.lineWidth = 4 * SCALE_FACTOR;
       ctx.strokeStyle = "#000";
-      ctx.lineTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
+      const drawX = (cmd.x * SCALE_FACTOR) + offsetX;
+      const drawY = (cmd.y * SCALE_FACTOR) + offsetY;
+      ctx.lineTo(drawX, drawY);
       ctx.stroke();
     }
   });
@@ -281,9 +289,9 @@ function handleMessage(data) {
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
-    // 🔸 左上にオフセット
-    const offsetX = -50; // 左に50px
-    const offsetY = -50; // 上に50px
+    // 🔸 左上にオフセット（受信側から見て）
+    const offsetX = 500; // 右に500px（180度回転後は左になる）
+    const offsetY = 200; // 下に200px（180度回転後は上になる）
     
     ctx.beginPath();
     ctx.moveTo((data.x * SCALE_FACTOR) + offsetX, (data.y * SCALE_FACTOR) + offsetY);
@@ -299,9 +307,9 @@ function handleMessage(data) {
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
-    // 🔸 左上にオフセット
-    const offsetX = -50; // 左に50px
-    const offsetY = -50; // 上に50px
+    // 🔸 左上にオフセット（受信側から見て）
+    const offsetX = 500; // 右に500px（180度回転後は左になる）
+    const offsetY = 200; // 下に200px（180度回転後は上になる）
     
     ctx.lineWidth = 4 * SCALE_FACTOR;
     ctx.strokeStyle = "#000";
