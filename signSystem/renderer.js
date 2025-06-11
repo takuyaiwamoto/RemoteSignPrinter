@@ -152,14 +152,17 @@ function redrawCanvas(withBackground = true) {
   ctx.rotate(Math.PI); // 180度回転（背景と同じ）
   ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
   
+  // 🔸 左に450px移動
+  const offsetX = 450;
+  
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       ctx.beginPath();
-      ctx.moveTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
+      ctx.moveTo((cmd.x * SCALE_FACTOR) + offsetX, cmd.y * SCALE_FACTOR);
     } else if (cmd.type === "draw") {
       ctx.lineWidth = 4 * SCALE_FACTOR;
-      ctx.strokeStyle = "#000"; // 黒色に戻す
-      ctx.lineTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
+      ctx.strokeStyle = "#000";
+      ctx.lineTo((cmd.x * SCALE_FACTOR) + offsetX, cmd.y * SCALE_FACTOR);
       ctx.stroke();
     }
   });
@@ -253,8 +256,11 @@ function handleMessage(data) {
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
+    // 🔸 左に450px移動
+    const offsetX = 450;
+    
     ctx.beginPath();
-    ctx.moveTo(data.x * SCALE_FACTOR, data.y * SCALE_FACTOR);
+    ctx.moveTo((data.x * SCALE_FACTOR) + offsetX, data.y * SCALE_FACTOR);
     
     ctx.restore();
   } else if (data.type === "draw") {
@@ -267,9 +273,12 @@ function handleMessage(data) {
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
+    // 🔸 左に450px移動
+    const offsetX = 450;
+    
     ctx.lineWidth = 4 * SCALE_FACTOR;
-    ctx.strokeStyle = "#000"; // 黒色
-    ctx.lineTo(data.x * SCALE_FACTOR, data.y * SCALE_FACTOR);
+    ctx.strokeStyle = "#000";
+    ctx.lineTo((data.x * SCALE_FACTOR) + offsetX, data.y * SCALE_FACTOR);
     ctx.stroke();
     
     ctx.restore();
@@ -305,14 +314,17 @@ function sendCanvasToMainProcess() {
   tmpCtx.rotate(Math.PI); // 180度回転（表示と同じ）
   tmpCtx.translate(-tmpCanvas.width / 2, -tmpCanvas.height / 2);
   
+  // 🔸 表示と同じ左に450px移動
+  const offsetX = 450;
+  
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       tmpCtx.beginPath();
-      tmpCtx.moveTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
+      tmpCtx.moveTo((cmd.x * SCALE_FACTOR) + offsetX, cmd.y * SCALE_FACTOR);
     } else if (cmd.type === "draw") {
       tmpCtx.lineWidth = 4 * SCALE_FACTOR;
       tmpCtx.strokeStyle = "rgba(255, 0, 0, 0.5)"; // 半透明の赤色
-      tmpCtx.lineTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
+      tmpCtx.lineTo((cmd.x * SCALE_FACTOR) + offsetX, cmd.y * SCALE_FACTOR);
       tmpCtx.stroke();
     }
   });
