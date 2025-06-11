@@ -135,7 +135,10 @@ function setBackground(src) {
   } else {
     const img = new Image();
     img.src = src;
+    console.log("🔍 背景画像読み込み開始:", src);
+    
     img.onload = () => {
+      console.log("✅ 背景画像読み込み成功:", src);
       backgroundImage = img;
       
       // 🔸 back2の場合は縦長に変更
@@ -148,6 +151,11 @@ function setBackground(src) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
       socket.send(JSON.stringify({ type: "background", src: src }));
+    };
+    
+    img.onerror = (error) => {
+      console.error("❌ 背景画像読み込みエラー:", src, error);
+      alert("背景画像が見つかりません: " + src);
     };
   }
 }
