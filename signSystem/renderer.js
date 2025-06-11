@@ -308,38 +308,52 @@ function handleMessage(data) {
 }
 
 function sendCanvasToMainProcess() {
-  const tmpCanvas = document.createElement("canvas");
-  // 🔸 印刷用キャンバスも拡大
-  tmpCanvas.width = canvas.width;
-  tmpCanvas.height = canvas.height;
-  const tmpCtx = tmpCanvas.getContext("2d");
-
-  // 🔸 印刷用キャンバス（270度回転 + 上下反転）
-  tmpCtx.save();
-  tmpCtx.translate(tmpCanvas.width / 2, tmpCanvas.height / 2); // キャンバス中心に移動
-  tmpCtx.rotate(Math.PI * 1.5); // 270度回転（左に90度）
-  tmpCtx.scale(1, -1); // 上下反転
-  tmpCtx.translate(-tmpCanvas.width / 2, -tmpCanvas.height / 2); // 元の位置に戻す
+  // 🔸 まず表示と全く同じ画像を生成
+  const displayCanvas = document.createElement("canvas");
+  displayCanvas.width = canvas.width;
+  displayCanvas.height = canvas.height;
+  const displayCtx = displayCanvas.getContext("2d");
   
-  // 🔸 印刷時の追加90度回転を補正したオフセット
-  const offsetX = -350; // 時計回りに90度回転補正: 元Y座標の負の値
-  const offsetY = 990; // 時計回りに90度回転補正: 元X座標
+  // 表示と同じ180度回転とオフセットを適用
+  displayCtx.save();
+  displayCtx.translate(displayCanvas.width / 2, displayCanvas.height / 2);
+  displayCtx.rotate(Math.PI); // 180度回転（表示と同じ）
+  displayCtx.translate(-displayCanvas.width / 2, -displayCanvas.height / 2);
+  
+  const offsetX = 990; // 表示と同じ
+  const offsetY = 350; // 表示と同じ
   
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
-      tmpCtx.beginPath();
-      tmpCtx.moveTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
+      displayCtx.beginPath();
+      displayCtx.moveTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
     } else if (cmd.type === "draw") {
-      tmpCtx.lineWidth = 4 * SCALE_FACTOR;
-      tmpCtx.strokeStyle = "#000";
-      tmpCtx.lineTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
-      tmpCtx.stroke();
+      displayCtx.lineWidth = 4 * SCALE_FACTOR;
+      displayCtx.strokeStyle = "#000";
+      displayCtx.lineTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
+      displayCtx.stroke();
     }
   });
   
-  tmpCtx.restore();
+  displayCtx.restore();
+  
+  // 🔸 次に印刷用に追加変換を適用
+  const printCanvas = document.createElement("canvas");
+  printCanvas.width = canvas.width;
+  printCanvas.height = canvas.height;
+  const printCtx = printCanvas.getContext("2d");
+  
+  printCtx.save();
+  printCtx.translate(printCanvas.width / 2, printCanvas.height / 2);
+  printCtx.rotate(-Math.PI / 2); // 左に90度回転
+  printCtx.scale(1, -1); // 上下反転
+  printCtx.translate(-printCanvas.width / 2, -printCanvas.height / 2);
+  
+  // 表示用キャンバスを印刷用キャンバスに描画
+  printCtx.drawImage(displayCanvas, 0, 0);
+  printCtx.restore();
 
-  const imageDataUrl = tmpCanvas.toDataURL("image/png");
+  const imageDataUrl = printCanvas.toDataURL("image/png");
   // 🔸 印刷時に用紙サイズ情報も送信
   ipcRenderer.send("save-pdf", {
     imageData: imageDataUrl,
