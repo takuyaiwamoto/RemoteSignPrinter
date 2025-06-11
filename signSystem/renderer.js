@@ -152,8 +152,8 @@ function redrawCanvas(withBackground = true) {
   ctx.rotate(Math.PI); // 180度回転（背景と同じ）
   ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
   
-  // 🔸 受信側から見て左に450px移動
-  const offsetX = 450;
+  // 🔸 受信側から見て左に750px移動（450 + 300）
+  const offsetX = 750;
   
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
@@ -256,8 +256,8 @@ function handleMessage(data) {
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
-    // 🔸 受信側から見て左に450px移動
-    const offsetX = 450;
+    // 🔸 受信側から見て左に750px移動（450 + 300）
+    const offsetX = 750;
     
     ctx.beginPath();
     ctx.moveTo((data.x * SCALE_FACTOR) + offsetX, data.y * SCALE_FACTOR);
@@ -273,8 +273,8 @@ function handleMessage(data) {
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
-    // 🔸 受信側から見て左に450px移動
-    const offsetX = 450;
+    // 🔸 受信側から見て左に750px移動（450 + 300）
+    const offsetX = 750;
     
     ctx.lineWidth = 4 * SCALE_FACTOR;
     ctx.strokeStyle = "#000";
@@ -314,8 +314,8 @@ function sendCanvasToMainProcess() {
   tmpCtx.rotate(Math.PI); // 180度回転（表示と同じ）
   tmpCtx.translate(-tmpCanvas.width / 2, -tmpCanvas.height / 2);
   
-  // 🔸 受信側から見て左に450px移動
-  const offsetX = 450;
+  // 🔸 受信側から見て左に750px移動（450 + 300）
+  const offsetX = 750;
   
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
