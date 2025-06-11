@@ -155,31 +155,10 @@ function redrawCanvas(withBackground = true) {
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       ctx.beginPath();
-      // 回転前の座標系でそのまま描画（オフセットなし）
       ctx.moveTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
     } else if (cmd.type === "draw") {
-      ctx.lineWidth = 6 * SCALE_FACTOR;
-      ctx.strokeStyle = "rgba(255, 0, 0, 0.8)"; // 濃い半透明の赤色
-      ctx.lineTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
-      ctx.stroke();
-    }
-  });
-  
-  ctx.restore();
-  
-  // 🔸 最上面に追加の筆跡描画（確実に見えるように）
-  ctx.save();
-  ctx.translate(canvas.width / 2, canvas.height / 2);
-  ctx.rotate(Math.PI);
-  ctx.translate(-canvas.width / 2, -canvas.height / 2);
-  
-  drawingData.forEach(cmd => {
-    if (cmd.type === "start") {
-      ctx.beginPath();
-      ctx.moveTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
-    } else if (cmd.type === "draw") {
-      ctx.lineWidth = 8 * SCALE_FACTOR;
-      ctx.strokeStyle = "rgba(0, 255, 0, 0.6)"; // 緑色の太線
+      ctx.lineWidth = 4 * SCALE_FACTOR;
+      ctx.strokeStyle = "#000"; // 黒色に戻す
       ctx.lineTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
       ctx.stroke();
     }
@@ -288,8 +267,8 @@ function handleMessage(data) {
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
-    ctx.lineWidth = 8 * SCALE_FACTOR;
-    ctx.strokeStyle = "rgba(0, 255, 0, 0.8)"; // 緑色
+    ctx.lineWidth = 4 * SCALE_FACTOR;
+    ctx.strokeStyle = "#000"; // 黒色
     ctx.lineTo(data.x * SCALE_FACTOR, data.y * SCALE_FACTOR);
     ctx.stroke();
     
