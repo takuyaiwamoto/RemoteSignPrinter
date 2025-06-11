@@ -308,34 +308,19 @@ function handleMessage(data) {
 }
 
 function sendCanvasToMainProcess() {
-  // 🔸 印刷用キャンバス（表示と完全に同じ）
+  // 🔸 印刷用キャンバス（表示キャンバスをそのまま複製）
   const tmpCanvas = document.createElement("canvas");
   tmpCanvas.width = canvas.width;
   tmpCanvas.height = canvas.height;
   const tmpCtx = tmpCanvas.getContext("2d");
 
-  // 表示と同じ180度回転とオフセットを適用
-  tmpCtx.save();
-  tmpCtx.translate(tmpCanvas.width / 2, tmpCanvas.height / 2);
-  tmpCtx.rotate(Math.PI); // 180度回転（表示と同じ）
-  tmpCtx.translate(-tmpCanvas.width / 2, -tmpCanvas.height / 2);
-  
-  const offsetX = 990; // 表示と同じ
-  const offsetY = 350; // 表示と同じ
-  
-  drawingData.forEach(cmd => {
-    if (cmd.type === "start") {
-      tmpCtx.beginPath();
-      tmpCtx.moveTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
-    } else if (cmd.type === "draw") {
-      tmpCtx.lineWidth = 4 * SCALE_FACTOR;
-      tmpCtx.strokeStyle = "#000";
-      tmpCtx.lineTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
-      tmpCtx.stroke();
-    }
-  });
-  
-  tmpCtx.restore();
+  console.log("🖨️ 印刷用キャンバス情報:");
+  console.log(`- キャンバスサイズ: ${tmpCanvas.width} x ${tmpCanvas.height}`);
+  console.log(`- SCALE_FACTOR: ${SCALE_FACTOR}`);
+  console.log(`- drawingData項目数: ${drawingData.length}`);
+
+  // 表示中のキャンバスをそのまま複製
+  tmpCtx.drawImage(canvas, 0, 0);
 
   const imageDataUrl = tmpCanvas.toDataURL("image/png");
   // 🔸 印刷時に用紙サイズ情報も送信
