@@ -146,32 +146,24 @@ function redrawCanvas(withBackground = true) {
     ctx.restore();
   }
   
-  // 🔸 筆跡描画（オフセットを先に適用してから180度回転）
+  // 🔸 筆跡描画（180度回転 + オフセット）
   ctx.save();
-  
-  // 🔸 左上にオフセット（受信側から見て）
-  const offsetX = 990; // 左に990px移動（940 + 50）
-  const offsetY = 350; // 下に50px移動（400 - 50）
-  
   ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
   ctx.rotate(Math.PI); // 180度回転（背景と同じ）
   ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
   
-  console.log(`🔍 描画オフセット: X=${offsetX}, Y=${offsetY}`);
+  // 🔸 左上にオフセット（受信側から見て）
+  const offsetX = 990; // 左に990px移動
+  const offsetY = 350; // 下に移動
   
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       ctx.beginPath();
-      const drawX = (cmd.x * SCALE_FACTOR) + offsetX;
-      const drawY = (cmd.y * SCALE_FACTOR) + offsetY;
-      console.log(`📍 Start: 元座標(${cmd.x}, ${cmd.y}) → 描画座標(${drawX}, ${drawY})`);
-      ctx.moveTo(drawX, drawY);
+      ctx.moveTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
     } else if (cmd.type === "draw") {
       ctx.lineWidth = 4 * SCALE_FACTOR;
       ctx.strokeStyle = "#000";
-      const drawX = (cmd.x * SCALE_FACTOR) + offsetX;
-      const drawY = (cmd.y * SCALE_FACTOR) + offsetY;
-      ctx.lineTo(drawX, drawY);
+      ctx.lineTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
       ctx.stroke();
     }
   });
@@ -259,15 +251,15 @@ function handleMessage(data) {
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
     drawingData.push({ ...data });
     
-    // 🔸 リアルタイム描画（背景と同じ180度回転を適用 + 左上にオフセット）
+    // 🔸 リアルタイム描画（180度回転 + オフセット）
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
     // 🔸 左上にオフセット（受信側から見て）
-    const offsetX = 990; // 左に990px移動（940 + 50）
-    const offsetY = 350; // 下に50px移動（400 - 50）
+    const offsetX = 990; // 左に990px移動
+    const offsetY = 350; // 下に移動
     
     ctx.beginPath();
     ctx.moveTo((data.x * SCALE_FACTOR) + offsetX, (data.y * SCALE_FACTOR) + offsetY);
