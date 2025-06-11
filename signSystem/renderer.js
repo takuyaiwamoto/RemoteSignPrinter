@@ -314,10 +314,11 @@ function sendCanvasToMainProcess() {
   tmpCanvas.height = canvas.height;
   const tmpCtx = tmpCanvas.getContext("2d");
 
-  // 🔸 印刷用キャンバス（360度回転 = 180度 + 180度追加回転）
+  // 🔸 印刷用キャンバス（270度回転 + 上下反転）
   tmpCtx.save();
   tmpCtx.translate(tmpCanvas.width / 2, tmpCanvas.height / 2); // キャンバス中心に移動
-  tmpCtx.rotate(Math.PI * 2); // 360度回転（180度 + 180度追加）
+  tmpCtx.rotate(Math.PI * 1.5); // 270度回転（左に90度）
+  tmpCtx.scale(1, -1); // 上下反転
   tmpCtx.translate(-tmpCanvas.width / 2, -tmpCanvas.height / 2); // 元の位置に戻す
   
   // 🔸 印刷時の追加90度回転を補正したオフセット
