@@ -146,24 +146,21 @@ function redrawCanvas(withBackground = true) {
     ctx.restore();
   }
   
-  // 🔸 筆跡描画（180度回転 + オフセット）
+  // 🔸 筆跡描画（オフセット適用後に180度回転）
   ctx.save();
   ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
   ctx.rotate(Math.PI); // 180度回転（背景と同じ）
   ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
   
-  // 🔸 左上にオフセット（受信側から見て）
-  const offsetX = 990; // 左に990px移動
-  const offsetY = 350; // 下に移動
-  
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       ctx.beginPath();
-      ctx.moveTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
+      // 回転前の座標系でそのまま描画（オフセットなし）
+      ctx.moveTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
     } else if (cmd.type === "draw") {
       ctx.lineWidth = 4 * SCALE_FACTOR;
       ctx.strokeStyle = "#000";
-      ctx.lineTo((cmd.x * SCALE_FACTOR) + offsetX, (cmd.y * SCALE_FACTOR) + offsetY);
+      ctx.lineTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
       ctx.stroke();
     }
   });
@@ -251,18 +248,14 @@ function handleMessage(data) {
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
     drawingData.push({ ...data });
     
-    // 🔸 リアルタイム描画（180度回転 + オフセット）
+    // 🔸 リアルタイム描画（180度回転のみ）
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
-    // 🔸 左上にオフセット（受信側から見て）
-    const offsetX = 990; // 左に990px移動
-    const offsetY = 350; // 下に移動
-    
     ctx.beginPath();
-    ctx.moveTo((data.x * SCALE_FACTOR) + offsetX, (data.y * SCALE_FACTOR) + offsetY);
+    ctx.moveTo(data.x * SCALE_FACTOR, data.y * SCALE_FACTOR);
     
     ctx.restore();
   } else if (data.type === "draw") {
@@ -275,13 +268,9 @@ function handleMessage(data) {
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
-    // 🔸 左上にオフセット（受信側から見て）
-    const offsetX = 990; // 左に990px移動（940 + 50）
-    const offsetY = 350; // 下に50px移動（400 - 50）
-    
     ctx.lineWidth = 4 * SCALE_FACTOR;
     ctx.strokeStyle = "#000";
-    ctx.lineTo((data.x * SCALE_FACTOR) + offsetX, (data.y * SCALE_FACTOR) + offsetY);
+    ctx.lineTo(data.x * SCALE_FACTOR, data.y * SCALE_FACTOR);
     ctx.stroke();
     
     ctx.restore();
