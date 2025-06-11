@@ -289,7 +289,7 @@ function handleMessage(data) {
 }
 
 function sendCanvasToMainProcess() {
-  // 🔸 印刷用キャンバス（表示キャンバスをそのまま複製）
+  // 🔸 印刷用キャンバス（背景なし、筆跡のみ透過色で）
   const tmpCanvas = document.createElement("canvas");
   tmpCanvas.width = canvas.width;
   tmpCanvas.height = canvas.height;
@@ -300,8 +300,25 @@ function sendCanvasToMainProcess() {
   console.log(`- SCALE_FACTOR: ${SCALE_FACTOR}`);
   console.log(`- drawingData項目数: ${drawingData.length}`);
 
-  // 表示中のキャンバスをそのまま複製
-  tmpCtx.drawImage(canvas, 0, 0);
+  // 背景は描画せず、筆跡のみ透過色で描画
+  tmpCtx.save();
+  tmpCtx.translate(tmpCanvas.width / 2, tmpCanvas.height / 2);
+  tmpCtx.rotate(Math.PI); // 180度回転（表示と同じ）
+  tmpCtx.translate(-tmpCanvas.width / 2, -tmpCanvas.height / 2);
+  
+  drawingData.forEach(cmd => {
+    if (cmd.type === "start") {
+      tmpCtx.beginPath();
+      tmpCtx.moveTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
+    } else if (cmd.type === "draw") {
+      tmpCtx.lineWidth = 4 * SCALE_FACTOR;
+      tmpCtx.strokeStyle = "rgba(255, 0, 0, 0.5)"; // 半透明の赤色
+      tmpCtx.lineTo(cmd.x * SCALE_FACTOR, cmd.y * SCALE_FACTOR);
+      tmpCtx.stroke();
+    }
+  });
+  
+  tmpCtx.restore();
 
   const imageDataUrl = tmpCanvas.toDataURL("image/png");
   // 🔸 印刷時に用紙サイズ情報も送信
