@@ -57,6 +57,27 @@
   <button onclick="clearCanvas()">Clear</button>
   <button onclick="sendPrintCommand()">送信</button>
   <button onclick="playVideo()" style="background-color: #FF6B6B; color: white;">📹 ビデオ再生</button>
+  <button onclick="toggleDevTools()" style="background-color: #FFA500; color: white;">🔧 Dev Tool</button>
+</div>
+
+<div id="devTools" style="display: none; border: 2px solid orange; padding: 10px; margin-top: 10px;">
+  <h3>開発者ツール</h3>
+  
+  <div class="button-group">
+    <label>キャンバスサイズ調整:</label>
+    <input type="range" id="canvasScale" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateCanvasScale(this.value)">
+    <span id="canvasScaleValue">1.0x</span>
+  </div>
+  
+  <div class="button-group">
+    <label>回転後待機時間（秒）:</label>
+    <input type="range" id="rotationWait" min="1" max="10" step="0.5" value="5.1" oninput="updateRotationWait(this.value)">
+    <span id="rotationWaitValue">5.1秒</span>
+  </div>
+  
+  <div class="button-group">
+    <button onclick="sendDevSettings()">設定を受信側に送信</button>
+  </div>
 </div>
 
 <div id="countdown"></div>
@@ -69,6 +90,8 @@ let socket = new WebSocket("wss://realtime-sign-server.onrender.com");
 let backgroundImage = null;
 let currentPaperSize = "A4"; // 現在の用紙サイズ
 let currentVideoSize = 100; // 現在のビデオサイズ（デフォルト100%）
+let canvasScale = 1.0; // キャンバススケール
+let rotationWaitTime = 5.1; // 回転後待機時間
 socket.onopen = () => console.log("✅ WebSocket接続完了（送信側）");
 
 // 🔸 用紙サイズ設定関数
@@ -300,6 +323,36 @@ function playVideo() {
       size: currentVideoSize
     }));
     console.log(`📹 ビデオ再生指示を送信（サイズ: ${currentVideoSize}%）`);
+  } else {
+    console.error("❌ WebSocket接続なし");
+  }
+}
+
+// 🔸 Dev Tools 関数
+function toggleDevTools() {
+  const devTools = document.getElementById("devTools");
+  devTools.style.display = devTools.style.display === "none" ? "block" : "none";
+}
+
+function updateCanvasScale(value) {
+  canvasScale = parseFloat(value);
+  document.getElementById("canvasScaleValue").textContent = value + "x";
+}
+
+function updateRotationWait(value) {
+  rotationWaitTime = parseFloat(value);
+  document.getElementById("rotationWaitValue").textContent = value + "秒";
+}
+
+function sendDevSettings() {
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: "devSettings",
+      canvasScale: canvasScale,
+      rotationWaitTime: rotationWaitTime
+    }));
+    console.log(`🔧 Dev設定送信: scale=${canvasScale}, wait=${rotationWaitTime}`);
+    alert("設定を受信側に送信しました");
   } else {
     console.error("❌ WebSocket接続なし");
   }
