@@ -18,11 +18,262 @@
       display: block;
       margin: auto;
     }
+    #devButton {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 20000;
+      background: #FF4444;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #devPanel {
+      position: fixed;
+      top: 60px;
+      right: 10px;
+      width: 300px;
+      background: white;
+      border: 2px solid #FF4444;
+      border-radius: 10px;
+      padding: 20px;
+      z-index: 20000;
+      display: none;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    .control-group {
+      margin-bottom: 15px;
+    }
+    .control-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    .control-group input {
+      width: 60px;
+      padding: 5px;
+      margin-right: 10px;
+    }
+    .control-group button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 3px;
+      cursor: pointer;
+      margin-right: 5px;
+    }
+    .control-group button:hover {
+      background: #45a049;
+    }
+    #drawingArea {
+      position: absolute;
+      border: 2px solid rgba(255, 0, 0, 0.5);
+      background: rgba(255, 0, 0, 0.1);
+      display: none;
+      pointer-events: auto;
+      cursor: move;
+      z-index: 10000;
+    }
+    
+    .resize-handle {
+      position: absolute;
+      background: rgba(255, 0, 0, 0.8);
+      border: 1px solid #fff;
+      z-index: 10001;
+    }
+    
+    .resize-handle.nw {
+      top: -5px;
+      left: -5px;
+      width: 10px;
+      height: 10px;
+      cursor: nw-resize;
+    }
+    
+    .resize-handle.ne {
+      top: -5px;
+      right: -5px;
+      width: 10px;
+      height: 10px;
+      cursor: ne-resize;
+    }
+    
+    .resize-handle.sw {
+      bottom: -5px;
+      left: -5px;
+      width: 10px;
+      height: 10px;
+      cursor: sw-resize;
+    }
+    
+    .resize-handle.se {
+      bottom: -5px;
+      right: -5px;
+      width: 10px;
+      height: 10px;
+      cursor: se-resize;
+    }
+    
+    .resize-handle.n {
+      top: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 10px;
+      height: 10px;
+      cursor: n-resize;
+    }
+    
+    .resize-handle.s {
+      bottom: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 10px;
+      height: 10px;
+      cursor: s-resize;
+    }
+    
+    .resize-handle.w {
+      top: 50%;
+      left: -5px;
+      transform: translateY(-50%);
+      width: 10px;
+      height: 10px;
+      cursor: w-resize;
+    }
+    
+    .resize-handle.e {
+      top: 50%;
+      right: -5px;
+      transform: translateY(-50%);
+      width: 10px;
+      height: 10px;
+      cursor: e-resize;
+    }
+    
+    #printPreviewModal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 2000;
+      display: none;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    #printPreviewContent {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 90%;
+      max-height: 90%;
+      overflow: auto;
+      position: relative;
+    }
+    
+    #printPreviewCanvas {
+      border: 1px solid #ddd;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .close-button {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      background: #ff4444;
+      color: white;
+      border: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    
+    .print-buttons {
+      margin-top: 15px;
+      text-align: center;
+    }
+    
+    .print-buttons button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin: 0 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    
+    .print-buttons button:hover {
+      background: #45a049;
+    }
   </style>
 </head>
 <body>
+<button id="devButton" onclick="toggleDevPanel()">DEV</button>
+<button id="reviewButton" onclick="showPrintPreview()" style="position: fixed; top: 10px; left: 10px; z-index: 15000; background: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;">レビュー</button>
+
+<div id="devPanel">
+  <h3>描画エリア調整</h3>
+  
+  <div class="control-group">
+    <label>中央位置 (X, Y):</label>
+    <input type="number" id="centerX" value="0" placeholder="X">
+    <input type="number" id="centerY" value="0" placeholder="Y">
+  </div>
+  
+  <div class="control-group">
+    <label>幅・高さ:</label>
+    <input type="number" id="areaWidth" value="630" placeholder="幅">
+    <input type="number" id="areaHeight" value="450" placeholder="高さ">
+  </div>
+  
+  <div class="control-group">
+    <button onclick="showDrawingArea()">プレビュー</button>
+    <button onclick="applyDrawingArea()">適用</button>
+    <button onclick="hideDrawingArea()">非表示</button>
+  </div>
+  
+  <div class="control-group">
+    <button onclick="resetDrawingArea()">リセット</button>
+  </div>
+</div>
+
+<div id="drawingArea">
+  <div class="resize-handle nw"></div>
+  <div class="resize-handle n"></div>
+  <div class="resize-handle ne"></div>
+  <div class="resize-handle w"></div>
+  <div class="resize-handle e"></div>
+  <div class="resize-handle sw"></div>
+  <div class="resize-handle s"></div>
+  <div class="resize-handle se"></div>
+</div>
+
 <div id="container">
   <canvas id="drawCanvas" width="1470" height="1040"></canvas>
+</div>
+
+<div id="printPreviewModal">
+  <div id="printPreviewContent">
+    <button class="close-button" onclick="closePrintPreview()">×</button>
+    <h3>印刷物プレビュー</h3>
+    <canvas id="printPreviewCanvas"></canvas>
+    <div class="print-buttons">
+      <button onclick="printFull()">印刷フル</button>
+      <button onclick="printPen()">印刷ペン</button>
+    </div>
+  </div>
 </div>
 
 <script src="renderer.js"></script>
