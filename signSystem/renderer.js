@@ -26,6 +26,10 @@ let lastBackgroundSrc = null;
 let currentPaperSize = "A4"; // 🔸 現在の用紙サイズ（デフォルトはA4）
 let currentVideoSize = 100; // 🔸 現在のビデオサイズ（デフォルト100%）
 
+// 🔸 Dev Tool設定
+let devCanvasScale = 1.0; // キャンバススケール
+let devRotationWaitTime = 5.1; // 回転後待機時間（秒）
+
 let socket = new WebSocket("wss://realtime-sign-server.onrender.com");
 socket.onopen = () => console.log("✅ WebSocket接続完了（Electron受信側）");
 socket.onerror = e => console.error("❌ WebSocketエラー", e);
@@ -33,20 +37,7 @@ socket.onclose = () => console.warn("⚠️ WebSocket切断");
 
 let animationImage = null;
 
-// 🔸 音声ファイルを準備
-const audio = new Audio();
-audio.src = resolveImagePath("haisyutu.mp3"); // 音声ファイルのパスを解決
-audio.preload = "auto"; // 事前読み込み
-
-// 🔸 音声の読み込み状況をチェック
-audio.addEventListener('canplaythrough', () => {
-  console.log("✅ 音声ファイル読み込み完了: haisyutu.mp3");
-});
-
-audio.addEventListener('error', (e) => {
-  console.error("❌ 音声ファイル読み込みエラー:", e);
-  console.error("音声ファイルパス:", audio.src);
-});
+// 音声機能は削除されました
 
 function resolveImagePath(filename) {
   return filename.startsWith("file://") ? filename : `file://${path.join(__dirname, filename)}`;
@@ -293,6 +284,14 @@ function handleMessage(data) {
     // 🔸 ビデオサイズ変更
     currentVideoSize = data.size;
     console.log(`📐 ビデオサイズを${data.size}%に設定`);
+  } else if (data.type === "devSettings") {
+    // 🔸 Dev Tool設定受信
+    devCanvasScale = data.canvasScale || 1.0;
+    devRotationWaitTime = data.rotationWaitTime || 5.1;
+    console.log(`🔧 Dev設定受信: scale=${devCanvasScale}, wait=${devRotationWaitTime}`);
+    
+    // キャンバスサイズを即座に適用
+    applyCanvasScale();
   }
 }
 
@@ -339,25 +338,18 @@ function sendCanvasToMainProcess() {
   });
 }
 
-// 🔸 音声再生関数
-function playAudio() {
-  try {
-    console.log("🔊 音声再生を試行中...");
-    
-    // 音声を最初から再生
-    audio.currentTime = 0;
-    const playPromise = audio.play();
-    
-    if (playPromise !== undefined) {
-      playPromise.then(() => {
-        console.log("✅ 音声再生開始: haisyutu.mp3");
-      }).catch(error => {
-        console.error("❌ 音声再生エラー:", error);
-      });
-    }
-  } catch (error) {
-    console.error("❌ 音声再生に失敗:", error);
-  }
+// 🔸 Dev Tool関数
+function applyCanvasScale() {
+  const newWidth = Math.floor(originalWidth * SCALE_FACTOR * devCanvasScale);
+  const newHeight = Math.floor(originalHeight * SCALE_FACTOR * devCanvasScale);
+  
+  canvas.width = newWidth;
+  canvas.height = newHeight;
+  canvas.style.width = newWidth + "px";
+  canvas.style.height = newHeight + "px";
+  
+  console.log(`🔧 キャンバスサイズ変更: ${newWidth} x ${newHeight} (scale: ${devCanvasScale})`);
+  redrawCanvas();
 }
 
 function prepareAndRunAnimation() {
@@ -410,16 +402,13 @@ function runAnimationSequence() {
     animationImage.style.transition = "transform 1.5s ease";
     animationImage.style.transform = "translateX(-50%) rotate(180deg)"; // 180度回転
 
-    // 🔸 回転完了と同時に音声再生（回転開始から1.5秒後）
-    setTimeout(() => {
-      playAudio();
-    }, 1500);
+    // 音声再生は削除されました
 
-    // 🔸 回転完了後の待機時間を用紙サイズに応じて調整
+    // 🔸 回転完了後の待機時間（Dev Tool設定を使用）
     let rotationWaitTime;
     if (currentPaperSize === "A4") {
-      rotationWaitTime = 5100; // A4：5.1秒待機（1.1秒 + 4秒）
-      console.log("⏰ A4モード：回転後5.1秒待機してから移動開始");
+      rotationWaitTime = devRotationWaitTime * 1000; // Dev設定の秒数をmsに変換
+      console.log(`⏰ A4モード：回転後${devRotationWaitTime}秒待機してから移動開始`);
     } else {
       rotationWaitTime = 1100; // ポスター：従来通り1.1秒
       console.log("⏰ ポスターモード：回転後1.1秒待機してから移動開始");
