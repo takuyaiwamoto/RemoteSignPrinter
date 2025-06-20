@@ -31,7 +31,7 @@
   </style>
 </head>
 <body>
-<canvas id="drawCanvas" width="842" height="595"></canvas>
+<canvas id="drawCanvas" width="859" height="607"></canvas>
 
 <div class="button-group">
   <label>背景:</label>
@@ -65,7 +65,7 @@
   
   <div class="button-group">
     <label>キャンバスサイズ調整:</label>
-    <input type="range" id="canvasScale" min="0.1" max="2.0" step="0.1" value="1.0" oninput="updateCanvasScale(this.value)">
+    <input type="range" id="canvasScale" min="0.1" max="3.0" step="0.05" value="1.0" oninput="updateCanvasScale(this.value)">
     <span id="canvasScaleValue">1.0x</span>
   </div>
   
@@ -93,11 +93,11 @@ let currentVideoSize = 100; // 現在のビデオサイズ（デフォルト100%
 let canvasScale = 1.0; // キャンバススケール
 let rotationWaitTime = 5.1; // 回転後待機時間
 
-// 背景別キャンバスサイズ設定
+// 背景別キャンバスサイズ設定（1.02倍サイズ = 0.6*1.7）
 const backgroundSizes = {
-  'back3': { width: 842, height: 595 },    // 背景1
-  'back2': { width: 595, height: 842 },    // 背景2（縦向き）
-  'white': { width: 842, height: 595 }     // 白背景
+  'back3': { width: 859, height: 607 },    // 背景1 (842*0.6*1.7, 595*0.6*1.7)
+  'back2': { width: 607, height: 859 },    // 背景2（縦向き） (595*0.6*1.7, 842*0.6*1.7)
+  'white': { width: 859, height: 607 }     // 白背景 (842*0.6*1.7, 595*0.6*1.7)
 };
 socket.onopen = () => console.log("✅ WebSocket接続完了（送信側）");
 
@@ -126,29 +126,29 @@ function setPaperSize(size) {
 
 // 🔸 キャンバスサイズ変更関数を追加
 function setCanvasToPortraitSize() {
-  // 縦長サイズ（A4縦）に変更
-  canvas.width = 595;  // A4縦の幅
-  canvas.height = 842; // A4縦の高さ
+  // 縦長サイズ（A4縦の1.02倍）に変更
+  canvas.width = 607;  // A4縦の幅 (595*0.6*1.7)
+  canvas.height = 859; // A4縦の高さ (842*0.6*1.7)
   
   // 🔸 HTML要素のサイズも変更
-  canvas.setAttribute('width', '595');
-  canvas.setAttribute('height', '842');
-  canvas.style.width = '595px';
-  canvas.style.height = '842px';
+  canvas.setAttribute('width', '607');
+  canvas.setAttribute('height', '859');
+  canvas.style.width = '607px';
+  canvas.style.height = '859px';
   
   console.log(`書き手側キャンバスを縦長に変更: ${canvas.width} x ${canvas.height}`);
 }
 
 function resetCanvasToNormalSize() {
-  // 通常サイズ（A4横）に戻す
-  canvas.width = 842;  // 元のサイズ
-  canvas.height = 595; // 元のサイズ
+  // 通常サイズ（A4横の1.02倍）に戻す
+  canvas.width = 859;  // 元のサイズ (842*0.6*1.7)
+  canvas.height = 607; // 元のサイズ (595*0.6*1.7)
   
   // 🔸 HTML要素のサイズも変更
-  canvas.setAttribute('width', '842');
-  canvas.setAttribute('height', '595');
-  canvas.style.width = '842px';
-  canvas.style.height = '595px';
+  canvas.setAttribute('width', '859');
+  canvas.setAttribute('height', '607');
+  canvas.style.width = '859px';
+  canvas.style.height = '607px';
   
   console.log(`書き手側キャンバスを通常サイズに変更: ${canvas.width} x ${canvas.height}`);
 }

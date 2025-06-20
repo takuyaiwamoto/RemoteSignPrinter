@@ -30,6 +30,20 @@ let currentVideoSize = 100; // 🔸 現在のビデオサイズ（デフォル�
 let devCanvasScale = 1.0; // キャンバススケール
 let devRotationWaitTime = 5.1; // 回転後待機時間（秒）
 
+// 🔸 描画エリア調整設定
+let drawingAreaOffset = { x: 0, y: 0 }; // 描画エリアのオフセット
+let drawingAreaSize = { width: 630, height: 450 }; // 描画エリアのサイズ
+let showDrawingAreaFrame = false; // 描画エリアの枠表示フラグ
+let isDragSetupComplete = false; // ドラッグセットアップ完了フラグ
+
+// 🔸 ドラッグ機能の状態管理
+let isDragging = false;
+let isResizing = false;
+let dragStartPos = { x: 0, y: 0 };
+let dragStartAreaPos = { x: 0, y: 0 };
+let dragStartAreaSize = { width: 0, height: 0 };
+let resizeDirection = null;
+
 // 🔸 送信側と受信側のキャンバスサイズ情報
 let senderCanvasSize = { width: 842, height: 595 }; // 送信側のキャンバスサイズ
 let receiverCanvasSize = { width: 842, height: 595 }; // 受信側のキャンバスサイズ
@@ -108,6 +122,27 @@ function updateCanvasSize() {
 function redrawCanvas(withBackground = true) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
+  // 🔸 描画エリアの枠表示（dev機能がオンの場合のみ、キャンバス上に描画）
+  if (showDrawingAreaFrame) {
+    ctx.save();
+    ctx.fillStyle = "rgba(255, 0, 0, 0.05)"; // 非常に薄い赤色
+    
+    // キャンバス中央から描画エリアの位置を計算
+    const areaCenterX = canvas.width / 2 + drawingAreaOffset.x;
+    const areaCenterY = canvas.height / 2 + drawingAreaOffset.y;
+    const areaLeft = areaCenterX - drawingAreaSize.width / 2;
+    const areaTop = areaCenterY - drawingAreaSize.height / 2;
+    
+    ctx.fillRect(areaLeft, areaTop, drawingAreaSize.width, drawingAreaSize.height);
+    
+    // 描画エリアの境界線を描画
+    ctx.strokeStyle = "rgba(255, 0, 0, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(areaLeft, areaTop, drawingAreaSize.width, drawingAreaSize.height);
+    
+    ctx.restore();
+  }
+  
   // 🔸 背景画像を180度回転して描画
   if (withBackground && backgroundImage) {
     ctx.save();
@@ -141,29 +176,40 @@ function redrawCanvas(withBackground = true) {
     ctx.restore();
   }
   
-  // 🔸 筆跡描画（オフセット適用後に180度回転）
+  // 🔸 筆跡描画（描画エリア調整を適用して180度回転）
   ctx.save();
   ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
   ctx.rotate(Math.PI); // 180度回転（背景と同じ）
   ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
   
-  // 🔸 受信側から見て左に750px移動（450 + 300）
-  const offsetX = 750;
-  
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       ctx.beginPath();
-      // 🔸 送信側と受信側のサイズ比を考慮した座標変換
-      const scaledX = (cmd.x / senderCanvasSize.width) * receiverCanvasSize.width + offsetX;
-      const scaledY = (cmd.y / senderCanvasSize.height) * receiverCanvasSize.height;
-      ctx.moveTo(scaledX, scaledY);
+      // 🔸 描画エリア調整を適用した座標変換
+      const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+      const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+      
+      // 描画エリアの中央位置に調整
+      const areaCenterX = canvas.width / 2 + drawingAreaOffset.x;
+      const areaCenterY = canvas.height / 2 + drawingAreaOffset.y;
+      const areaLeft = areaCenterX - drawingAreaSize.width / 2;
+      const areaTop = areaCenterY - drawingAreaSize.height / 2;
+      
+      ctx.moveTo(areaLeft + scaledX, areaTop + scaledY);
     } else if (cmd.type === "draw") {
-      ctx.lineWidth = 4 * (receiverCanvasSize.width / senderCanvasSize.width); // 線の太さもスケール
+      ctx.lineWidth = 4 * (drawingAreaSize.width / senderCanvasSize.width); // 線の太さもスケール
       ctx.strokeStyle = "#000";
-      // 🔸 送信側と受信側のサイズ比を考慮した座標変換
-      const scaledX = (cmd.x / senderCanvasSize.width) * receiverCanvasSize.width + offsetX;
-      const scaledY = (cmd.y / senderCanvasSize.height) * receiverCanvasSize.height;
-      ctx.lineTo(scaledX, scaledY);
+      // 🔸 描画エリア調整を適用した座標変換
+      const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+      const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+      
+      // 描画エリアの中央位置に調整
+      const areaCenterX = canvas.width / 2 + drawingAreaOffset.x;
+      const areaCenterY = canvas.height / 2 + drawingAreaOffset.y;
+      const areaLeft = areaCenterX - drawingAreaSize.width / 2;
+      const areaTop = areaCenterY - drawingAreaSize.height / 2;
+      
+      ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
       ctx.stroke();
     }
   });
@@ -221,8 +267,36 @@ function handleMessage(data) {
   } else if (data.type === "background") {
     // 🔸 送信側のキャンバスサイズ情報を保存
     if (data.canvasSize) {
+      const oldSenderSize = { ...senderCanvasSize };
       senderCanvasSize = data.canvasSize;
       console.log(`📐 送信側キャンバスサイズ: ${senderCanvasSize.width} x ${senderCanvasSize.height}`);
+      
+      // 🔸 キャンバスサイズ変更時に描画エリアも連動してスケール
+      if (oldSenderSize.width !== 0 && oldSenderSize.height !== 0) {
+        const scaleX = senderCanvasSize.width / oldSenderSize.width;
+        const scaleY = senderCanvasSize.height / oldSenderSize.height;
+        
+        // 描画エリアサイズを連動してスケール
+        drawingAreaSize.width = Math.round(drawingAreaSize.width * scaleX);
+        drawingAreaSize.height = Math.round(drawingAreaSize.height * scaleY);
+        
+        // 描画エリアの位置（オフセット）も連動してスケール
+        drawingAreaOffset.x = Math.round(drawingAreaOffset.x * scaleX);
+        drawingAreaOffset.y = Math.round(drawingAreaOffset.y * scaleY);
+        
+        // GUI入力値も更新
+        document.getElementById('centerX').value = drawingAreaOffset.x;
+        document.getElementById('centerY').value = drawingAreaOffset.y;
+        document.getElementById('areaWidth').value = drawingAreaSize.width;
+        document.getElementById('areaHeight').value = drawingAreaSize.height;
+        
+        console.log(`📏 描画エリアをスケール調整: サイズ${drawingAreaSize.width}x${drawingAreaSize.height}, 位置(${drawingAreaOffset.x}, ${drawingAreaOffset.y}) (倍率: ${scaleX.toFixed(2)}, ${scaleY.toFixed(2)})`);
+        
+        // 描画エリアが表示中なら更新
+        if (showDrawingAreaFrame) {
+          showDrawingArea();
+        }
+      }
     }
     
     if (data.src === "white") {
@@ -252,43 +326,49 @@ function handleMessage(data) {
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
     drawingData.push({ ...data });
     
-    // 🔸 リアルタイム描画（180度回転のみ）
+    // 🔸 リアルタイム描画（描画エリア調整を適用して180度回転）
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
-    // 🔸 受信側から見て左に750px移動
-    const offsetX = 750;
+    // 🔸 描画エリア調整を適用した座標変換
+    const scaledX = (data.x / senderCanvasSize.width) * drawingAreaSize.width;
+    const scaledY = (data.y / senderCanvasSize.height) * drawingAreaSize.height;
     
-    // 🔸 送信側と受信側のサイズ比を考慮した座標変換
-    const scaledX = (data.x / senderCanvasSize.width) * receiverCanvasSize.width + offsetX;
-    const scaledY = (data.y / senderCanvasSize.height) * receiverCanvasSize.height;
+    // 描画エリアの中央位置に調整
+    const areaCenterX = canvas.width / 2 + drawingAreaOffset.x;
+    const areaCenterY = canvas.height / 2 + drawingAreaOffset.y;
+    const areaLeft = areaCenterX - drawingAreaSize.width / 2;
+    const areaTop = areaCenterY - drawingAreaSize.height / 2;
     
     ctx.beginPath();
-    ctx.moveTo(scaledX, scaledY);
+    ctx.moveTo(areaLeft + scaledX, areaTop + scaledY);
     
     ctx.restore();
   } else if (data.type === "draw") {
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
     drawingData.push({ ...data });
     
-    // 🔸 リアルタイム描画（背景と同じ180度回転を適用 + 左上にオフセット）
+    // 🔸 リアルタイム描画（描画エリア調整を適用して180度回転）
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2); // キャンバス中心に移動
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
-    // 🔸 受信側から見て左に750px移動
-    const offsetX = 750;
+    // 🔸 描画エリア調整を適用した座標変換
+    const scaledX = (data.x / senderCanvasSize.width) * drawingAreaSize.width;
+    const scaledY = (data.y / senderCanvasSize.height) * drawingAreaSize.height;
     
-    // 🔸 送信側と受信側のサイズ比を考慮した座標変換
-    const scaledX = (data.x / senderCanvasSize.width) * receiverCanvasSize.width + offsetX;
-    const scaledY = (data.y / senderCanvasSize.height) * receiverCanvasSize.height;
+    // 描画エリアの中央位置に調整
+    const areaCenterX = canvas.width / 2 + drawingAreaOffset.x;
+    const areaCenterY = canvas.height / 2 + drawingAreaOffset.y;
+    const areaLeft = areaCenterX - drawingAreaSize.width / 2;
+    const areaTop = areaCenterY - drawingAreaSize.height / 2;
     
-    ctx.lineWidth = 4 * (receiverCanvasSize.width / senderCanvasSize.width); // 線の太さもスケール
+    ctx.lineWidth = 4 * (drawingAreaSize.width / senderCanvasSize.width); // 線の太さもスケール
     ctx.strokeStyle = "#000";
-    ctx.lineTo(scaledX, scaledY);
+    ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
     ctx.stroke();
     
     ctx.restore();
@@ -305,9 +385,36 @@ function handleMessage(data) {
     console.log(`📐 ビデオサイズを${data.size}%に設定`);
   } else if (data.type === "devSettings") {
     // 🔸 Dev Tool設定受信
+    const oldCanvasScale = devCanvasScale;
     devCanvasScale = data.canvasScale || 1.0;
     devRotationWaitTime = data.rotationWaitTime || 5.1;
     console.log(`🔧 Dev設定受信: scale=${devCanvasScale}, wait=${devRotationWaitTime}`);
+    
+    // 🔸 キャンバススケール変更時に描画エリアも連動してスケール
+    if (oldCanvasScale !== 0 && oldCanvasScale !== devCanvasScale) {
+      const scaleRatio = devCanvasScale / oldCanvasScale;
+      
+      // 描画エリアサイズを連動してスケール
+      drawingAreaSize.width = Math.round(drawingAreaSize.width * scaleRatio);
+      drawingAreaSize.height = Math.round(drawingAreaSize.height * scaleRatio);
+      
+      // 描画エリアの位置（オフセット）も連動してスケール
+      drawingAreaOffset.x = Math.round(drawingAreaOffset.x * scaleRatio);
+      drawingAreaOffset.y = Math.round(drawingAreaOffset.y * scaleRatio);
+      
+      // GUI入力値も更新
+      document.getElementById('centerX').value = drawingAreaOffset.x;
+      document.getElementById('centerY').value = drawingAreaOffset.y;
+      document.getElementById('areaWidth').value = drawingAreaSize.width;
+      document.getElementById('areaHeight').value = drawingAreaSize.height;
+      
+      console.log(`📏 Dev設定による描画エリアスケール調整: サイズ${drawingAreaSize.width}x${drawingAreaSize.height}, 位置(${drawingAreaOffset.x}, ${drawingAreaOffset.y}) (倍率: ${scaleRatio.toFixed(2)})`);
+      
+      // 描画エリアが表示中なら更新
+      if (showDrawingAreaFrame) {
+        showDrawingArea();
+      }
+    }
     
     // キャンバスサイズを即座に適用
     applyCanvasScale();
@@ -568,4 +675,422 @@ function playVideoWithSize() {
   } catch (error) {
     console.error("❌ ビデオ再生に失敗:", error);
   }
+}
+
+// 🔸 Dev Panel GUI機能
+function toggleDevPanel() {
+  const panel = document.getElementById('devPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function showDrawingArea() {
+  const centerX = parseInt(document.getElementById('centerX').value) || 0;
+  const centerY = parseInt(document.getElementById('centerY').value) || 0;
+  const width = parseInt(document.getElementById('areaWidth').value) || 630;
+  const height = parseInt(document.getElementById('areaHeight').value) || 450;
+  
+  const drawingArea = document.getElementById('drawingArea');
+  const canvas = document.getElementById('drawCanvas');
+  const canvasRect = canvas.getBoundingClientRect();
+  
+  // キャンバス中央から相対位置を計算
+  const canvasCenterX = canvasRect.left + canvasRect.width / 2;
+  const canvasCenterY = canvasRect.top + canvasRect.height / 2;
+  
+  const areaLeft = canvasCenterX + centerX - width / 2;
+  const areaTop = canvasCenterY + centerY - height / 2;
+  
+  drawingArea.style.left = areaLeft + 'px';
+  drawingArea.style.top = areaTop + 'px';
+  drawingArea.style.width = width + 'px';
+  drawingArea.style.height = height + 'px';
+  drawingArea.style.display = 'block';
+  
+  // 描画エリアの枠表示を有効にする
+  showDrawingAreaFrame = true;
+  
+  // ドラッグイベントリスナーを追加（初回のみ）
+  if (!isDragSetupComplete) {
+    setupDragEvents();
+    isDragSetupComplete = true;
+  }
+  
+  // キャンバスを再描画して枠を表示
+  redrawCanvas();
+  
+  console.log(`📐 描画エリア表示: ${width}x${height} at (${centerX}, ${centerY})`);
+}
+
+function hideDrawingArea() {
+  document.getElementById('drawingArea').style.display = 'none';
+  // 描画エリアの枠表示を無効にする
+  showDrawingAreaFrame = false;
+  // キャンバスを再描画して枠を非表示
+  redrawCanvas();
+}
+
+function applyDrawingArea() {
+  const centerX = parseInt(document.getElementById('centerX').value) || 0;
+  const centerY = parseInt(document.getElementById('centerY').value) || 0;
+  const width = parseInt(document.getElementById('areaWidth').value) || 842;
+  const height = parseInt(document.getElementById('areaHeight').value) || 595;
+  
+  // 描画エリア設定を更新
+  drawingAreaOffset.x = centerX;
+  drawingAreaOffset.y = centerY;
+  drawingAreaSize.width = width;
+  drawingAreaSize.height = height;
+  
+  console.log(`✅ 描画エリア適用: オフセット(${centerX}, ${centerY}), サイズ${width}x${height}`);
+  
+  // キャンバスを再描画
+  redrawCanvas();
+  
+  // 確認メッセージ
+  alert('描画エリアを適用しました');
+}
+
+function resetDrawingArea() {
+  // デフォルト値にリセット
+  document.getElementById('centerX').value = 0;
+  document.getElementById('centerY').value = 0;
+  document.getElementById('areaWidth').value = 630;
+  document.getElementById('areaHeight').value = 450;
+  
+  drawingAreaOffset = { x: 0, y: 0 };
+  drawingAreaSize = { width: 630, height: 450 };
+  
+  hideDrawingArea();
+  redrawCanvas();
+  
+  console.log('🔄 描画エリアをリセットしました');
+}
+
+// 🔸 ドラッグ機能のセットアップ
+function setupDragEvents() {
+  const drawingArea = document.getElementById('drawingArea');
+  const resizeHandles = drawingArea.querySelectorAll('.resize-handle');
+  
+  // 描画エリア本体のドラッグイベント
+  drawingArea.addEventListener('mousedown', handleAreaMouseDown);
+  
+  // リサイズハンドルのドラッグイベント
+  resizeHandles.forEach(handle => {
+    handle.addEventListener('mousedown', handleResizeMouseDown);
+  });
+  
+  // グローバルマウスイベント（重複登録を防ぐ）
+  if (!isDragSetupComplete) {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }
+  
+  console.log('🖱️ ドラッグイベントセットアップ完了');
+}
+
+function handleAreaMouseDown(e) {
+  if (e.target.classList.contains('resize-handle')) return;
+  
+  isDragging = true;
+  dragStartPos.x = e.clientX;
+  dragStartPos.y = e.clientY;
+  
+  const drawingArea = document.getElementById('drawingArea');
+  const rect = drawingArea.getBoundingClientRect();
+  dragStartAreaPos.x = rect.left;
+  dragStartAreaPos.y = rect.top;
+  
+  e.preventDefault();
+  console.log('🖱️ 描画エリア移動開始');
+}
+
+function handleResizeMouseDown(e) {
+  isResizing = true;
+  resizeDirection = e.target.className.replace('resize-handle ', '');
+  
+  dragStartPos.x = e.clientX;
+  dragStartPos.y = e.clientY;
+  
+  const drawingArea = document.getElementById('drawingArea');
+  const rect = drawingArea.getBoundingClientRect();
+  dragStartAreaPos.x = rect.left;
+  dragStartAreaPos.y = rect.top;
+  dragStartAreaSize.width = rect.width;
+  dragStartAreaSize.height = rect.height;
+  
+  e.preventDefault();
+  e.stopPropagation();
+  console.log(`🔧 リサイズ開始: ${resizeDirection}`);
+}
+
+function handleMouseMove(e) {
+  if (!isDragging && !isResizing) return;
+  
+  e.preventDefault(); // デフォルトの動作を防止
+  
+  const deltaX = e.clientX - dragStartPos.x;
+  const deltaY = e.clientY - dragStartPos.y;
+  const drawingArea = document.getElementById('drawingArea');
+  
+  if (isDragging) {
+    // 移動処理
+    const newLeft = dragStartAreaPos.x + deltaX;
+    const newTop = dragStartAreaPos.y + deltaY;
+    
+    drawingArea.style.left = newLeft + 'px';
+    drawingArea.style.top = newTop + 'px';
+    
+    // リアルタイムで入力値を更新
+    updateInputValues();
+    
+    // キャンバス上の枠も更新
+    if (showDrawingAreaFrame) {
+      redrawCanvas();
+    }
+  } else if (isResizing) {
+    // リサイズ処理
+    let newLeft = dragStartAreaPos.x;
+    let newTop = dragStartAreaPos.y;
+    let newWidth = dragStartAreaSize.width;
+    let newHeight = dragStartAreaSize.height;
+    
+    switch (resizeDirection) {
+      case 'nw':
+        newLeft += deltaX;
+        newTop += deltaY;
+        newWidth -= deltaX;
+        newHeight -= deltaY;
+        break;
+      case 'n':
+        newTop += deltaY;
+        newHeight -= deltaY;
+        break;
+      case 'ne':
+        newTop += deltaY;
+        newWidth += deltaX;
+        newHeight -= deltaY;
+        break;
+      case 'w':
+        newLeft += deltaX;
+        newWidth -= deltaX;
+        break;
+      case 'e':
+        newWidth += deltaX;
+        break;
+      case 'sw':
+        newLeft += deltaX;
+        newWidth -= deltaX;
+        newHeight += deltaY;
+        break;
+      case 's':
+        newHeight += deltaY;
+        break;
+      case 'se':
+        newWidth += deltaX;
+        newHeight += deltaY;
+        break;
+    }
+    
+    // 最小サイズ制限
+    if (newWidth < 50) newWidth = 50;
+    if (newHeight < 50) newHeight = 50;
+    
+    drawingArea.style.left = newLeft + 'px';
+    drawingArea.style.top = newTop + 'px';
+    drawingArea.style.width = newWidth + 'px';
+    drawingArea.style.height = newHeight + 'px';
+    
+    // リアルタイムで入力値を更新
+    updateInputValues();
+    
+    // キャンバス上の枠も更新
+    if (showDrawingAreaFrame) {
+      redrawCanvas();
+    }
+  }
+}
+
+function handleMouseUp(e) {
+  if (isDragging || isResizing) {
+    console.log('🖱️ ドラッグ操作完了');
+    isDragging = false;
+    isResizing = false;
+    resizeDirection = null;
+  }
+}
+
+function updateInputValues() {
+  const drawingArea = document.getElementById('drawingArea');
+  const canvas = document.getElementById('drawCanvas');
+  const canvasRect = canvas.getBoundingClientRect();
+  const areaRect = drawingArea.getBoundingClientRect();
+  
+  // キャンバス中央からの相対位置を計算
+  const canvasCenterX = canvasRect.left + canvasRect.width / 2;
+  const canvasCenterY = canvasRect.top + canvasRect.height / 2;
+  const areaCenterX = areaRect.left + areaRect.width / 2;
+  const areaCenterY = areaRect.top + areaRect.height / 2;
+  
+  const offsetX = Math.round(areaCenterX - canvasCenterX);
+  const offsetY = Math.round(areaCenterY - canvasCenterY);
+  const width = Math.round(areaRect.width);
+  const height = Math.round(areaRect.height);
+  
+  // GUI入力値を更新
+  document.getElementById('centerX').value = offsetX;
+  document.getElementById('centerY').value = offsetY;
+  document.getElementById('areaWidth').value = width;
+  document.getElementById('areaHeight').value = height;
+  
+  // 内部設定値も更新
+  drawingAreaOffset.x = offsetX;
+  drawingAreaOffset.y = offsetY;
+  drawingAreaSize.width = width;
+  drawingAreaSize.height = height;
+}
+
+// 🔸 印刷物プレビュー機能
+function showPrintPreview() {
+  const modal = document.getElementById('printPreviewModal');
+  const previewCanvas = document.getElementById('printPreviewCanvas');
+  const previewCtx = previewCanvas.getContext('2d');
+  
+  // プレビュー用キャンバスサイズを設定（実際の印刷サイズ）
+  previewCanvas.width = drawingAreaSize.width;
+  previewCanvas.height = drawingAreaSize.height;
+  
+  // プレビュー用キャンバスを初期化
+  previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+  
+  // 背景を白で塗りつぶし
+  previewCtx.fillStyle = '#ffffff';
+  previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+  
+  // 背景画像があれば描画
+  if (backgroundImage) {
+    previewCtx.drawImage(backgroundImage, 0, 0, previewCanvas.width, previewCanvas.height);
+  }
+  
+  // 筆跡を描画（180度回転せずにそのまま）
+  drawingData.forEach(cmd => {
+    if (cmd.type === "start") {
+      previewCtx.beginPath();
+      // 送信側から受信側への座標変換
+      const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+      const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+      previewCtx.moveTo(scaledX, scaledY);
+    } else if (cmd.type === "draw") {
+      previewCtx.lineWidth = 4 * (drawingAreaSize.width / senderCanvasSize.width);
+      previewCtx.strokeStyle = "#000";
+      // 送信側から受信側への座標変換
+      const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+      const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+      previewCtx.lineTo(scaledX, scaledY);
+      previewCtx.stroke();
+    }
+  });
+  
+  // モーダルを表示
+  modal.style.display = 'flex';
+  
+  console.log('📋 印刷物プレビューを表示');
+}
+
+function closePrintPreview() {
+  const modal = document.getElementById('printPreviewModal');
+  modal.style.display = 'none';
+  console.log('📋 印刷物プレビューを閉じました');
+}
+
+// 🔸 印刷フル機能（背景込み）
+function printFull() {
+  const printCanvas = document.createElement('canvas');
+  const printCtx = printCanvas.getContext('2d');
+  
+  // 印刷用キャンバスサイズを設定
+  printCanvas.width = drawingAreaSize.width;
+  printCanvas.height = drawingAreaSize.height;
+  
+  // 背景を白で塗りつぶし
+  printCtx.fillStyle = '#ffffff';
+  printCtx.fillRect(0, 0, printCanvas.width, printCanvas.height);
+  
+  // 背景画像があれば描画
+  if (backgroundImage) {
+    printCtx.drawImage(backgroundImage, 0, 0, printCanvas.width, printCanvas.height);
+  }
+  
+  // 筆跡を描画
+  drawingData.forEach(cmd => {
+    if (cmd.type === "start") {
+      printCtx.beginPath();
+      const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+      const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+      printCtx.moveTo(scaledX, scaledY);
+    } else if (cmd.type === "draw") {
+      printCtx.lineWidth = 4 * (drawingAreaSize.width / senderCanvasSize.width);
+      printCtx.strokeStyle = "#000";
+      const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+      const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+      printCtx.lineTo(scaledX, scaledY);
+      printCtx.stroke();
+    }
+  });
+  
+  // 印刷用データを作成
+  const imageDataUrl = printCanvas.toDataURL("image/png");
+  
+  // Electronのメインプロセスに印刷データを送信
+  if (typeof ipcRenderer !== 'undefined') {
+    ipcRenderer.send("save-pdf", {
+      imageData: imageDataUrl,
+      paperSize: currentPaperSize,
+      printType: "full"
+    });
+  }
+  
+  console.log('🖨️ フル印刷（背景込み）を実行');
+}
+
+// 🔸 印刷ペン機能（描画データのみ）
+function printPen() {
+  const printCanvas = document.createElement('canvas');
+  const printCtx = printCanvas.getContext('2d');
+  
+  // 印刷用キャンバスサイズを設定
+  printCanvas.width = drawingAreaSize.width;
+  printCanvas.height = drawingAreaSize.height;
+  
+  // 背景は透明のまま（描画データのみ）
+  
+  // 筆跡のみを描画
+  drawingData.forEach(cmd => {
+    if (cmd.type === "start") {
+      printCtx.beginPath();
+      const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+      const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+      printCtx.moveTo(scaledX, scaledY);
+    } else if (cmd.type === "draw") {
+      printCtx.lineWidth = 4 * (drawingAreaSize.width / senderCanvasSize.width);
+      printCtx.strokeStyle = "#000";
+      const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+      const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+      printCtx.lineTo(scaledX, scaledY);
+      printCtx.stroke();
+    }
+  });
+  
+  // 印刷用データを作成
+  const imageDataUrl = printCanvas.toDataURL("image/png");
+  
+  // Electronのメインプロセスに印刷データを送信
+  if (typeof ipcRenderer !== 'undefined') {
+    ipcRenderer.send("save-pdf", {
+      imageData: imageDataUrl,
+      paperSize: currentPaperSize,
+      printType: "pen"
+    });
+  }
+  
+  console.log('🖨️ ペン印刷（描画データのみ）を実行');
 }
