@@ -92,6 +92,13 @@ let currentPaperSize = "A4"; // 現在の用紙サイズ
 let currentVideoSize = 100; // 現在のビデオサイズ（デフォルト100%）
 let canvasScale = 1.0; // キャンバススケール
 let rotationWaitTime = 5.1; // 回転後待機時間
+
+// 背景別キャンバスサイズ設定
+const backgroundSizes = {
+  'back3': { width: 842, height: 595 },    // 背景1
+  'back2': { width: 595, height: 842 },    // 背景2（縦向き）
+  'white': { width: 842, height: 595 }     // 白背景
+};
 socket.onopen = () => console.log("✅ WebSocket接続完了（送信側）");
 
 // 🔸 用紙サイズ設定関数
@@ -150,11 +157,16 @@ function setBackground(src) {
   if (src === null) {
     backgroundImage = null;
     
-    // 🔸 白背景の場合は通常サイズに戻す
-    resetCanvasToNormalSize();
+    // 🔸 白背景のキャンバスサイズを設定
+    setCanvasSize('white');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    socket.send(JSON.stringify({ type: "background", src: "white" }));
+    // 受信側にサイズ情報付きで送信
+    socket.send(JSON.stringify({ 
+      type: "background", 
+      src: "white",
+      canvasSize: backgroundSizes['white']
+    }));
   } else {
     const img = new Image();
     img.src = src;
@@ -164,16 +176,19 @@ function setBackground(src) {
       console.log("✅ 背景画像読み込み成功:", src);
       backgroundImage = img;
       
-      // 🔸 back2の場合は縦長に変更
-      if (src.includes('back2')) {
-        setCanvasToPortraitSize();
-      } else {
-        resetCanvasToNormalSize();
-      }
+      // 🔸 背景に応じたキャンバスサイズを設定
+      const backgroundKey = src.includes('back3') ? 'back3' : 'back2';
+      setCanvasSize(backgroundKey);
       
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
-      socket.send(JSON.stringify({ type: "background", src: src }));
+      
+      // 受信側にサイズ情報付きで送信
+      socket.send(JSON.stringify({ 
+        type: "background", 
+        src: src,
+        canvasSize: backgroundSizes[backgroundKey]
+      }));
     };
     
     img.onerror = (error) => {
@@ -181,6 +196,21 @@ function setBackground(src) {
       alert("背景画像が見つかりません: " + src);
     };
   }
+}
+
+// 🔸 キャンバスサイズ設定関数
+function setCanvasSize(backgroundKey) {
+  const size = backgroundSizes[backgroundKey];
+  if (!size) return;
+  
+  canvas.width = size.width;
+  canvas.height = size.height;
+  canvas.setAttribute('width', size.width);
+  canvas.setAttribute('height', size.height);
+  canvas.style.width = size.width + 'px';
+  canvas.style.height = size.height + 'px';
+  
+  console.log(`📐 送信側キャンバスサイズ変更: ${size.width} x ${size.height}`);
 }
 
 function sendPrintCommand() {
