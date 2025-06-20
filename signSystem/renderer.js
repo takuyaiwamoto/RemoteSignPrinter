@@ -30,6 +30,10 @@ let currentVideoSize = 100; // 🔸 現在のビデオサイズ（デフォル�
 let devCanvasScale = 1.0; // キャンバススケール
 let devRotationWaitTime = 5.1; // 回転後待機時間（秒）
 
+// 🔸 送信側と受信側のキャンバスサイズ情報
+let senderCanvasSize = { width: 842, height: 595 }; // 送信側のキャンバスサイズ
+let receiverCanvasSize = { width: 842, height: 595 }; // 受信側のキャンバスサイズ
+
 let socket = new WebSocket("wss://realtime-sign-server.onrender.com");
 socket.onopen = () => console.log("✅ WebSocket接続完了（Electron受信側）");
 socket.onerror = e => console.error("❌ WebSocketエラー", e);
@@ -149,11 +153,17 @@ function redrawCanvas(withBackground = true) {
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       ctx.beginPath();
-      ctx.moveTo((cmd.x * SCALE_FACTOR) + offsetX, cmd.y * SCALE_FACTOR);
+      // 🔸 送信側と受信側のサイズ比を考慮した座標変換
+      const scaledX = (cmd.x / senderCanvasSize.width) * receiverCanvasSize.width + offsetX;
+      const scaledY = (cmd.y / senderCanvasSize.height) * receiverCanvasSize.height;
+      ctx.moveTo(scaledX, scaledY);
     } else if (cmd.type === "draw") {
-      ctx.lineWidth = 4 * SCALE_FACTOR;
+      ctx.lineWidth = 4 * (receiverCanvasSize.width / senderCanvasSize.width); // 線の太さもスケール
       ctx.strokeStyle = "#000";
-      ctx.lineTo((cmd.x * SCALE_FACTOR) + offsetX, cmd.y * SCALE_FACTOR);
+      // 🔸 送信側と受信側のサイズ比を考慮した座標変換
+      const scaledX = (cmd.x / senderCanvasSize.width) * receiverCanvasSize.width + offsetX;
+      const scaledY = (cmd.y / senderCanvasSize.height) * receiverCanvasSize.height;
+      ctx.lineTo(scaledX, scaledY);
       ctx.stroke();
     }
   });
@@ -209,12 +219,18 @@ function handleMessage(data) {
     updateCanvasSize();
     
   } else if (data.type === "background") {
+    // 🔸 送信側のキャンバスサイズ情報を保存
+    if (data.canvasSize) {
+      senderCanvasSize = data.canvasSize;
+      console.log(`📐 送信側キャンバスサイズ: ${senderCanvasSize.width} x ${senderCanvasSize.height}`);
+    }
+    
     if (data.src === "white") {
       backgroundImage = null;
       lastBackgroundSrc = null;
       
-      // 🔸 白背景の場合は通常サイズに戻す
-      resetCanvasToNormalSize();
+      // 🔸 受信側キャンバスサイズを送信側に合わせて設定
+      setReceiverCanvasSize();
       redrawCanvas();
     } else {
       const img = new Image();
@@ -224,13 +240,8 @@ function handleMessage(data) {
       img.onload = () => {
         backgroundImage = img;
         
-        // 🔸 back2の場合は縦長に変更
-        if (data.src.includes('back2')) {
-          setCanvasToPortraitSize();
-        } else {
-          resetCanvasToNormalSize();
-        }
-        
+        // 🔸 受信側キャンバスサイズを送信側に合わせて設定
+        setReceiverCanvasSize();
         redrawCanvas();
       };
     }
@@ -247,11 +258,15 @@ function handleMessage(data) {
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
-    // 🔸 受信側から見て左に750px移動（450 + 300）
+    // 🔸 受信側から見て左に750px移動
     const offsetX = 750;
     
+    // 🔸 送信側と受信側のサイズ比を考慮した座標変換
+    const scaledX = (data.x / senderCanvasSize.width) * receiverCanvasSize.width + offsetX;
+    const scaledY = (data.y / senderCanvasSize.height) * receiverCanvasSize.height;
+    
     ctx.beginPath();
-    ctx.moveTo((data.x * SCALE_FACTOR) + offsetX, data.y * SCALE_FACTOR);
+    ctx.moveTo(scaledX, scaledY);
     
     ctx.restore();
   } else if (data.type === "draw") {
@@ -264,12 +279,16 @@ function handleMessage(data) {
     ctx.rotate(Math.PI); // 180度回転（背景と同じ）
     ctx.translate(-canvas.width / 2, -canvas.height / 2); // 元の位置に戻す
     
-    // 🔸 受信側から見て左に750px移動（450 + 300）
+    // 🔸 受信側から見て左に750px移動
     const offsetX = 750;
     
-    ctx.lineWidth = 4 * SCALE_FACTOR;
+    // 🔸 送信側と受信側のサイズ比を考慮した座標変換
+    const scaledX = (data.x / senderCanvasSize.width) * receiverCanvasSize.width + offsetX;
+    const scaledY = (data.y / senderCanvasSize.height) * receiverCanvasSize.height;
+    
+    ctx.lineWidth = 4 * (receiverCanvasSize.width / senderCanvasSize.width); // 線の太さもスケール
     ctx.strokeStyle = "#000";
-    ctx.lineTo((data.x * SCALE_FACTOR) + offsetX, data.y * SCALE_FACTOR);
+    ctx.lineTo(scaledX, scaledY);
     ctx.stroke();
     
     ctx.restore();
@@ -338,17 +357,29 @@ function sendCanvasToMainProcess() {
   });
 }
 
-// 🔸 Dev Tool関数
-function applyCanvasScale() {
-  const newWidth = Math.floor(originalWidth * SCALE_FACTOR * devCanvasScale);
-  const newHeight = Math.floor(originalHeight * SCALE_FACTOR * devCanvasScale);
+// 🔸 受信側キャンバスサイズ設定関数
+function setReceiverCanvasSize() {
+  // Dev Tool設定を適用したサイズを計算
+  const newWidth = Math.floor(senderCanvasSize.width * SCALE_FACTOR * devCanvasScale);
+  const newHeight = Math.floor(senderCanvasSize.height * SCALE_FACTOR * devCanvasScale);
   
   canvas.width = newWidth;
   canvas.height = newHeight;
   canvas.style.width = newWidth + "px";
   canvas.style.height = newHeight + "px";
   
-  console.log(`🔧 キャンバスサイズ変更: ${newWidth} x ${newHeight} (scale: ${devCanvasScale})`);
+  // 受信側のキャンバスサイズを記録
+  receiverCanvasSize = { width: newWidth, height: newHeight };
+  
+  console.log(`📐 受信側キャンバスサイズ変更: ${newWidth} x ${newHeight}`);
+  console.log(`📊 送信側: ${senderCanvasSize.width} x ${senderCanvasSize.height}`);
+  console.log(`📊 受信側: ${receiverCanvasSize.width} x ${receiverCanvasSize.height}`);
+}
+
+// 🔸 Dev Tool関数
+function applyCanvasScale() {
+  // 送信側サイズに基づいて再計算
+  setReceiverCanvasSize();
   redrawCanvas();
 }
 
