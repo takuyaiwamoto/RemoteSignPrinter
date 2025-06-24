@@ -100,6 +100,26 @@ ipcMain.on("save-pdf", (event, data) => {
       return;
     }
     console.log("✅ PNG保存完了:", savePath);
+    console.log("📁 保存場所:", savePath);
+    
+    // 🔸 画像確認のためにエクスプローラーで開く（デバッグ用）
+    if (process.platform === 'win32') {
+      exec(`explorer /select,"${savePath.replace(/\//g, '\\')}"`, (error) => {
+        if (error) {
+          console.error("❌ エクスプローラー起動エラー:", error);
+        } else {
+          console.log("✅ エクスプローラーで画像を表示");
+        }
+      });
+    } else if (process.platform === 'darwin') {
+      exec(`open -R "${savePath}"`, (error) => {
+        if (error) {
+          console.error("❌ Finder起動エラー:", error);
+        } else {
+          console.log("✅ Finderで画像を表示");
+        }
+      });
+    }
     
     // 🔸 OS別の印刷処理
     const printerName = "Brother_MFC_J6983CDW";
