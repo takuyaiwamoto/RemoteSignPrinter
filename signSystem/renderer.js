@@ -422,45 +422,45 @@ function handleMessage(data) {
 }
 
 function sendCanvasToMainProcess() {
-  // 🔸 印刷用キャンバス（背景なし、筆跡のみ透過色で）
+  // 🔸 印刷用キャンバス（描画エリアサイズで作成）
   const tmpCanvas = document.createElement("canvas");
-  tmpCanvas.width = canvas.width;
-  tmpCanvas.height = canvas.height;
+  tmpCanvas.width = drawingAreaSize.width;
+  tmpCanvas.height = drawingAreaSize.height;
   const tmpCtx = tmpCanvas.getContext("2d");
 
   console.log("🖨️ 印刷用キャンバス情報:");
-  console.log(`- キャンバスサイズ: ${tmpCanvas.width} x ${tmpCanvas.height}`);
-  console.log(`- SCALE_FACTOR: ${SCALE_FACTOR}`);
+  console.log(`- 描画エリアサイズ: ${tmpCanvas.width} x ${tmpCanvas.height}`);
   console.log(`- drawingData項目数: ${drawingData.length}`);
 
-  // 背景は描画せず、筆跡のみ透過色で描画
-  tmpCtx.save();
-  tmpCtx.translate(tmpCanvas.width / 2, tmpCanvas.height / 2);
-  tmpCtx.rotate(Math.PI); // 180度回転（表示と同じ）
-  tmpCtx.translate(-tmpCanvas.width / 2, -tmpCanvas.height / 2);
-  
-  // 🔸 受信側から見て左に750px移動（450 + 300）
-  const offsetX = 750;
-  
+  // 🔸 描画データのみの印刷：白背景に描画データのみ
+  tmpCtx.fillStyle = '#ffffff';
+  tmpCtx.fillRect(0, 0, tmpCanvas.width, tmpCanvas.height);
+
+  // 筆跡を描画エリア内に正しく配置
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       tmpCtx.beginPath();
-      tmpCtx.moveTo((cmd.x * SCALE_FACTOR) + offsetX, cmd.y * SCALE_FACTOR);
+      // 送信側から描画エリアへの座標変換
+      const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+      const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+      tmpCtx.moveTo(scaledX, scaledY);
     } else if (cmd.type === "draw") {
-      tmpCtx.lineWidth = 4 * SCALE_FACTOR;
-      tmpCtx.strokeStyle = "rgba(255, 0, 0, 0.5)"; // 半透明の赤色
-      tmpCtx.lineTo((cmd.x * SCALE_FACTOR) + offsetX, cmd.y * SCALE_FACTOR);
+      tmpCtx.lineWidth = 4 * (drawingAreaSize.width / senderCanvasSize.width);
+      tmpCtx.strokeStyle = "#000";
+      // 送信側から描画エリアへの座標変換
+      const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+      const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+      tmpCtx.lineTo(scaledX, scaledY);
       tmpCtx.stroke();
     }
   });
-  
-  tmpCtx.restore();
 
   const imageDataUrl = tmpCanvas.toDataURL("image/png");
   // 🔸 印刷時に用紙サイズ情報も送信
   ipcRenderer.send("save-pdf", {
     imageData: imageDataUrl,
-    paperSize: currentPaperSize
+    paperSize: currentPaperSize,
+    printType: "drawing_area_only"
   });
 }
 

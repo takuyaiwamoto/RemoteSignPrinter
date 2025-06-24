@@ -101,39 +101,86 @@ ipcMain.on("save-pdf", (event, data) => {
     }
     console.log("✅ PNG保存完了:", savePath);
     
-    // 🔸 Windowsで最も確実で簡潔な印刷方法
-    const printerName = "Brother MFC-J6983CDW";
+    // 🔸 OS別の印刷処理
+    const printerName = "Brother_MFC_J6983CDW";
     
-    // 🔸 メインモニターの位置情報を取得
-    const { screen } = require('electron');
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { x: primaryX, y: primaryY, width: primaryWidth, height: primaryHeight } = primaryDisplay.bounds;
-    
-    // 方法1: mspaint /pt （最も確実で互換性が高い）
-    const mspaintCommand = `mspaint /pt "${savePath}" "${printerName}"`;
-    
-    console.log(`🖨 mspaintで印刷: ${mspaintCommand}`);
-    console.log(`📍 メインモニター位置: ${primaryX}, ${primaryY} (${primaryWidth}x${primaryHeight})`);
-    
-    // 🔸 ダイアログがメインモニターに表示されるようにウィンドウ位置を設定
-    process.env.DISPLAY_X = primaryX.toString();
-    process.env.DISPLAY_Y = primaryY.toString();
-    
-    exec(mspaintCommand, { 
-      windowsHide: true,
-      env: { ...process.env, DISPLAY_X: primaryX.toString(), DISPLAY_Y: primaryY.toString() }
-    }, (error, stdout, stderr) => {
-      if (error) {
-        console.error("❌ mspaint印刷エラー:", error);
-        console.error("❌ エラー詳細:", error.message);
-        // フォールバック：PowerShell印刷
-        fallbackPowerShellPrint(savePath, printerName);
-      } else {
-        console.log(`✅ Brother印刷完了（mspaint - ダイアログ抑制）`);
-        console.log("📋 stdout:", stdout);
-        console.log("📋 stderr:", stderr);
-      }
-    });
+    if (process.platform === 'darwin') {
+      // macOS用の印刷処理
+      console.log(`🖨️ macOSで印刷開始: ${savePath}`);
+      
+      // macでプリンター一覧を確認
+      exec('lpstat -p', (error, stdout, stderr) => {
+        if (error) {
+          console.error("❌ プリンター確認エラー:", error);
+        } else {
+          console.log("📋 利用可能なプリンター:", stdout);
+        }
+      });
+      
+      // lprコマンドで印刷
+      const printCommand = `lpr -P "${printerName}" "${savePath}"`;
+      console.log(`🖨️ lprコマンド実行: ${printCommand}`);
+      
+      exec(printCommand, (error, stdout, stderr) => {
+        if (error) {
+          console.error("❌ lpr印刷エラー:", error);
+          console.error("❌ エラー詳細:", error.message);
+          
+          // フォールバック: デフォルトプリンターで印刷
+          const fallbackCommand = `lpr "${savePath}"`;
+          console.log(`🔄 デフォルトプリンターで印刷: ${fallbackCommand}`);
+          
+          exec(fallbackCommand, (fbError, fbStdout, fbStderr) => {
+            if (fbError) {
+              console.error("❌ デフォルトプリンター印刷エラー:", fbError);
+              // 最終手段: Previewアプリで開く
+              exec(`open -a Preview "${savePath}"`, (previewError) => {
+                if (previewError) {
+                  console.error("❌ Preview起動エラー:", previewError);
+                } else {
+                  console.log("✅ Previewアプリで画像を開きました（手動印刷してください）");
+                }
+              });
+            } else {
+              console.log("✅ デフォルトプリンターで印刷完了");
+            }
+          });
+        } else {
+          console.log(`✅ Brother印刷完了（lpr）`);
+          console.log("📋 stdout:", stdout);
+          console.log("📋 stderr:", stderr);
+        }
+      });
+      
+    } else {
+      // Windows用の印刷処理（既存のコード）
+      const { screen } = require('electron');
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { x: primaryX, y: primaryY, width: primaryWidth, height: primaryHeight } = primaryDisplay.bounds;
+      
+      const mspaintCommand = `mspaint /pt "${savePath}" "${printerName}"`;
+      
+      console.log(`🖨 mspaintで印刷: ${mspaintCommand}`);
+      console.log(`📍 メインモニター位置: ${primaryX}, ${primaryY} (${primaryWidth}x${primaryHeight})`);
+      
+      process.env.DISPLAY_X = primaryX.toString();
+      process.env.DISPLAY_Y = primaryY.toString();
+      
+      exec(mspaintCommand, { 
+        windowsHide: true,
+        env: { ...process.env, DISPLAY_X: primaryX.toString(), DISPLAY_Y: primaryY.toString() }
+      }, (error, stdout, stderr) => {
+        if (error) {
+          console.error("❌ mspaint印刷エラー:", error);
+          console.error("❌ エラー詳細:", error.message);
+          fallbackPowerShellPrint(savePath, printerName);
+        } else {
+          console.log(`✅ Brother印刷完了（mspaint - ダイアログ抑制）`);
+          console.log("📋 stdout:", stdout);
+          console.log("📋 stderr:", stderr);
+        }
+      });
+    }
   });
 });
 
@@ -199,31 +246,70 @@ ipcMain.on("print-transparent-image", (event, data) => {
     }
     console.log("✅ 透過PNG保存完了:", savePath);
     
-    // 🔸 透過画像も確実で簡潔な印刷方法
-    const printerName = "Brother MFC-J6983CDW";
+    // 🔸 OS別の透過画像印刷処理
+    const printerName = "Brother_MFC_J6983CDW";
     
-    // 🔸 メインモニターの位置情報を取得
-    const { screen } = require('electron');
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { x: primaryX, y: primaryY } = primaryDisplay.bounds;
-    
-    // 方法1: mspaint /pt （最も確実で互換性が高い）
-    const mspaintCommand = `mspaint /pt "${savePath}" "${printerName}"`;
-    
-    console.log(`🖨️ 透過画像をmspaintで印刷: ${mspaintCommand}`);
-    console.log(`📍 透過画像印刷 - メインモニター位置: ${primaryX}, ${primaryY}`);
-    
-    exec(mspaintCommand, { 
-      windowsHide: true,
-      env: { ...process.env, DISPLAY_X: primaryX.toString(), DISPLAY_Y: primaryY.toString() }
-    }, (error, stdout, stderr) => {
-      if (error) {
-        console.error("❌ 透過画像mspaint印刷エラー:", error);
-        // フォールバック：PowerShell印刷
-        fallbackPowerShellPrint(savePath, printerName);
-      } else {
-        console.log(`✅ 透過画像印刷完了（mspaint - ダイアログ抑制）: ${fileName}`);
-      }
-    });
+    if (process.platform === 'darwin') {
+      // macOS用の透過画像印刷処理
+      console.log(`🖨️ macOSで透過画像印刷開始: ${savePath}`);
+      
+      // lprコマンドで印刷
+      const printCommand = `lpr -P "${printerName}" "${savePath}"`;
+      console.log(`🖨️ 透過画像lprコマンド実行: ${printCommand}`);
+      
+      exec(printCommand, (error, stdout, stderr) => {
+        if (error) {
+          console.error("❌ 透過画像lpr印刷エラー:", error);
+          console.error("❌ エラー詳細:", error.message);
+          
+          // フォールバック: デフォルトプリンターで印刷
+          const fallbackCommand = `lpr "${savePath}"`;
+          console.log(`🔄 透過画像をデフォルトプリンターで印刷: ${fallbackCommand}`);
+          
+          exec(fallbackCommand, (fbError, fbStdout, fbStderr) => {
+            if (fbError) {
+              console.error("❌ 透過画像デフォルトプリンター印刷エラー:", fbError);
+              // 最終手段: Previewアプリで開く
+              exec(`open -a Preview "${savePath}"`, (previewError) => {
+                if (previewError) {
+                  console.error("❌ 透過画像Preview起動エラー:", previewError);
+                } else {
+                  console.log("✅ 透過画像をPreviewアプリで開きました（手動印刷してください）");
+                }
+              });
+            } else {
+              console.log("✅ 透過画像をデフォルトプリンターで印刷完了");
+            }
+          });
+        } else {
+          console.log(`✅ 透過画像Brother印刷完了（lpr）: ${fileName}`);
+          console.log("📋 stdout:", stdout);
+          console.log("📋 stderr:", stderr);
+        }
+      });
+      
+    } else {
+      // Windows用の透過画像印刷処理（既存のコード）
+      const { screen } = require('electron');
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { x: primaryX, y: primaryY } = primaryDisplay.bounds;
+      
+      const mspaintCommand = `mspaint /pt "${savePath}" "${printerName}"`;
+      
+      console.log(`🖨️ 透過画像をmspaintで印刷: ${mspaintCommand}`);
+      console.log(`📍 透過画像印刷 - メインモニター位置: ${primaryX}, ${primaryY}`);
+      
+      exec(mspaintCommand, { 
+        windowsHide: true,
+        env: { ...process.env, DISPLAY_X: primaryX.toString(), DISPLAY_Y: primaryY.toString() }
+      }, (error, stdout, stderr) => {
+        if (error) {
+          console.error("❌ 透過画像mspaint印刷エラー:", error);
+          fallbackPowerShellPrint(savePath, printerName);
+        } else {
+          console.log(`✅ 透過画像印刷完了（mspaint - ダイアログ抑制）: ${fileName}`);
+        }
+      });
+    }
   });
 });
