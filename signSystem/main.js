@@ -103,22 +103,29 @@ ipcMain.on("save-pdf", (event, data) => {
     console.log("📁 保存場所:", savePath);
     
     // 🔸 画像確認のためにエクスプローラーで開く（デバッグ用）
-    if (process.platform === 'win32') {
-      exec(`explorer /select,"${savePath.replace(/\//g, '\\')}"`, (error) => {
-        if (error) {
-          console.error("❌ エクスプローラー起動エラー:", error);
-        } else {
-          console.log("✅ エクスプローラーで画像を表示");
-        }
-      });
-    } else if (process.platform === 'darwin') {
-      exec(`open -R "${savePath}"`, (error) => {
-        if (error) {
-          console.error("❌ Finder起動エラー:", error);
-        } else {
-          console.log("✅ Finderで画像を表示");
-        }
-      });
+    // 送信ボタン（printType: "pen"）の場合はフォルダを開かない
+    const shouldOpenFolder = data.printType !== "pen";
+    
+    if (shouldOpenFolder) {
+      if (process.platform === 'win32') {
+        exec(`explorer /select,"${savePath.replace(/\//g, '\\')}"`, (error) => {
+          if (error) {
+            console.error("❌ エクスプローラー起動エラー:", error);
+          } else {
+            console.log("✅ エクスプローラーで画像を表示");
+          }
+        });
+      } else if (process.platform === 'darwin') {
+        exec(`open -R "${savePath}"`, (error) => {
+          if (error) {
+            console.error("❌ Finder起動エラー:", error);
+          } else {
+            console.log("✅ Finderで画像を表示");
+          }
+        });
+      }
+    } else {
+      console.log("📁 送信ボタンからの印刷のため、フォルダは開きません");
     }
     
     // 🔸 OS別の印刷処理
