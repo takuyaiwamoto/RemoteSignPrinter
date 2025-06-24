@@ -245,8 +245,10 @@ function handleMessage(data) {
       currentPaperSize = data.paperSize;
       console.log(`印刷用紙サイズ: ${currentPaperSize}`);
     }
-    prepareAndRunAnimation();
+    // 🔸 印刷処理を先に実行（アニメーション前に描画データを保存）
     sendCanvasToMainProcess();
+    // 🔸 印刷処理完了後にアニメーション開始
+    prepareAndRunAnimation();
   } else if (data.type === "paperSize") {
     // 🔸 用紙サイズ変更の通知を受信
     currentPaperSize = data.size;
@@ -431,6 +433,18 @@ function sendCanvasToMainProcess() {
   console.log("🖨️ 印刷用キャンバス情報:");
   console.log(`- 描画エリアサイズ: ${tmpCanvas.width} x ${tmpCanvas.height}`);
   console.log(`- drawingData項目数: ${drawingData.length}`);
+  console.log(`- senderCanvasSize: ${senderCanvasSize.width} x ${senderCanvasSize.height}`);
+  console.log(`- drawingAreaOffset: ${drawingAreaOffset.x}, ${drawingAreaOffset.y}`);
+  
+  // 🔸 デバッグ：drawingDataの中身を確認
+  if (drawingData.length > 0) {
+    console.log("📝 drawingData最初の5項目:");
+    drawingData.slice(0, 5).forEach((cmd, i) => {
+      console.log(`  ${i}: type=${cmd.type}, x=${cmd.x}, y=${cmd.y}`);
+    });
+  } else {
+    console.log("⚠️ drawingDataが空です！描画データが受信されていません。");
+  }
 
   // 🔸 描画データのみの印刷：白背景に描画データのみ
   tmpCtx.fillStyle = '#ffffff';
