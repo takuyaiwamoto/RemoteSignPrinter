@@ -68,8 +68,22 @@ ipcMain.on('toggle-fullscreen', (event) => {
   const focusedWindow = BrowserWindow.getFocusedWindow();
   if (focusedWindow) {
     const isFullScreen = focusedWindow.isFullScreen();
-    focusedWindow.setFullScreen(!isFullScreen);
-    console.log(`🖥️ フルスクリーンモード: ${!isFullScreen ? 'ON' : 'OFF'}`);
+    const newFullScreenState = !isFullScreen;
+    
+    // フルスクリーンモード設定
+    focusedWindow.setFullScreen(newFullScreenState);
+    
+    // フルスクリーン時はタイトルバーを完全に非表示
+    if (newFullScreenState) {
+      focusedWindow.setMenuBarVisibility(false);
+    } else {
+      focusedWindow.setMenuBarVisibility(true);
+    }
+    
+    // レンダラープロセスにフルスクリーン状態を通知
+    event.reply('fullscreen-changed', newFullScreenState);
+    
+    console.log(`🖥️ フルスクリーンモード: ${newFullScreenState ? 'ON' : 'OFF'}`);
   }
 });
 

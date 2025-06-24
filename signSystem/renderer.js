@@ -1136,3 +1136,23 @@ function toggleFullscreen() {
     console.log('❌ フルスクリーン機能はElectron環境でのみ利用可能');
   }
 }
+
+// 🔸 フルスクリーン状態変更の受信
+if (typeof ipcRenderer !== 'undefined') {
+  ipcRenderer.on('fullscreen-changed', (event, isFullScreen) => {
+    const devButton = document.getElementById('devButton');
+    const reviewButton = document.getElementById('reviewButton');
+    
+    if (isFullScreen) {
+      // フルスクリーン時：ボタンを透明にする（見えないが押せる）
+      if (devButton) devButton.style.opacity = '0.01';
+      if (reviewButton) reviewButton.style.opacity = '0.01';
+      console.log('🖥️ フルスクリーンモード：ボタンを透明化');
+    } else {
+      // ウィンドウモード時：ボタンを元に戻す
+      if (devButton) devButton.style.opacity = '1';
+      if (reviewButton) reviewButton.style.opacity = '1';
+      console.log('🖥️ ウィンドウモード：ボタンを表示');
+    }
+  });
+}
