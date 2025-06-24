@@ -122,7 +122,7 @@ ipcMain.on("save-pdf", (event, data) => {
     }
     
     // 🔸 OS別の印刷処理
-    const printerName = "Brother_MFC_J6983CDW";
+    const printerName = "Brother MFC-J6983CDW";
     console.log(`🖨️ 使用予定プリンター名: "${printerName}"`);
     
     if (process.platform === 'darwin') {
@@ -285,7 +285,7 @@ ipcMain.on("print-transparent-image", (event, data) => {
     console.log("✅ 透過PNG保存完了:", savePath);
     
     // 🔸 OS別の透過画像印刷処理
-    const printerName = "Brother_MFC_J6983CDW";
+    const printerName = "Brother MFC-J6983CDW";
     
     if (process.platform === 'darwin') {
       // macOS用の透過画像印刷処理
