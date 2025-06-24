@@ -1077,6 +1077,10 @@ function printPen() {
   printCanvas.width = drawingAreaSize.width;
   printCanvas.height = drawingAreaSize.height;
   
+  // 🔸 印刷画像を180度回転
+  printCtx.translate(printCanvas.width, printCanvas.height);
+  printCtx.rotate(Math.PI);
+  
   // 背景は透明のまま（描画データのみ）
   
   // 筆跡のみを描画
