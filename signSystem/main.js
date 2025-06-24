@@ -123,17 +123,35 @@ ipcMain.on("save-pdf", (event, data) => {
     
     // 🔸 OS別の印刷処理
     const printerName = "Brother_MFC_J6983CDW";
+    console.log(`🖨️ 使用予定プリンター名: "${printerName}"`);
     
     if (process.platform === 'darwin') {
       // macOS用の印刷処理
       console.log(`🖨️ macOSで印刷開始: ${savePath}`);
       
-      // macでプリンター一覧を確認
+      // macでプリンター一覧を確認（詳細版）
       exec('lpstat -p', (error, stdout, stderr) => {
         if (error) {
           console.error("❌ プリンター確認エラー:", error);
         } else {
-          console.log("📋 利用可能なプリンター:", stdout);
+          console.log("📋 利用可能なプリンター（lpstat -p）:");
+          console.log(stdout);
+          console.log(`🔍 探しているプリンター: "${printerName}"`);
+          if (stdout.includes(printerName)) {
+            console.log("✅ 対象プリンターが見つかりました");
+          } else {
+            console.log("⚠️ 対象プリンターが見つかりません");
+          }
+        }
+      });
+      
+      // 別の方法でもプリンター一覧を確認
+      exec('lpstat -a', (error, stdout, stderr) => {
+        if (error) {
+          console.error("❌ プリンター確認エラー2:", error);
+        } else {
+          console.log("📋 プリンター状態（lpstat -a）:");
+          console.log(stdout);
         }
       });
       
