@@ -424,14 +424,8 @@ function handleMessage(data) {
 }
 
 function sendCanvasToMainProcess() {
-  // 🔸 印刷用キャンバス（描画エリアサイズで作成）
-  const tmpCanvas = document.createElement("canvas");
-  tmpCanvas.width = drawingAreaSize.width;
-  tmpCanvas.height = drawingAreaSize.height;
-  const tmpCtx = tmpCanvas.getContext("2d");
-
-  console.log("🖨️ 印刷用キャンバス情報:");
-  console.log(`- 描画エリアサイズ: ${tmpCanvas.width} x ${tmpCanvas.height}`);
+  console.log("🖨️ 送信ボタン印刷処理開始");
+  console.log(`- 描画エリアサイズ: ${drawingAreaSize.width} x ${drawingAreaSize.height}`);
   console.log(`- drawingData項目数: ${drawingData.length}`);
   console.log(`- senderCanvasSize: ${senderCanvasSize.width} x ${senderCanvasSize.height}`);
   console.log(`- drawingAreaOffset: ${drawingAreaOffset.x}, ${drawingAreaOffset.y}`);
@@ -446,36 +440,44 @@ function sendCanvasToMainProcess() {
     console.log("⚠️ drawingDataが空です！描画データが受信されていません。");
   }
 
-  // 🔸 描画データのみの印刷：白背景に描画データのみ
-  tmpCtx.fillStyle = '#ffffff';
-  tmpCtx.fillRect(0, 0, tmpCanvas.width, tmpCanvas.height);
-
-  // 筆跡を描画エリア内に正しく配置
+  // 🔸 printPen()と同じ処理を使用
+  const printCanvas = document.createElement('canvas');
+  const printCtx = printCanvas.getContext('2d');
+  
+  // 印刷用キャンバスサイズを設定
+  printCanvas.width = drawingAreaSize.width;
+  printCanvas.height = drawingAreaSize.height;
+  
+  // 背景は透明のまま（描画データのみ）
+  
+  // 筆跡のみを描画
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
-      tmpCtx.beginPath();
-      // 送信側から描画エリアへの座標変換
+      printCtx.beginPath();
       const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
       const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
-      tmpCtx.moveTo(scaledX, scaledY);
+      printCtx.moveTo(scaledX, scaledY);
     } else if (cmd.type === "draw") {
-      tmpCtx.lineWidth = 4 * (drawingAreaSize.width / senderCanvasSize.width);
-      tmpCtx.strokeStyle = "#000";
-      // 送信側から描画エリアへの座標変換
+      printCtx.lineWidth = 4 * (drawingAreaSize.width / senderCanvasSize.width);
+      printCtx.strokeStyle = "#000";
       const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
       const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
-      tmpCtx.lineTo(scaledX, scaledY);
-      tmpCtx.stroke();
+      printCtx.lineTo(scaledX, scaledY);
+      printCtx.stroke();
     }
   });
-
-  const imageDataUrl = tmpCanvas.toDataURL("image/png");
+  
+  // 印刷用データを作成
+  const imageDataUrl = printCanvas.toDataURL("image/png");
+  
   // 🔸 印刷時に用紙サイズ情報も送信
   ipcRenderer.send("save-pdf", {
     imageData: imageDataUrl,
     paperSize: currentPaperSize,
-    printType: "drawing_area_only"
+    printType: "pen"
   });
+  
+  console.log('🖨️ 送信ボタン印刷（描画データのみ）を実行');
 }
 
 // 🔸 受信側キャンバスサイズ設定関数
