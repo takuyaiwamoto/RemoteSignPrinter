@@ -245,8 +245,9 @@ function handleMessage(data) {
       currentPaperSize = data.paperSize;
       console.log(`印刷用紙サイズ: ${currentPaperSize}`);
     }
-    // 🔸 印刷処理を先に実行（アニメーション前に描画データを保存）
-    sendCanvasToMainProcess();
+    // 🔸 送信ボタンは印刷ペンと同じ処理を実行
+    console.log("🔴 送信ボタン押下 → 印刷ペン処理を実行");
+    printPen();
     // 🔸 印刷処理完了後にアニメーション開始
     prepareAndRunAnimation();
   } else if (data.type === "paperSize") {
