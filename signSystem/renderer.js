@@ -696,7 +696,15 @@ function playVideoWithSize() {
 // 🔸 Dev Panel GUI機能
 function toggleDevPanel() {
   const panel = document.getElementById('devPanel');
-  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    // DEVパネルを開いた時に自動的に描画エリアを表示
+    showDrawingArea();
+  } else {
+    panel.style.display = 'none';
+    // DEVパネルを閉じた時に描画エリアも非表示にする
+    hideDrawingArea();
+  }
 }
 
 function showDrawingArea() {
@@ -739,10 +747,14 @@ function showDrawingArea() {
 
 function hideDrawingArea() {
   document.getElementById('drawingArea').style.display = 'none';
-  // 描画エリアの枠表示を無効にする
-  showDrawingAreaFrame = false;
-  // キャンバスを再描画して枠を非表示
-  redrawCanvas();
+  // DEVパネルが開いている間は枠表示を維持
+  const devPanel = document.getElementById('devPanel');
+  if (devPanel.style.display === 'none') {
+    // DEVパネルが閉じている時のみ枠を非表示
+    showDrawingAreaFrame = false;
+    // キャンバスを再描画して枠を非表示
+    redrawCanvas();
+  }
 }
 
 function applyDrawingArea() {
@@ -762,8 +774,8 @@ function applyDrawingArea() {
   // キャンバスを再描画
   redrawCanvas();
   
-  // 確認メッセージ
-  alert('描画エリアを適用しました');
+  // 適用後は自動的に描画エリアを非表示にする
+  hideDrawingArea();
 }
 
 function resetDrawingArea() {
