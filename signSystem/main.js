@@ -63,6 +63,16 @@ app.whenReady().then(() => {
   });
 });
 
+// 🔸 フルスクリーン切り替えのIPCハンドラー
+ipcMain.on('toggle-fullscreen', (event) => {
+  const focusedWindow = BrowserWindow.getFocusedWindow();
+  if (focusedWindow) {
+    const isFullScreen = focusedWindow.isFullScreen();
+    focusedWindow.setFullScreen(!isFullScreen);
+    console.log(`🖥️ フルスクリーンモード: ${!isFullScreen ? 'ON' : 'OFF'}`);
+  }
+});
+
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });

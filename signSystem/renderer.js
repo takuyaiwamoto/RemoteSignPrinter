@@ -1126,3 +1126,13 @@ function printPen() {
   
   console.log('🖨️ ペン印刷（描画データのみ）を実行');
 }
+
+// 🔸 フルスクリーン切り替え機能
+function toggleFullscreen() {
+  if (typeof ipcRenderer !== 'undefined') {
+    ipcRenderer.send('toggle-fullscreen');
+    console.log('🖥️ フルスクリーンモード切り替え');
+  } else {
+    console.log('❌ フルスクリーン機能はElectron環境でのみ利用可能');
+  }
+}
