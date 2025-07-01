@@ -1745,19 +1745,43 @@ function printFull() {
     }
   });
   
+  // 🔸 Canvas変換を使った180度回転（送信側と同じ方法）
+  console.log(`🔄 フル印刷: 180度回転処理開始`);
+  const rotatedCanvas = document.createElement('canvas');
+  const rotatedCtx = rotatedCanvas.getContext('2d');
+  rotatedCanvas.width = printCanvas.width;
+  rotatedCanvas.height = printCanvas.height;
+  
+  // 現在の印刷キャンバス内容を180度回転してコピー
+  rotatedCtx.save();
+  rotatedCtx.translate(rotatedCanvas.width, rotatedCanvas.height);
+  rotatedCtx.rotate(Math.PI);
+  rotatedCtx.drawImage(printCanvas, 0, 0);
+  rotatedCtx.restore();
+  
+  console.log('🔄 フル印刷: 180度回転完了');
+  
   // 印刷用データを作成
-  const imageDataUrl = printCanvas.toDataURL("image/png");
-  
-  // Electronのメインプロセスに印刷データを送信
-  if (typeof ipcRenderer !== 'undefined') {
-    ipcRenderer.send("save-pdf", {
-      imageData: imageDataUrl,
-      paperSize: currentPaperSize,
-      printType: "full"
-    });
+  try {
+    const imageDataUrl = rotatedCanvas.toDataURL("image/png");
+    console.log('🔄 フル印刷: 画像データ作成完了', imageDataUrl.substring(0, 100) + '...');
+    
+    // Electronのメインプロセスに印刷データを送信
+    if (typeof ipcRenderer !== 'undefined') {
+      ipcRenderer.send("save-pdf", {
+        imageData: imageDataUrl,
+        paperSize: currentPaperSize,
+        printType: "full"
+      });
+      console.log('📤 フル印刷データをメインプロセスに送信完了');
+    } else {
+      console.error('❌ ipcRenderer が利用できません');
+    }
+    
+    console.log('🖨️ フル印刷（背景込み）を実行');
+  } catch (error) {
+    console.error('❌ フル印刷でエラー発生:', error);
   }
-  
-  console.log('🖨️ フル印刷（背景込み）を実行');
 }
 
 // 🔸 印刷ペン機能（描画データのみ）
@@ -1769,13 +1793,9 @@ function printPen() {
   printCanvas.width = drawingAreaSize.width;
   printCanvas.height = drawingAreaSize.height;
   
-  // 🔸 印刷画像を180度回転
-  printCtx.translate(printCanvas.width, printCanvas.height);
-  printCtx.rotate(Math.PI);
-  
   // 背景は透明のまま（描画データのみ）
   
-  // 筆跡のみを描画
+  // まず通常の描画を行う
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       printCtx.beginPath();
@@ -1802,19 +1822,43 @@ function printPen() {
     }
   });
   
+  // 🔸 Canvas変換を使った180度回転（送信側と同じ方法）
+  console.log(`🔄 ペン印刷: 180度回転処理開始`);
+  const rotatedCanvas = document.createElement('canvas');
+  const rotatedCtx = rotatedCanvas.getContext('2d');
+  rotatedCanvas.width = printCanvas.width;
+  rotatedCanvas.height = printCanvas.height;
+  
+  // 現在の印刷キャンバス内容を180度回転してコピー
+  rotatedCtx.save();
+  rotatedCtx.translate(rotatedCanvas.width, rotatedCanvas.height);
+  rotatedCtx.rotate(Math.PI);
+  rotatedCtx.drawImage(printCanvas, 0, 0);
+  rotatedCtx.restore();
+  
+  console.log('🔄 ペン印刷: 180度回転完了');
+  
   // 印刷用データを作成
-  const imageDataUrl = printCanvas.toDataURL("image/png");
-  
-  // Electronのメインプロセスに印刷データを送信
-  if (typeof ipcRenderer !== 'undefined') {
-    ipcRenderer.send("save-pdf", {
-      imageData: imageDataUrl,
-      paperSize: currentPaperSize,
-      printType: "pen"
-    });
+  try {
+    const imageDataUrl = rotatedCanvas.toDataURL("image/png");
+    console.log('🔄 ペン印刷: 画像データ作成完了', imageDataUrl.substring(0, 100) + '...');
+    
+    // Electronのメインプロセスに印刷データを送信
+    if (typeof ipcRenderer !== 'undefined') {
+      ipcRenderer.send("save-pdf", {
+        imageData: imageDataUrl,
+        paperSize: currentPaperSize,
+        printType: "pen"
+      });
+      console.log('📤 ペン印刷データをメインプロセスに送信完了');
+    } else {
+      console.error('❌ ipcRenderer が利用できません');
+    }
+    
+    console.log('🖨️ ペン印刷（描画データのみ）を実行');
+  } catch (error) {
+    console.error('❌ ペン印刷でエラー発生:', error);
   }
-  
-  console.log('🖨️ ペン印刷（描画データのみ）を実行');
 }
 
 // 🔸 フルスクリーン切り替え機能
