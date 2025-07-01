@@ -1,1 +1,26 @@
+# Directories to exclude
 newSignSystem/
+video-overlay/
+voiceIdolSign/
+
+# macOS system files
+.DS_Store
+
+# Node modules
+node_modules/
+
+# Electron builds
+dist/
+out/
+
+# IDE files
+.vscode/
+.idea/
+
+# Log files
+*.log
+npm-debug.log*
+
+# Temporary files
+*.tmp
+*.temp
