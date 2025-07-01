@@ -19,21 +19,31 @@ function rgbToHex(r, g, b) {
   return "#" + ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
 }
 
+// イージング関数（滑らかな変化のため）
+function easeInOutSine(x) {
+  return -(Math.cos(Math.PI * x) - 1) / 2;
+}
+
 function interpolateColor(color1, color2, factor) {
+  // イージング関数を適用してより滑らかな変化
+  const easedFactor = easeInOutSine(factor);
+  
   const rgb1 = hexToRgb(color1);
   const rgb2 = hexToRgb(color2);
   
-  const r = rgb1.r + factor * (rgb2.r - rgb1.r);
-  const g = rgb1.g + factor * (rgb2.g - rgb1.g);
-  const b = rgb1.b + factor * (rgb2.b - rgb1.b);
+  const r = rgb1.r + easedFactor * (rgb2.r - rgb1.r);
+  const g = rgb1.g + easedFactor * (rgb2.g - rgb1.g);
+  const b = rgb1.b + easedFactor * (rgb2.b - rgb1.b);
   
   return rgbToHex(r, g, b);
 }
 
 function getNeonColorFromIndex(neonIndex) {
   const colors = [
-    '#ff0000', '#ff8000', '#ffff00', '#80ff00', '#00ff00', '#00ff80',
-    '#00ffff', '#0080ff', '#0000ff', '#8000ff', '#ff00ff', '#ff0080'
+    '#ff0000', '#ff4000', '#ff8000', '#ffb000', '#ffff00', '#b0ff00',
+    '#80ff00', '#40ff00', '#00ff00', '#00ff40', '#00ff80', '#00ffb0',
+    '#00ffff', '#00b0ff', '#0080ff', '#0040ff', '#0000ff', '#4000ff',
+    '#8000ff', '#b000ff', '#ff00ff', '#ff00b0', '#ff0080', '#ff0040'
   ];
   
   const position = (neonIndex % colors.length);
