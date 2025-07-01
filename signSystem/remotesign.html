@@ -84,9 +84,9 @@
 
 <div class="button-group">
   <label>ペンの太さ:</label>
-  <button class="thickness-btn selected" onclick="setPenThickness(2)">細い</button>
+  <button class="thickness-btn" onclick="setPenThickness(2)">細い</button>
   <button class="thickness-btn" onclick="setPenThickness(4)">普通</button>
-  <button class="thickness-btn" onclick="setPenThickness(8)">太い</button>
+  <button class="thickness-btn selected" onclick="setPenThickness(8)">太い</button>
   <button class="thickness-btn" onclick="setPenThickness(12)">極太</button>
 </div>
 
@@ -137,7 +137,7 @@ let currentPaperSize = "A4"; // 現在の用紙サイズ
 let currentVideoSize = 100; // 現在のビデオサイズ（デフォルト100%）
 let canvasScale = 1.0; // キャンバススケール
 let rotationWaitTime = 5.1; // 回転後待機時間
-let currentPenThickness = 2; // 現在のペンの太さ
+let currentPenThickness = 8; // 現在のペンの太さ（標準は太い）
 let currentPenColor = 'black'; // 現在のペンの色
 let neonColorIndex = 0; // ネオン用の色インデックス
 let drawDistance = 0; // 描画距離の追跡（ネオン用）
@@ -481,8 +481,8 @@ canvas.addEventListener("mousemove", (e) => {
       const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
       drawDistance += distance;
       
-      // 50ピクセルごとに色を変更（さらに滑らかな変化）
-      neonColorIndex = drawDistance / 50;
+      // 100ピクセルごとに色を変更（非常になだらかな変化）
+      neonColorIndex = drawDistance / 100;
     }
     
     // 新しいパスを開始して短いセグメントを描画
@@ -575,8 +575,8 @@ canvas.addEventListener("touchmove", (e) => {
       const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
       drawDistance += distance;
       
-      // 50ピクセルごとに色を変更（さらに滑らかな変化）
-      neonColorIndex = drawDistance / 50;
+      // 100ピクセルごとに色を変更（非常になだらかな変化）
+      neonColorIndex = drawDistance / 100;
     }
     
     // 新しいパスを開始して短いセグメントを描画
