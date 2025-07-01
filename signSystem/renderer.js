@@ -7,6 +7,45 @@ let SCALE_FACTOR = 4.0;
 const canvas = document.getElementById("drawCanvas");
 const ctx = canvas.getContext("2d");
 
+// 色補間関数（送信側と同じ）
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return { r, g, b };
+}
+
+function rgbToHex(r, g, b) {
+  return "#" + ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
+}
+
+function interpolateColor(color1, color2, factor) {
+  const rgb1 = hexToRgb(color1);
+  const rgb2 = hexToRgb(color2);
+  
+  const r = rgb1.r + factor * (rgb2.r - rgb1.r);
+  const g = rgb1.g + factor * (rgb2.g - rgb1.g);
+  const b = rgb1.b + factor * (rgb2.b - rgb1.b);
+  
+  return rgbToHex(r, g, b);
+}
+
+function getNeonColorFromIndex(neonIndex) {
+  const colors = [
+    '#ff0000', '#ff8000', '#ffff00', '#80ff00', '#00ff00', '#00ff80',
+    '#00ffff', '#0080ff', '#0000ff', '#8000ff', '#ff00ff', '#ff0080'
+  ];
+  
+  const position = (neonIndex % colors.length);
+  const colorIndex1 = Math.floor(position);
+  const colorIndex2 = (colorIndex1 + 1) % colors.length;
+  const factor = position - colorIndex1;
+  
+  const color1 = colors[colorIndex1];
+  const color2 = colors[colorIndex2];
+  return interpolateColor(color1, color2, factor);
+}
+
 // 🔸 キャンバスのサイズを1.4倍に設定
 const originalWidth = canvas.width;
 const originalHeight = canvas.height;
@@ -201,16 +240,12 @@ function redrawCanvas(withBackground = true) {
       const thickness = cmd.thickness || 4;
       ctx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width); // 線の太さもスケール
       
-      // ネオン効果の処理（カラーパレットを送信側と合わせる）
+      // ネオン効果の処理（滑らかな色補間）
       if (cmd.color === 'neon' && cmd.neonIndex !== null) {
-        const colors = [
-          '#ff0000', '#ff8000', '#ffff00', '#80ff00', '#00ff00', '#00ff80',
-          '#00ffff', '#0080ff', '#0000ff', '#8000ff', '#ff00ff', '#ff0080'
-        ];
-        const colorIndex = Math.floor(cmd.neonIndex) % colors.length;
-        ctx.strokeStyle = colors[colorIndex];
+        const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
+        ctx.strokeStyle = interpolatedColor;
         ctx.shadowBlur = 5; // シャドウを小さくして汚れを軽減
-        ctx.shadowColor = colors[colorIndex];
+        ctx.shadowColor = interpolatedColor;
       } else {
         ctx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
         ctx.shadowBlur = 0;
@@ -389,13 +424,12 @@ function handleMessage(data) {
     const thickness = data.thickness || 4;
     ctx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width); // 線の太さもスケール
     
-    // ネオン効果の処理
+    // ネオン効果の処理（滑らかな色補間）
     if (data.color === 'neon' && data.neonIndex !== null) {
-      const colors = ['#ff0000', '#0000ff', '#ffff00']; // 赤、青、黄
-      const colorIndex = Math.floor(data.neonIndex) % colors.length;
-      ctx.strokeStyle = colors[colorIndex];
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = colors[colorIndex];
+      const interpolatedColor = getNeonColorFromIndex(data.neonIndex);
+      ctx.strokeStyle = interpolatedColor;
+      ctx.shadowBlur = 5;
+      ctx.shadowColor = interpolatedColor;
     } else {
       ctx.strokeStyle = data.color === 'black' ? '#000' : (data.color || '#000');
       ctx.shadowBlur = 0;
@@ -499,11 +533,10 @@ function sendCanvasToMainProcess() {
       const thickness = cmd.thickness || 4;
       printCtx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
       
-      // ネオン効果の処理（印刷時はネオン効果なし）
-      if (cmd.color === 'neon') {
-        const colors = ['#ff0000', '#0000ff', '#ffff00'];
-        const colorIndex = Math.floor(cmd.neonIndex || 0) % colors.length;
-        printCtx.strokeStyle = colors[colorIndex];
+      // ネオン効果の処理（印刷時も補間色を使用）
+      if (cmd.color === 'neon' && cmd.neonIndex !== null) {
+        const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
+        printCtx.strokeStyle = interpolatedColor;
       } else {
         printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
       }
@@ -1062,11 +1095,10 @@ function showPrintPreview() {
       
       // ネオン効果の処理（プレビューでも表示）
       if (cmd.color === 'neon' && cmd.neonIndex !== null) {
-        const colors = ['#ff0000', '#0000ff', '#ffff00'];
-        const colorIndex = Math.floor(cmd.neonIndex) % colors.length;
-        previewCtx.strokeStyle = colors[colorIndex];
-        previewCtx.shadowBlur = 10;
-        previewCtx.shadowColor = colors[colorIndex];
+        const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
+        previewCtx.strokeStyle = interpolatedColor;
+        previewCtx.shadowBlur = 5;
+        previewCtx.shadowColor = interpolatedColor;
       } else {
         previewCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
         previewCtx.shadowBlur = 0;
@@ -1169,11 +1201,10 @@ function printPen() {
       const thickness = cmd.thickness || 4;
       printCtx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
       
-      // ネオン効果の処理（印刷時はネオン効果なし）
-      if (cmd.color === 'neon') {
-        const colors = ['#ff0000', '#0000ff', '#ffff00'];
-        const colorIndex = Math.floor(cmd.neonIndex || 0) % colors.length;
-        printCtx.strokeStyle = colors[colorIndex];
+      // ネオン効果の処理（印刷時も補間色を使用）
+      if (cmd.color === 'neon' && cmd.neonIndex !== null) {
+        const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
+        printCtx.strokeStyle = interpolatedColor;
       } else {
         printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
       }
