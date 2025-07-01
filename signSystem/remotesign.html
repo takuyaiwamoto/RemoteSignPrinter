@@ -360,10 +360,26 @@ function setPenColor(color) {
   }
 }
 
-// ネオン色を取得する関数
+// ネオン色を取得する関数（より多くの色でスムーズなグラデーション）
 function getNeonColor() {
-  const colors = ['#ff0000', '#0000ff', '#ffff00']; // 赤、青、黄
-  return colors[Math.floor(neonColorIndex) % colors.length];
+  const colors = [
+    '#ff0000', // 赤
+    '#ff8000', // オレンジ
+    '#ffff00', // 黄色
+    '#80ff00', // 黄緑
+    '#00ff00', // 緑
+    '#00ff80', // 緑青
+    '#00ffff', // シアン
+    '#0080ff', // 青
+    '#0000ff', // 青
+    '#8000ff', // 紫
+    '#ff00ff', // マゼンタ
+    '#ff0080'  // ピンク
+  ];
+  const colorIndex = Math.floor(neonColorIndex) % colors.length;
+  const selectedColor = colors[colorIndex];
+  console.log(`🌈 ネオン色: index=${neonColorIndex.toFixed(2)}, colorIndex=${colorIndex}, color=${selectedColor}`);
+  return selectedColor;
 }
 
 canvas.addEventListener("mousedown", (e) => {
@@ -405,31 +421,31 @@ canvas.addEventListener("mousemove", (e) => {
   const x = e.offsetX;
   const y = e.offsetY;
   
-  // 前の位置からの距離を計算（ネオン効果用）
-  if (currentPenColor === 'neon' && lastPosition) {
-    const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
-    drawDistance += distance;
-    
-    // 10ピクセルごとに色を変更（より滑らかなグラデーション）
-    neonColorIndex = drawDistance / 10;
-  }
-  
-  // 現在の位置を記録
-  lastPosition = { x, y };
-  
-  // ネオンの場合は各線分で新しいパスを開始（色の変化を明確にするため）
   if (currentPenColor === 'neon') {
-    // 新しい線分を別の色で描画
+    // 前の位置からの距離を計算
+    if (lastPosition) {
+      const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
+      drawDistance += distance;
+      
+      // 5ピクセルごとに色を変更（より細かい色変化）
+      neonColorIndex = drawDistance / 5;
+    }
+    
+    // 新しいパスを開始して短いセグメントを描画
     ctx.beginPath();
     if (lastPosition) {
       ctx.moveTo(lastPosition.x, lastPosition.y);
     }
+    
+    const neonColor = getNeonColor();
     ctx.lineWidth = currentPenThickness;
-    ctx.strokeStyle = getNeonColor();
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = getNeonColor();
+    ctx.strokeStyle = neonColor;
+    ctx.shadowBlur = 5; // シャドウを小さくして汚れを軽減
+    ctx.shadowColor = neonColor;
     ctx.lineTo(x, y);
     ctx.stroke();
+    
+    console.log(`🎨 ネオンセグメント: from(${lastPosition?.x}, ${lastPosition?.y}) to(${x}, ${y}), color=${neonColor}`);
   } else {
     ctx.lineWidth = currentPenThickness;
     ctx.strokeStyle = currentPenColor === 'black' ? '#000' : currentPenColor;
@@ -437,6 +453,9 @@ canvas.addEventListener("mousemove", (e) => {
     ctx.lineTo(x, y);
     ctx.stroke();
   }
+  
+  // 現在の位置を記録
+  lastPosition = { x, y };
   
   const drawMsg = { 
     type: "draw", 
@@ -496,29 +515,27 @@ canvas.addEventListener("touchmove", (e) => {
   const x = touch.clientX - rect.left;
   const y = touch.clientY - rect.top;
   
-  // 前の位置からの距離を計算（ネオン効果用）
-  if (currentPenColor === 'neon' && lastPosition) {
-    const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
-    drawDistance += distance;
-    
-    // 10ピクセルごとに色を変更（より滑らかなグラデーション）
-    neonColorIndex = drawDistance / 10;
-  }
-  
-  // 現在の位置を記録
-  lastPosition = { x, y };
-  
-  // ネオンの場合は各線分で新しいパスを開始（色の変化を明確にするため）
   if (currentPenColor === 'neon') {
-    // 新しい線分を別の色で描画
+    // 前の位置からの距離を計算
+    if (lastPosition) {
+      const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
+      drawDistance += distance;
+      
+      // 5ピクセルごとに色を変更（より細かい色変化）
+      neonColorIndex = drawDistance / 5;
+    }
+    
+    // 新しいパスを開始して短いセグメントを描画
     ctx.beginPath();
     if (lastPosition) {
       ctx.moveTo(lastPosition.x, lastPosition.y);
     }
+    
+    const neonColor = getNeonColor();
     ctx.lineWidth = currentPenThickness;
-    ctx.strokeStyle = getNeonColor();
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = getNeonColor();
+    ctx.strokeStyle = neonColor;
+    ctx.shadowBlur = 5; // シャドウを小さくして汚れを軽減
+    ctx.shadowColor = neonColor;
     ctx.lineTo(x, y);
     ctx.stroke();
   } else {
@@ -528,6 +545,9 @@ canvas.addEventListener("touchmove", (e) => {
     ctx.lineTo(x, y);
     ctx.stroke();
   }
+  
+  // 現在の位置を記録
+  lastPosition = { x, y };
   
   const touchDrawMsg = { 
     type: "draw", 

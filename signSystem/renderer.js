@@ -201,12 +201,15 @@ function redrawCanvas(withBackground = true) {
       const thickness = cmd.thickness || 4;
       ctx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width); // 線の太さもスケール
       
-      // ネオン効果の処理
+      // ネオン効果の処理（カラーパレットを送信側と合わせる）
       if (cmd.color === 'neon' && cmd.neonIndex !== null) {
-        const colors = ['#ff0000', '#0000ff', '#ffff00']; // 赤、青、黄
+        const colors = [
+          '#ff0000', '#ff8000', '#ffff00', '#80ff00', '#00ff00', '#00ff80',
+          '#00ffff', '#0080ff', '#0000ff', '#8000ff', '#ff00ff', '#ff0080'
+        ];
         const colorIndex = Math.floor(cmd.neonIndex) % colors.length;
         ctx.strokeStyle = colors[colorIndex];
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 5; // シャドウを小さくして汚れを軽減
         ctx.shadowColor = colors[colorIndex];
       } else {
         ctx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
