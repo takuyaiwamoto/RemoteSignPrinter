@@ -107,6 +107,7 @@ app.on("window-all-closed", () => {
 // 印刷処理
 ipcMain.on("save-pdf", (event, data) => {
   console.log("📥 画像データ受信");
+  console.log("📥 受信データタイプ:", data.printType || "不明");
  
   let imageDataUrl;
   if (typeof data === 'string') {
@@ -119,7 +120,8 @@ ipcMain.on("save-pdf", (event, data) => {
   const pngBuffer = Buffer.from(base64Data, "base64");
  
   const now = new Date();
-  const fileName = `signature_${now.getFullYear()}${(now.getMonth() + 1)
+  const printType = data.printType || "signature";
+  const fileName = `${printType}_${now.getFullYear()}${(now.getMonth() + 1)
     .toString().padStart(2, "0")}${now.getDate().toString().padStart(2, "0")}_${now
     .getHours().toString().padStart(2, "0")}${now.getMinutes().toString().padStart(2, "0")}${now
     .getSeconds().toString().padStart(2, "0")}.png`;
@@ -140,8 +142,8 @@ ipcMain.on("save-pdf", (event, data) => {
     console.log("📁 保存場所:", savePath);
     
     // 🔸 画像確認のためにエクスプローラーで開く（デバッグ用）
-    // 送信ボタン（printType: "pen"）の場合はフォルダを開かない
-    const shouldOpenFolder = data.printType !== "pen";
+    // 送信ボタン（printType: "pen"）と更に180度回転ボタン（printType: "double_rotated"）の場合はフォルダを開かない
+    const shouldOpenFolder = data.printType !== "pen" && data.printType !== "double_rotated";
     
     if (shouldOpenFolder) {
       if (process.platform === 'win32') {
@@ -162,7 +164,11 @@ ipcMain.on("save-pdf", (event, data) => {
         });
       }
     } else {
-      console.log("📁 送信ボタンからの印刷のため、フォルダは開きません");
+      if (data.printType === "pen") {
+        console.log("📁 送信ボタンからの印刷のため、フォルダは開きません");
+      } else if (data.printType === "double_rotated") {
+        console.log("📁 更に180度回転ボタンからの印刷のため、フォルダは開きません");
+      }
     }
     
     // 🔸 OS別の印刷処理

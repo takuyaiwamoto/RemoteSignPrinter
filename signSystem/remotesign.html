@@ -217,7 +217,7 @@
 
 <div class="button-group">
   <button onclick="clearCanvas()">Clear</button>
-  <button onclick="sendPrintCommand()">送信</button>
+  <button onclick="saveDoubleRotatedImage()" style="background-color: #4CAF50; color: white; font-size: 18px; padding: 12px 24px; font-weight: bold;">送信</button>
   <button onclick="playVideo()" style="background-color: #FF6B6B; color: white;">📹 ビデオ再生</button>
   <button onclick="toggleDevTools()" style="background-color: #FFA500; color: white;">🔧 Dev Tool</button>
 </div>
@@ -517,20 +517,6 @@ function setCanvasSize(backgroundKey) {
   console.log(`📐 送信側キャンバスサイズ変更: ${size.width} x ${size.height}`);
 }
 
-function sendPrintCommand() {
-  if (socket.readyState === WebSocket.OPEN) {
-    // 🔸 印刷コマンドに用紙サイズ情報を含める
-    const printMsg = { 
-      type: "print",
-      paperSize: currentPaperSize 
-    };
-    socket.send(JSON.stringify(printMsg));
-    console.log("📤 送信 print:", printMsg);
-    startCountdown();
-  } else {
-    console.error("❌ WebSocket接続なし - 印刷コマンド送信失敗");
-  }
-}
 
 function startCountdown() {
   const countdownEl = document.getElementById("countdown");
@@ -558,6 +544,11 @@ function startCountdown() {
       if (backgroundImage) {
         ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
       }
+      
+      // 描画コマンドをクリア
+      drawingCommands = [];
+      console.log('🧹 カウントダウン終了: 描画コマンドをクリア');
+      
       // ✅ 背景の同期送信
       const bgSrc = backgroundImage ? backgroundImage.src : "white";
       socket.send(JSON.stringify({ type: "clear" }));
@@ -571,6 +562,11 @@ function clearCanvas() {
   if (backgroundImage) {
     ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
   }
+  
+  // 描画コマンドをクリア
+  drawingCommands = [];
+  console.log('🧹 描画コマンドをクリア');
+  
   socket.send(JSON.stringify({ type: "clear" }));
 }
 
@@ -809,6 +805,16 @@ canvas.addEventListener("mousedown", (e) => {
   drawDistance = 0; // 新しいストロークの開始時に距離をリセット
   lastPosition = { x, y }; // 初期位置を記録
   
+  // 描画コマンドを記録
+  const startCmd = {
+    type: "start",
+    x: x,
+    y: y,
+    thickness: currentPenThickness,
+    color: currentPenColor === 'neon' ? getNeonColor() : (currentPenColor === 'black' ? '#000' : currentPenColor)
+  };
+  drawingCommands.push(startCmd);
+  
   const startMsg = { 
     type: "start", 
     x, 
@@ -842,6 +848,8 @@ canvas.addEventListener("mousemove", (e) => {
   const x = e.offsetX;
   const y = e.offsetY;
   
+  let actualColor;
+  
   if (currentPenColor === 'neon') {
     // 前の位置からの距離を計算
     if (lastPosition) {
@@ -859,6 +867,7 @@ canvas.addEventListener("mousemove", (e) => {
     }
     
     const neonColor = getNeonColor();
+    actualColor = neonColor;
     ctx.lineWidth = currentPenThickness;
     ctx.strokeStyle = neonColor;
     ctx.shadowBlur = 5; // シャドウを小さくして汚れを軽減
@@ -868,12 +877,23 @@ canvas.addEventListener("mousemove", (e) => {
     
     console.log(`🎨 ネオンセグメント: from(${lastPosition?.x}, ${lastPosition?.y}) to(${x}, ${y}), color=${neonColor}`);
   } else {
+    actualColor = currentPenColor === 'black' ? '#000' : currentPenColor;
     ctx.lineWidth = currentPenThickness;
-    ctx.strokeStyle = currentPenColor === 'black' ? '#000' : currentPenColor;
+    ctx.strokeStyle = actualColor;
     ctx.shadowBlur = 0;
     ctx.lineTo(x, y);
     ctx.stroke();
   }
+  
+  // 描画コマンドを記録
+  const drawCmd = {
+    type: "draw",
+    x: x,
+    y: y,
+    thickness: currentPenThickness,
+    color: actualColor
+  };
+  drawingCommands.push(drawCmd);
   
   // 現在の位置を記録
   lastPosition = { x, y };
@@ -923,6 +943,16 @@ canvas.addEventListener("touchstart", (e) => {
   drawDistance = 0; // 新しいストロークの開始時に距離をリセット
   lastPosition = { x, y }; // 初期位置を記録
   
+  // 描画コマンドを記録
+  const startCmd = {
+    type: "start",
+    x: x,
+    y: y,
+    thickness: currentPenThickness,
+    color: currentPenColor === 'neon' ? getNeonColor() : (currentPenColor === 'black' ? '#000' : currentPenColor)
+  };
+  drawingCommands.push(startCmd);
+  
   const touchStartMsg = { 
     type: "start", 
     x, 
@@ -959,6 +989,8 @@ canvas.addEventListener("touchmove", (e) => {
   const x = touch.clientX - rect.left;
   const y = touch.clientY - rect.top;
   
+  let actualColor;
+  
   if (currentPenColor === 'neon') {
     // 前の位置からの距離を計算
     if (lastPosition) {
@@ -976,6 +1008,7 @@ canvas.addEventListener("touchmove", (e) => {
     }
     
     const neonColor = getNeonColor();
+    actualColor = neonColor;
     ctx.lineWidth = currentPenThickness;
     ctx.strokeStyle = neonColor;
     ctx.shadowBlur = 5; // シャドウを小さくして汚れを軽減
@@ -983,12 +1016,23 @@ canvas.addEventListener("touchmove", (e) => {
     ctx.lineTo(x, y);
     ctx.stroke();
   } else {
+    actualColor = currentPenColor === 'black' ? '#000' : currentPenColor;
     ctx.lineWidth = currentPenThickness;
-    ctx.strokeStyle = currentPenColor === 'black' ? '#000' : currentPenColor;
+    ctx.strokeStyle = actualColor;
     ctx.shadowBlur = 0;
     ctx.lineTo(x, y);
     ctx.stroke();
   }
+  
+  // 描画コマンドを記録
+  const drawCmd = {
+    type: "draw",
+    x: x,
+    y: y,
+    thickness: currentPenThickness,
+    color: actualColor
+  };
+  drawingCommands.push(drawCmd);
   
   // 現在の位置を記録
   lastPosition = { x, y };
@@ -1078,6 +1122,185 @@ function sendDevSettings() {
     console.log("✅ 設定を受信側に送信しました");
   } else {
     console.error("❌ WebSocket接続なし");
+  }
+}
+
+// 描画データを保存する配列
+let drawingCommands = [];
+
+function saveRotatedImage() {
+  console.log('📤 送信ボタン: 180度回転画像ダウンロード開始');
+  
+  try {
+    // 最終的な画像用のcanvasを作成
+    const finalCanvas = document.createElement('canvas');
+    const finalCtx = finalCanvas.getContext('2d');
+    finalCanvas.width = canvas.width;
+    finalCanvas.height = canvas.height;
+    
+    // 1. 背景を先に描画（回転させない）
+    if (backgroundImage) {
+      finalCtx.drawImage(backgroundImage, 0, 0, finalCanvas.width, finalCanvas.height);
+    } else {
+      // 白背景で塗りつぶし
+      finalCtx.fillStyle = '#ffffff';
+      finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+    }
+    
+    // 2. ペイントデータのみを180度回転させて描画
+    if (drawingCommands.length > 0) {
+      console.log(`🎨 描画コマンド数: ${drawingCommands.length}`);
+      
+      // 180度回転変換を適用
+      finalCtx.save();
+      finalCtx.translate(finalCanvas.width, finalCanvas.height);
+      finalCtx.rotate(Math.PI);
+      
+      // 描画コマンドを実行（座標は元のまま、キャンバスが回転している）
+      drawingCommands.forEach(cmd => {
+        if (cmd.type === 'start') {
+          finalCtx.beginPath();
+          finalCtx.moveTo(cmd.x, cmd.y);
+        } else if (cmd.type === 'draw') {
+          finalCtx.lineWidth = cmd.thickness || 8;
+          finalCtx.strokeStyle = cmd.color || 'black';
+          finalCtx.lineTo(cmd.x, cmd.y);
+          finalCtx.stroke();
+        }
+      });
+      
+      finalCtx.restore();
+      console.log('🔄 ペイントデータの180度回転処理完了');
+    } else {
+      console.log('⚠️ 描画データがありません');
+    }
+    
+    // 自動ダウンロード
+    const imageDataUrl = finalCanvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    const now = new Date();
+    const fileName = `rotated_${now.getFullYear()}${(now.getMonth() + 1)
+      .toString().padStart(2, "0")}${now.getDate().toString().padStart(2, "0")}_${now
+      .getHours().toString().padStart(2, "0")}${now.getMinutes().toString().padStart(2, "0")}${now
+      .getSeconds().toString().padStart(2, "0")}.png`;
+    
+    link.download = fileName;
+    link.href = imageDataUrl;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    console.log('📥 180度回転画像ダウンロード完了:', fileName);
+    
+  } catch (error) {
+    console.error('❌ 180度回転画像保存エラー詳細:', error.message, error);
+    alert('画像の保存に失敗しました: ' + error.message);
+  }
+}
+
+// 現在の状態から更に180度回転させて保存する関数
+function saveDoubleRotatedImage() {
+  console.log('🔄 送信ボタン: 回転アニメーション開始');
+  
+  // WebSocket経由で受信側にアニメーション開始を通知
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: "startRotationAnimation",
+      waitTime: rotationWaitTime // 書き手側の待機時間設定を送信
+    }));
+    console.log(`🎬 受信側にアニメーション開始を送信 (待機時間: ${rotationWaitTime}秒)`);
+  }
+  
+  // 待機時間後に実際の印刷処理を実行
+  setTimeout(() => {
+    console.log('🔄 更に180度回転: ペイントデータをさらに180度回転');
+    actualPrintProcess();
+  }, rotationWaitTime * 1000);
+}
+
+// 実際の印刷処理を行う関数
+function actualPrintProcess() {
+  try {
+    // 新しいcanvasを作成（taintedにならないように）
+    const cleanCanvas = document.createElement('canvas');
+    const cleanCtx = cleanCanvas.getContext('2d');
+    cleanCanvas.width = canvas.width;
+    cleanCanvas.height = canvas.height;
+    
+    // 白背景で塗りつぶし（背景画像は使わない）
+    cleanCtx.fillStyle = '#ffffff';
+    cleanCtx.fillRect(0, 0, cleanCanvas.width, cleanCanvas.height);
+    
+    // 保存された描画コマンドを再実行（360度回転 = 元の向き）
+    if (drawingCommands.length > 0) {
+      console.log(`🎨 描画コマンド数: ${drawingCommands.length}`);
+      
+      // 描画コマンドを実行（回転なし = 元の向き）
+      drawingCommands.forEach(cmd => {
+        if (cmd.type === 'start') {
+          cleanCtx.beginPath();
+          cleanCtx.moveTo(cmd.x, cmd.y);
+        } else if (cmd.type === 'draw') {
+          cleanCtx.lineWidth = cmd.thickness || 8;
+          cleanCtx.strokeStyle = cmd.color || 'black';
+          cleanCtx.lineTo(cmd.x, cmd.y);
+          cleanCtx.stroke();
+        }
+      });
+      
+      console.log('🔄 ペイントデータの360度回転処理完了（元の向き）');
+    } else {
+      // 描画データがない場合のテスト描画
+      console.log('🔄 描画データがないため、テスト描画を実行');
+      cleanCtx.strokeStyle = 'black';
+      cleanCtx.lineWidth = 5;
+      cleanCtx.beginPath();
+      cleanCtx.moveTo(100, 100);
+      cleanCtx.lineTo(200, 200);
+      cleanCtx.lineTo(300, 100);
+      cleanCtx.stroke();
+      
+      cleanCtx.font = '20px Arial';
+      cleanCtx.fillStyle = 'black';
+      cleanCtx.fillText('Test Drawing (360°)', 150, 250);
+    }
+    
+    // 自動印刷処理
+    const imageDataUrl = cleanCanvas.toDataURL('image/png');
+    
+    // WebSocket経由で受信側に印刷指示を送信
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      console.log('🖨️ WebSocket経由で受信側に印刷データを送信');
+      socket.send(JSON.stringify({
+        type: "printRotatedImage",
+        imageData: imageDataUrl,
+        printType: 'double_rotated'
+      }));
+      console.log('✅ 更に180度回転画像の印刷処理を開始');
+    } else {
+      // フォールバック: ダウンロード
+      console.log('⚠️ WebSocket接続がないため、ダウンロードします');
+      const link = document.createElement('a');
+      const now = new Date();
+      const fileName = `double_rotated_${now.getFullYear()}${(now.getMonth() + 1)
+        .toString().padStart(2, "0")}${now.getDate().toString().padStart(2, "0")}_${now
+        .getHours().toString().padStart(2, "0")}${now.getMinutes().toString().padStart(2, "0")}${now
+        .getSeconds().toString().padStart(2, "0")}.png`;
+      
+      link.download = fileName;
+      link.href = imageDataUrl;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('📥 更に180度回転画像ダウンロード完了:', fileName);
+    }
+    
+  } catch (error) {
+    console.error('❌ 更に180度回転画像保存エラー詳細:', error.message, error);
+    alert('更に180度回転画像の保存に失敗しました: ' + error.message);
   }
 }
 

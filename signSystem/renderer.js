@@ -1042,6 +1042,14 @@ function handleMessage(data) {
     // ハートエフェクト指示を受信
     console.log('💖 送信側からハートエフェクト指示を受信');
     createHeart();
+  } else if (data.type === "downloadRotated") {
+    // 🔸 180度回転ダウンロード要求を受信
+    if (data.paperSize) {
+      currentPaperSize = data.paperSize;
+      console.log(`📤 180度回転ダウンロード用紙サイズ: ${currentPaperSize}`);
+    }
+    console.log("🔄 送信ボタン押下 → 180度回転ダウンロード処理実行");
+    downloadRotated();
   } else if (data.type === "devSettings") {
     // 🔸 Dev Tool設定受信
     const oldCanvasScale = devCanvasScale;
@@ -1077,6 +1085,26 @@ function handleMessage(data) {
     
     // キャンバスサイズを即座に適用
     applyCanvasScale();
+  } else if (data.type === "printRotatedImage") {
+    // 🔸 更に180度回転画像の印刷処理
+    console.log("🖨️ 受信側: printRotatedImage メッセージを受信");
+    console.log("📥 受信データタイプ:", data.printType);
+    
+    // ElectronのメインプロセスにWebSocketで受信した画像データを送信
+    const { ipcRenderer } = require('electron');
+    ipcRenderer.send('save-pdf', {
+      imageData: data.imageData,
+      printType: data.printType || 'double_rotated'
+    });
+    
+    console.log("✅ 更に180度回転画像をElectronに送信完了");
+  } else if (data.type === "startRotationAnimation") {
+    // 🔸 回転アニメーション開始
+    console.log("🎬 回転アニメーション開始");
+    console.log(`⏱️ 待機時間: ${data.waitTime}秒`);
+    
+    // アニメーション実行
+    prepareAndRunAnimation(data.waitTime);
   }
 }
 
@@ -1173,7 +1201,9 @@ function applyCanvasScale() {
   redrawCanvas();
 }
 
-function prepareAndRunAnimation() {
+function prepareAndRunAnimation(waitTime = null) {
+  console.log(`🎬 アニメーション準備開始 (待機時間: ${waitTime}秒)`);
+  
   const imageDataUrl = canvas.toDataURL("image/png");
   canvas.style.display = "none";
   const container = document.getElementById("container");
@@ -1198,10 +1228,10 @@ function prepareAndRunAnimation() {
   
   container.appendChild(animationImage);
 
-  runAnimationSequence();
+  runAnimationSequence(waitTime);
 }
 
-function runAnimationSequence() {
+function runAnimationSequence(waitTime = null) {
   // 🔸 アニメーション画像を直接操作（containerではなく）
   
   // 初期状態を設定（その場に止まる）
@@ -1225,9 +1255,13 @@ function runAnimationSequence() {
 
     // 音声再生は削除されました
 
-    // 🔸 回転完了後の待機時間（Dev Tool設定を使用）
+    // 🔸 回転完了後の待機時間（書き手側の設定またはDev Tool設定を使用）
     let rotationWaitTime;
-    if (currentPaperSize === "A4") {
+    if (waitTime !== null) {
+      // 書き手側から送信された待機時間を使用
+      rotationWaitTime = waitTime * 1000; // 秒をmsに変換
+      console.log(`⏰ 書き手側設定：回転後${waitTime}秒待機してから移動開始`);
+    } else if (currentPaperSize === "A4") {
       rotationWaitTime = devRotationWaitTime * 1000; // Dev設定の秒数をmsに変換
       console.log(`⏰ A4モード：回転後${devRotationWaitTime}秒待機してから移動開始`);
     } else {
@@ -1746,11 +1780,16 @@ function printFull() {
   });
   
   // 🔸 Canvas変換を使った180度回転（送信側と同じ方法）
-  console.log(`🔄 フル印刷: 180度回転処理開始`);
+  console.log(`🔄 フル印刷: 180度回転処理開始 - キャンバスサイズ: ${printCanvas.width}x${printCanvas.height}`);
+  
   const rotatedCanvas = document.createElement('canvas');
   const rotatedCtx = rotatedCanvas.getContext('2d');
   rotatedCanvas.width = printCanvas.width;
   rotatedCanvas.height = printCanvas.height;
+  
+  // デバッグ: 元画像の内容確認
+  const originalData = printCanvas.toDataURL("image/png");
+  console.log('🔄 元画像データ:', originalData.substring(0, 100) + '...');
   
   // 現在の印刷キャンバス内容を180度回転してコピー
   rotatedCtx.save();
@@ -1759,6 +1798,9 @@ function printFull() {
   rotatedCtx.drawImage(printCanvas, 0, 0);
   rotatedCtx.restore();
   
+  // デバッグ: 回転後画像の内容確認
+  const rotatedData = rotatedCanvas.toDataURL("image/png");
+  console.log('🔄 回転後画像データ:', rotatedData.substring(0, 100) + '...');
   console.log('🔄 フル印刷: 180度回転完了');
   
   // 印刷用データを作成
@@ -1823,11 +1865,16 @@ function printPen() {
   });
   
   // 🔸 Canvas変換を使った180度回転（送信側と同じ方法）
-  console.log(`🔄 ペン印刷: 180度回転処理開始`);
+  console.log(`🔄 ペン印刷: 180度回転処理開始 - キャンバスサイズ: ${printCanvas.width}x${printCanvas.height}`);
+  
   const rotatedCanvas = document.createElement('canvas');
   const rotatedCtx = rotatedCanvas.getContext('2d');
   rotatedCanvas.width = printCanvas.width;
   rotatedCanvas.height = printCanvas.height;
+  
+  // デバッグ: 元画像の内容確認
+  const originalData = printCanvas.toDataURL("image/png");
+  console.log('🔄 元画像データ:', originalData.substring(0, 100) + '...');
   
   // 現在の印刷キャンバス内容を180度回転してコピー
   rotatedCtx.save();
@@ -1836,6 +1883,9 @@ function printPen() {
   rotatedCtx.drawImage(printCanvas, 0, 0);
   rotatedCtx.restore();
   
+  // デバッグ: 回転後画像の内容確認
+  const rotatedData = rotatedCanvas.toDataURL("image/png");
+  console.log('🔄 回転後画像データ:', rotatedData.substring(0, 100) + '...');
   console.log('🔄 ペン印刷: 180度回転完了');
   
   // 印刷用データを作成
@@ -1858,6 +1908,87 @@ function printPen() {
     console.log('🖨️ ペン印刷（描画データのみ）を実行');
   } catch (error) {
     console.error('❌ ペン印刷でエラー発生:', error);
+  }
+}
+
+// 🔸 180度回転ダウンロード機能
+function downloadRotated() {
+  const downloadCanvas = document.createElement('canvas');
+  const downloadCtx = downloadCanvas.getContext('2d');
+  
+  // ダウンロード用キャンバスサイズを設定
+  downloadCanvas.width = drawingAreaSize.width;
+  downloadCanvas.height = drawingAreaSize.height;
+  
+  // 背景を白で塗りつぶし
+  downloadCtx.fillStyle = '#ffffff';
+  downloadCtx.fillRect(0, 0, downloadCanvas.width, downloadCanvas.height);
+  
+  // 筆跡のみを描画
+  drawingData.forEach(cmd => {
+    if (cmd.type === "start") {
+      downloadCtx.beginPath();
+      const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+      const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+      downloadCtx.moveTo(scaledX, scaledY);
+    } else if (cmd.type === "draw") {
+      // ペンの太さと色を適用
+      const thickness = cmd.thickness || 4;
+      downloadCtx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
+      
+      // ネオン効果の処理
+      if (cmd.color === 'neon' && cmd.neonIndex !== null) {
+        const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
+        downloadCtx.strokeStyle = interpolatedColor;
+      } else {
+        downloadCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
+      }
+      
+      const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+      const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+      downloadCtx.lineTo(scaledX, scaledY);
+      downloadCtx.stroke();
+    }
+  });
+  
+  // 🔸 180度回転済みの新しいキャンバスを作成
+  console.log(`🔄 180度回転ダウンロード: 回転処理開始`);
+  const rotatedCanvas = document.createElement('canvas');
+  const rotatedCtx = rotatedCanvas.getContext('2d');
+  rotatedCanvas.width = downloadCanvas.width;
+  rotatedCanvas.height = downloadCanvas.height;
+  
+  // 現在のダウンロードキャンバス内容を180度回転してコピー
+  rotatedCtx.save();
+  rotatedCtx.translate(rotatedCanvas.width, rotatedCanvas.height);
+  rotatedCtx.rotate(Math.PI);
+  rotatedCtx.drawImage(downloadCanvas, 0, 0);
+  rotatedCtx.restore();
+  
+  console.log('🔄 180度回転ダウンロード: 回転完了');
+  
+  // ダウンロード用データを作成
+  try {
+    const imageDataUrl = rotatedCanvas.toDataURL("image/png");
+    console.log('🔄 180度回転ダウンロード: 画像データ作成完了');
+    
+    // ダウンロードリンクを作成
+    const link = document.createElement('a');
+    const now = new Date();
+    const fileName = `rotated_${now.getFullYear()}${(now.getMonth() + 1)
+      .toString().padStart(2, "0")}${now.getDate().toString().padStart(2, "0")}_${now
+      .getHours().toString().padStart(2, "0")}${now.getMinutes().toString().padStart(2, "0")}${now
+      .getSeconds().toString().padStart(2, "0")}.png`;
+    
+    link.download = fileName;
+    link.href = imageDataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    console.log('📥 180度回転画像ダウンロード完了:', fileName);
+  } catch (error) {
+    console.error('❌ 180度回転ダウンロードでエラー発生:', error);
   }
 }
 
