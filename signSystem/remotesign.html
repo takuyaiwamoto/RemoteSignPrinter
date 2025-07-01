@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://realtime-sign-server-1.onrender.com ws://localhost:* wss://localhost:*; img-src 'self' data: blob:; media-src 'self';">
   <title>送信側1.2</title>
   <style>
     canvas {
@@ -248,7 +248,7 @@
 const canvas = document.getElementById("drawCanvas");
 const ctx = canvas.getContext("2d");
 let drawing = false;
-let socket = new WebSocket("wss://realtime-sign-server.onrender.com");
+let socket = new WebSocket("wss://realtime-sign-server-1.onrender.com");
 let backgroundImage = null;
 let currentPaperSize = "A4"; // 現在の用紙サイズ
 let currentVideoSize = 100; // 現在のビデオサイズ（デフォルト100%）
@@ -269,6 +269,8 @@ const backgroundSizes = {
   'white': { width: 859, height: 607 }     // 白背景 (842*0.6*1.7, 595*0.6*1.7)
 };
 socket.onopen = () => console.log("✅ WebSocket接続完了（送信側）");
+socket.onerror = (error) => console.error("❌ WebSocketエラー（送信側）:", error);
+socket.onclose = (event) => console.log("⚠️ WebSocket切断（送信側）:", event.code, event.reason);
 
 // ハートエフェクト生成関数
 function createHeart() {

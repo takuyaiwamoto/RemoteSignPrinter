@@ -582,7 +582,7 @@ let resizeDirection = null;
 let senderCanvasSize = { width: 842, height: 595 }; // 送信側のキャンバスサイズ
 let receiverCanvasSize = { width: 842, height: 595 }; // 受信側のキャンバスサイズ
 
-let socket = new WebSocket("wss://realtime-sign-server.onrender.com");
+let socket = new WebSocket("wss://realtime-sign-server-1.onrender.com");
 socket.onopen = () => console.log("✅ WebSocket接続完了（Electron受信側）");
 socket.onerror = e => console.error("❌ WebSocketエラー", e);
 socket.onclose = () => console.warn("⚠️ WebSocket切断");
