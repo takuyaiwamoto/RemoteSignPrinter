@@ -28,6 +28,35 @@
       background-color: #4CAF50;
       color: white;
     }
+    .color-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid #ccc;
+      margin: 0 5px;
+      cursor: pointer;
+    }
+    .color-btn.selected {
+      border: 3px solid #333;
+      box-shadow: 0 0 5px rgba(0,0,0,0.5);
+    }
+    .color-btn.neon {
+      background: linear-gradient(45deg, #ff0000, #0000ff, #ffff00);
+      animation: neonGlow 2s ease-in-out infinite;
+    }
+    @keyframes neonGlow {
+      0%, 100% { box-shadow: 0 0 10px #ff0000; }
+      33% { box-shadow: 0 0 10px #0000ff; }
+      66% { box-shadow: 0 0 10px #ffff00; }
+    }
+    .thickness-btn {
+      min-width: 60px;
+      padding: 5px 10px;
+    }
+    .thickness-btn.selected {
+      background-color: #2196F3;
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -51,6 +80,22 @@
   <button id="size100Btn" class="selected" onclick="setVideoSize(100)">100%</button>
   <button id="size90Btn" onclick="setVideoSize(90)">90%</button>
   <button id="size80Btn" onclick="setVideoSize(80)">80%</button>
+</div>
+
+<div class="button-group">
+  <label>ペンの太さ:</label>
+  <button class="thickness-btn selected" onclick="setPenThickness(2)">細い</button>
+  <button class="thickness-btn" onclick="setPenThickness(4)">普通</button>
+  <button class="thickness-btn" onclick="setPenThickness(8)">太い</button>
+  <button class="thickness-btn" onclick="setPenThickness(12)">極太</button>
+</div>
+
+<div class="button-group">
+  <label>色:</label>
+  <button class="color-btn selected" style="background: black;" onclick="setPenColor('black')"></button>
+  <button class="color-btn" style="background: red;" onclick="setPenColor('red')"></button>
+  <button class="color-btn" style="background: blue;" onclick="setPenColor('blue')"></button>
+  <button class="color-btn neon" onclick="setPenColor('neon')"></button>
 </div>
 
 <div class="button-group">
@@ -92,6 +137,10 @@ let currentPaperSize = "A4"; // 現在の用紙サイズ
 let currentVideoSize = 100; // 現在のビデオサイズ（デフォルト100%）
 let canvasScale = 1.0; // キャンバススケール
 let rotationWaitTime = 5.1; // 回転後待機時間
+let currentPenThickness = 2; // 現在のペンの太さ
+let currentPenColor = 'black'; // 現在のペンの色
+let neonColorIndex = 0; // ネオン用の色インデックス
+let drawDistance = 0; // 描画距離の追跡（ネオン用）
 
 // 背景別キャンバスサイズ設定（1.02倍サイズ = 0.6*1.7）
 const backgroundSizes = {
@@ -270,13 +319,67 @@ function clearCanvas() {
   socket.send(JSON.stringify({ type: "clear" }));
 }
 
+// ペンの太さ設定関数
+function setPenThickness(thickness) {
+  currentPenThickness = thickness;
+  
+  // ボタンの選択状態を更新
+  document.querySelectorAll('.thickness-btn').forEach(btn => btn.classList.remove('selected'));
+  event.target.classList.add('selected');
+  
+  console.log(`✏️ ペンの太さを${thickness}に設定`);
+  
+  // 受信側に太さ情報を送信
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ 
+      type: "penThickness", 
+      thickness: thickness 
+    }));
+  }
+}
+
+// ペンの色設定関数
+function setPenColor(color) {
+  currentPenColor = color;
+  neonColorIndex = 0; // 色変更時にネオンインデックスをリセット
+  drawDistance = 0; // 描画距離もリセット
+  
+  // ボタンの選択状態を更新
+  document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
+  event.target.classList.add('selected');
+  
+  console.log(`🎨 ペンの色を${color}に設定`);
+  
+  // 受信側に色情報を送信
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ 
+      type: "penColor", 
+      color: color 
+    }));
+  }
+}
+
+// ネオン色を取得する関数
+function getNeonColor() {
+  const colors = ['#ff0000', '#0000ff', '#ffff00']; // 赤、青、黄
+  return colors[Math.floor(neonColorIndex) % colors.length];
+}
+
 canvas.addEventListener("mousedown", (e) => {
   drawing = true;
   const x = e.offsetX;
   const y = e.offsetY;
   ctx.beginPath();
   ctx.moveTo(x, y);
-  const startMsg = { type: "start", x, y };
+  drawDistance = 0; // 新しいストロークの開始時に距離をリセット
+  
+  const startMsg = { 
+    type: "start", 
+    x, 
+    y,
+    thickness: currentPenThickness,
+    color: currentPenColor
+  };
   socket.send(JSON.stringify(startMsg));
   console.log("📤 送信 start:", startMsg);
 });
@@ -290,11 +393,43 @@ canvas.addEventListener("mousemove", (e) => {
   if (!drawing) return;
   const x = e.offsetX;
   const y = e.offsetY;
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = "#000";
+  
+  // 前の位置からの距離を計算（ネオン効果用）
+  if (currentPenColor === 'neon') {
+    const prevX = ctx.currentTransform ? ctx.currentTransform.e : x;
+    const prevY = ctx.currentTransform ? ctx.currentTransform.f : y;
+    const distance = Math.sqrt(Math.pow(x - prevX, 2) + Math.pow(y - prevY, 2));
+    drawDistance += distance;
+    
+    // 3ピクセルごとに色を変更
+    if (drawDistance >= 3) {
+      neonColorIndex += drawDistance / 3;
+      drawDistance = drawDistance % 3;
+    }
+  }
+  
+  ctx.lineWidth = currentPenThickness;
+  
+  if (currentPenColor === 'neon') {
+    ctx.strokeStyle = getNeonColor();
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = getNeonColor();
+  } else {
+    ctx.strokeStyle = currentPenColor === 'black' ? '#000' : currentPenColor;
+    ctx.shadowBlur = 0;
+  }
+  
   ctx.lineTo(x, y);
   ctx.stroke();
-  const drawMsg = { type: "draw", x, y };
+  
+  const drawMsg = { 
+    type: "draw", 
+    x, 
+    y,
+    thickness: currentPenThickness,
+    color: currentPenColor,
+    neonIndex: currentPenColor === 'neon' ? neonColorIndex : null
+  };
   socket.send(JSON.stringify(drawMsg));
   console.log("📤 送信 draw:", drawMsg);
 });
@@ -309,7 +444,15 @@ canvas.addEventListener("touchstart", (e) => {
   const y = touch.clientY - rect.top;
   ctx.beginPath();
   ctx.moveTo(x, y);
-  const touchStartMsg = { type: "start", x, y };
+  drawDistance = 0; // 新しいストロークの開始時に距離をリセット
+  
+  const touchStartMsg = { 
+    type: "start", 
+    x, 
+    y,
+    thickness: currentPenThickness,
+    color: currentPenColor
+  };
   socket.send(JSON.stringify(touchStartMsg));
   console.log("📤 送信 touch start:", touchStartMsg);
 });
@@ -326,11 +469,43 @@ canvas.addEventListener("touchmove", (e) => {
   const rect = canvas.getBoundingClientRect();
   const x = touch.clientX - rect.left;
   const y = touch.clientY - rect.top;
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = "#000";
+  
+  // 前の位置からの距離を計算（ネオン効果用）
+  if (currentPenColor === 'neon') {
+    const prevX = ctx.currentTransform ? ctx.currentTransform.e : x;
+    const prevY = ctx.currentTransform ? ctx.currentTransform.f : y;
+    const distance = Math.sqrt(Math.pow(x - prevX, 2) + Math.pow(y - prevY, 2));
+    drawDistance += distance;
+    
+    // 3ピクセルごとに色を変更
+    if (drawDistance >= 3) {
+      neonColorIndex += drawDistance / 3;
+      drawDistance = drawDistance % 3;
+    }
+  }
+  
+  ctx.lineWidth = currentPenThickness;
+  
+  if (currentPenColor === 'neon') {
+    ctx.strokeStyle = getNeonColor();
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = getNeonColor();
+  } else {
+    ctx.strokeStyle = currentPenColor === 'black' ? '#000' : currentPenColor;
+    ctx.shadowBlur = 0;
+  }
+  
   ctx.lineTo(x, y);
   ctx.stroke();
-  const touchDrawMsg = { type: "draw", x, y };
+  
+  const touchDrawMsg = { 
+    type: "draw", 
+    x, 
+    y,
+    thickness: currentPenThickness,
+    color: currentPenColor,
+    neonIndex: currentPenColor === 'neon' ? neonColorIndex : null
+  };
   socket.send(JSON.stringify(touchDrawMsg));
   console.log("📤 送信 touch draw:", touchDrawMsg);
 });

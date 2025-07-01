@@ -197,8 +197,22 @@ function redrawCanvas(withBackground = true) {
       
       ctx.moveTo(areaLeft + scaledX, areaTop + scaledY);
     } else if (cmd.type === "draw") {
-      ctx.lineWidth = 4 * (drawingAreaSize.width / senderCanvasSize.width); // 線の太さもスケール
-      ctx.strokeStyle = "#000";
+      // ペンの太さと色を適用
+      const thickness = cmd.thickness || 4;
+      ctx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width); // 線の太さもスケール
+      
+      // ネオン効果の処理
+      if (cmd.color === 'neon' && cmd.neonIndex !== null) {
+        const colors = ['#ff0000', '#0000ff', '#ffff00']; // 赤、青、黄
+        const colorIndex = Math.floor(cmd.neonIndex) % colors.length;
+        ctx.strokeStyle = colors[colorIndex];
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = colors[colorIndex];
+      } else {
+        ctx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
+        ctx.shadowBlur = 0;
+      }
+      
       // 🔸 描画エリア調整を適用した座標変換
       const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
       const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
@@ -368,8 +382,22 @@ function handleMessage(data) {
     const areaLeft = areaCenterX - drawingAreaSize.width / 2;
     const areaTop = areaCenterY - drawingAreaSize.height / 2;
     
-    ctx.lineWidth = 4 * (drawingAreaSize.width / senderCanvasSize.width); // 線の太さもスケール
-    ctx.strokeStyle = "#000";
+    // ペンの太さと色を適用
+    const thickness = data.thickness || 4;
+    ctx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width); // 線の太さもスケール
+    
+    // ネオン効果の処理
+    if (data.color === 'neon' && data.neonIndex !== null) {
+      const colors = ['#ff0000', '#0000ff', '#ffff00']; // 赤、青、黄
+      const colorIndex = Math.floor(data.neonIndex) % colors.length;
+      ctx.strokeStyle = colors[colorIndex];
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = colors[colorIndex];
+    } else {
+      ctx.strokeStyle = data.color === 'black' ? '#000' : (data.color || '#000');
+      ctx.shadowBlur = 0;
+    }
+    
     ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
     ctx.stroke();
     
@@ -385,6 +413,12 @@ function handleMessage(data) {
     // 🔸 ビデオサイズ変更
     currentVideoSize = data.size;
     console.log(`📐 ビデオサイズを${data.size}%に設定`);
+  } else if (data.type === "penThickness") {
+    // ペンの太さ変更通知を受信
+    console.log(`✏️ ペンの太さを${data.thickness}に変更`);
+  } else if (data.type === "penColor") {
+    // ペンの色変更通知を受信
+    console.log(`🎨 ペンの色を${data.color}に変更`);
   } else if (data.type === "devSettings") {
     // 🔸 Dev Tool設定受信
     const oldCanvasScale = devCanvasScale;
@@ -458,8 +492,19 @@ function sendCanvasToMainProcess() {
       const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
       printCtx.moveTo(scaledX, scaledY);
     } else if (cmd.type === "draw") {
-      printCtx.lineWidth = 4 * (drawingAreaSize.width / senderCanvasSize.width);
-      printCtx.strokeStyle = "#000";
+      // ペンの太さと色を適用
+      const thickness = cmd.thickness || 4;
+      printCtx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
+      
+      // ネオン効果の処理（印刷時はネオン効果なし）
+      if (cmd.color === 'neon') {
+        const colors = ['#ff0000', '#0000ff', '#ffff00'];
+        const colorIndex = Math.floor(cmd.neonIndex || 0) % colors.length;
+        printCtx.strokeStyle = colors[colorIndex];
+      } else {
+        printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
+      }
+      
       const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
       const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
       printCtx.lineTo(scaledX, scaledY);
@@ -1008,8 +1053,22 @@ function showPrintPreview() {
       const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
       previewCtx.moveTo(scaledX, scaledY);
     } else if (cmd.type === "draw") {
-      previewCtx.lineWidth = 4 * (drawingAreaSize.width / senderCanvasSize.width);
-      previewCtx.strokeStyle = "#000";
+      // ペンの太さと色を適用
+      const thickness = cmd.thickness || 4;
+      previewCtx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
+      
+      // ネオン効果の処理（プレビューでも表示）
+      if (cmd.color === 'neon' && cmd.neonIndex !== null) {
+        const colors = ['#ff0000', '#0000ff', '#ffff00'];
+        const colorIndex = Math.floor(cmd.neonIndex) % colors.length;
+        previewCtx.strokeStyle = colors[colorIndex];
+        previewCtx.shadowBlur = 10;
+        previewCtx.shadowColor = colors[colorIndex];
+      } else {
+        previewCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
+        previewCtx.shadowBlur = 0;
+      }
+      
       // 送信側から受信側への座標変換
       const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
       const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
@@ -1103,8 +1162,19 @@ function printPen() {
       const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
       printCtx.moveTo(scaledX, scaledY);
     } else if (cmd.type === "draw") {
-      printCtx.lineWidth = 4 * (drawingAreaSize.width / senderCanvasSize.width);
-      printCtx.strokeStyle = "#000";
+      // ペンの太さと色を適用
+      const thickness = cmd.thickness || 4;
+      printCtx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
+      
+      // ネオン効果の処理（印刷時はネオン効果なし）
+      if (cmd.color === 'neon') {
+        const colors = ['#ff0000', '#0000ff', '#ffff00'];
+        const colorIndex = Math.floor(cmd.neonIndex || 0) % colors.length;
+        printCtx.strokeStyle = colors[colorIndex];
+      } else {
+        printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
+      }
+      
       const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
       const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
       printCtx.lineTo(scaledX, scaledY);
