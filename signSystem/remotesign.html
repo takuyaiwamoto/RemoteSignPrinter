@@ -141,6 +141,7 @@ let currentPenThickness = 2; // 現在のペンの太さ
 let currentPenColor = 'black'; // 現在のペンの色
 let neonColorIndex = 0; // ネオン用の色インデックス
 let drawDistance = 0; // 描画距離の追跡（ネオン用）
+let lastPosition = null; // 前回の位置を記録
 
 // 背景別キャンバスサイズ設定（1.02倍サイズ = 0.6*1.7）
 const backgroundSizes = {
@@ -372,6 +373,7 @@ canvas.addEventListener("mousedown", (e) => {
   ctx.beginPath();
   ctx.moveTo(x, y);
   drawDistance = 0; // 新しいストロークの開始時に距離をリセット
+  lastPosition = { x, y }; // 初期位置を記録
   
   const startMsg = { 
     type: "start", 
@@ -395,32 +397,35 @@ canvas.addEventListener("mousemove", (e) => {
   const y = e.offsetY;
   
   // 前の位置からの距離を計算（ネオン効果用）
-  if (currentPenColor === 'neon') {
-    const prevX = ctx.currentTransform ? ctx.currentTransform.e : x;
-    const prevY = ctx.currentTransform ? ctx.currentTransform.f : y;
-    const distance = Math.sqrt(Math.pow(x - prevX, 2) + Math.pow(y - prevY, 2));
+  if (currentPenColor === 'neon' && lastPosition) {
+    const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
     drawDistance += distance;
     
-    // 3ピクセルごとに色を変更
-    if (drawDistance >= 3) {
-      neonColorIndex += drawDistance / 3;
-      drawDistance = drawDistance % 3;
-    }
+    // 10ピクセルごとに色を変更（より滑らかなグラデーション）
+    neonColorIndex = drawDistance / 10;
   }
   
-  ctx.lineWidth = currentPenThickness;
+  // 現在の位置を記録
+  lastPosition = { x, y };
   
-  if (currentPenColor === 'neon') {
+  // ネオンの場合は各線分で新しいパスを開始（色の変化を明確にするため）
+  if (currentPenColor === 'neon' && lastPosition) {
+    ctx.stroke(); // 前の線分を描画
+    ctx.beginPath(); // 新しいパスを開始
+    ctx.moveTo(lastPosition.x, lastPosition.y); // 前の位置から開始
+    ctx.lineWidth = currentPenThickness;
     ctx.strokeStyle = getNeonColor();
     ctx.shadowBlur = 10;
     ctx.shadowColor = getNeonColor();
+    ctx.lineTo(x, y);
+    ctx.stroke();
   } else {
+    ctx.lineWidth = currentPenThickness;
     ctx.strokeStyle = currentPenColor === 'black' ? '#000' : currentPenColor;
     ctx.shadowBlur = 0;
+    ctx.lineTo(x, y);
+    ctx.stroke();
   }
-  
-  ctx.lineTo(x, y);
-  ctx.stroke();
   
   const drawMsg = { 
     type: "draw", 
@@ -445,6 +450,7 @@ canvas.addEventListener("touchstart", (e) => {
   ctx.beginPath();
   ctx.moveTo(x, y);
   drawDistance = 0; // 新しいストロークの開始時に距離をリセット
+  lastPosition = { x, y }; // 初期位置を記録
   
   const touchStartMsg = { 
     type: "start", 
@@ -471,32 +477,35 @@ canvas.addEventListener("touchmove", (e) => {
   const y = touch.clientY - rect.top;
   
   // 前の位置からの距離を計算（ネオン効果用）
-  if (currentPenColor === 'neon') {
-    const prevX = ctx.currentTransform ? ctx.currentTransform.e : x;
-    const prevY = ctx.currentTransform ? ctx.currentTransform.f : y;
-    const distance = Math.sqrt(Math.pow(x - prevX, 2) + Math.pow(y - prevY, 2));
+  if (currentPenColor === 'neon' && lastPosition) {
+    const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
     drawDistance += distance;
     
-    // 3ピクセルごとに色を変更
-    if (drawDistance >= 3) {
-      neonColorIndex += drawDistance / 3;
-      drawDistance = drawDistance % 3;
-    }
+    // 10ピクセルごとに色を変更（より滑らかなグラデーション）
+    neonColorIndex = drawDistance / 10;
   }
   
-  ctx.lineWidth = currentPenThickness;
+  // 現在の位置を記録
+  lastPosition = { x, y };
   
-  if (currentPenColor === 'neon') {
+  // ネオンの場合は各線分で新しいパスを開始（色の変化を明確にするため）
+  if (currentPenColor === 'neon' && lastPosition) {
+    ctx.stroke(); // 前の線分を描画
+    ctx.beginPath(); // 新しいパスを開始
+    ctx.moveTo(lastPosition.x, lastPosition.y); // 前の位置から開始
+    ctx.lineWidth = currentPenThickness;
     ctx.strokeStyle = getNeonColor();
     ctx.shadowBlur = 10;
     ctx.shadowColor = getNeonColor();
+    ctx.lineTo(x, y);
+    ctx.stroke();
   } else {
+    ctx.lineWidth = currentPenThickness;
     ctx.strokeStyle = currentPenColor === 'black' ? '#000' : currentPenColor;
     ctx.shadowBlur = 0;
+    ctx.lineTo(x, y);
+    ctx.stroke();
   }
-  
-  ctx.lineTo(x, y);
-  ctx.stroke();
   
   const touchDrawMsg = { 
     type: "draw", 
