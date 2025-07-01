@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
   <title>送信側1.2</title>
   <style>
     canvas {
@@ -57,6 +58,114 @@
       background-color: #2196F3;
       color: white;
     }
+    .star {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: gold;
+      pointer-events: none;
+      animation: starTwinkle 1s ease-out forwards;
+      z-index: 10;
+      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    }
+    @keyframes starTwinkle {
+      0% {
+        opacity: 1;
+        transform: scale(0) rotate(0deg) translateX(0px) translateY(0px);
+        filter: blur(0px);
+      }
+      30% {
+        opacity: 1;
+        transform: scale(1.2) rotate(180deg) translateX(10px) translateY(-10px);
+        filter: blur(0px);
+      }
+      60% {
+        opacity: 0.7;
+        transform: scale(1.0) rotate(270deg) translateX(20px) translateY(-20px);
+        filter: blur(1px);
+      }
+      85% {
+        opacity: 0.3;
+        transform: scale(0.6) rotate(330deg) translateX(25px) translateY(-25px);
+        filter: blur(2px);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(0.2) rotate(360deg) translateX(30px) translateY(-30px);
+        filter: blur(3px);
+      }
+    }
+    .fairy-dust {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      background: #fff;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: fairyDustTwinkle 3s ease-in-out forwards;
+      z-index: 9;
+      box-shadow: 0 0 8px #fff, 0 0 16px #fff, 0 0 24px #fff;
+    }
+    @keyframes fairyDustTwinkle {
+      0% {
+        opacity: 0;
+        transform: scale(0) translateX(0px) translateY(0px);
+        filter: blur(2px);
+      }
+      15% {
+        opacity: 0.7;
+        transform: scale(0.5) translateX(3px) translateY(-3px);
+        filter: blur(1px);
+      }
+      30% {
+        opacity: 1;
+        transform: scale(1) translateX(8px) translateY(-8px);
+        filter: blur(0px);
+      }
+      60% {
+        opacity: 0.9;
+        transform: scale(0.9) translateX(15px) translateY(-15px);
+        filter: blur(0.5px);
+      }
+      80% {
+        opacity: 0.5;
+        transform: scale(0.6) translateX(20px) translateY(-20px);
+        filter: blur(1.5px);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(0.2) translateX(25px) translateY(-25px);
+        filter: blur(3px);
+      }
+    }
+    .heart {
+      position: fixed;
+      width: 25px;
+      height: 25px;
+      background: #ff69b4;
+      right: 50px;
+      bottom: 20px;
+      pointer-events: none;
+      z-index: 10000;
+      transform: rotate(45deg);
+    }
+    .heart::before,
+    .heart::after {
+      content: '';
+      width: 25px;
+      height: 25px;
+      position: absolute;
+      background: #ff69b4;
+      border-radius: 50%;
+    }
+    .heart::before {
+      top: -12.5px;
+      left: 0;
+    }
+    .heart::after {
+      top: 0;
+      left: -12.5px;
+    }
   </style>
 </head>
 <body>
@@ -96,6 +205,14 @@
   <button class="color-btn" style="background: red;" onclick="setPenColor('red')"></button>
   <button class="color-btn" style="background: blue;" onclick="setPenColor('blue')"></button>
   <button class="color-btn neon" onclick="setPenColor('neon')"></button>
+</div>
+
+<div class="button-group">
+  <label>エフェクト:</label>
+  <input type="checkbox" id="starEffect" checked onchange="toggleStarEffect()">
+  <label for="starEffect">星</label>
+  <input type="checkbox" id="fairyDustEffect" onchange="toggleFairyDustEffect()" checked>
+  <label for="fairyDustEffect">妖精の粉</label>
 </div>
 
 <div class="button-group">
@@ -142,6 +259,8 @@ let currentPenColor = 'black'; // 現在のペンの色
 let neonColorIndex = 0; // ネオン用の色インデックス
 let drawDistance = 0; // 描画距離の追跡（ネオン用）
 let lastPosition = null; // 前回の位置を記録
+let starEffectEnabled = true; // 星エフェクトの有効/無効（標準でON）
+let fairyDustEffectEnabled = true; // 妖精の粉エフェクトの有効/無効（標準でON）
 
 // 背景別キャンバスサイズ設定（1.02倍サイズ = 0.6*1.7）
 const backgroundSizes = {
@@ -150,6 +269,139 @@ const backgroundSizes = {
   'white': { width: 859, height: 607 }     // 白背景 (842*0.6*1.7, 595*0.6*1.7)
 };
 socket.onopen = () => console.log("✅ WebSocket接続完了（送信側）");
+
+// ハートエフェクト生成関数
+function createHeart() {
+  console.log('💖 ハート生成開始（送信側）');
+  const heart = document.createElement('div');
+  heart.className = 'heart';
+  
+  // ランダムなゆらゆら効果を生成
+  const randomAnimationName = `heartFloat_${Math.random().toString(36).substr(2, 9)}`;
+  const randomMoves = [];
+  for (let i = 0; i <= 5; i++) {
+    const randomX = (Math.random() - 0.5) * 30; // -15px to 15px
+    randomMoves.push(randomX);
+  }
+  
+  console.log(`💖 ランダム移動値: [${randomMoves.join(', ')}]`);
+  
+  // ランダムなキーフレームを動的に生成
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes ${randomAnimationName} {
+      0% {
+        opacity: 1;
+        transform: rotate(45deg) translateX(${randomMoves[0]}px);
+        bottom: 20px;
+      }
+      20% {
+        opacity: 1;
+        transform: rotate(45deg) translateX(${randomMoves[1]}px);
+        bottom: 80px;
+      }
+      40% {
+        opacity: 0.9;
+        transform: rotate(45deg) translateX(${randomMoves[2]}px);
+        bottom: 140px;
+      }
+      60% {
+        opacity: 0.8;
+        transform: rotate(45deg) translateX(${randomMoves[3]}px);
+        bottom: 200px;
+      }
+      80% {
+        opacity: 0.5;
+        transform: rotate(45deg) translateX(${randomMoves[4]}px);
+        bottom: 260px;
+      }
+      100% {
+        opacity: 0;
+        transform: rotate(45deg) translateX(${randomMoves[5]}px);
+        bottom: 320px;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+  console.log(`💖 スタイル追加: ${randomAnimationName}`);
+  
+  // ランダムアニメーションを適用
+  heart.style.animation = `${randomAnimationName} 3s linear forwards`;
+  
+  // デバッグ用スタイル追加
+  heart.style.border = '2px solid red';
+  heart.style.zIndex = '99999';
+  
+  document.body.appendChild(heart);
+  console.log('💖 ハートをDOMに追加（送信側）:', heart);
+  
+  // 音楽再生
+  const audio = new Audio('./poyo.mp3');
+  audio.play().catch(e => console.log('音楽再生エラー:', e));
+  
+  // アニメーション終了後削除（スタイルも削除）
+  setTimeout(() => {
+    if (heart.parentNode) {
+      heart.parentNode.removeChild(heart);
+      console.log('💖 ハート削除（送信側）');
+    }
+    if (style.parentNode) {
+      style.parentNode.removeChild(style);
+      console.log('💖 スタイル削除（送信側）');
+    }
+  }, 3000);
+}
+
+// 受信側からのメッセージ処理
+socket.onmessage = function(event) {
+  try {
+    // Blobの場合は文字列として読み取る
+    if (event.data instanceof Blob) {
+      console.log('📦 Blobデータを受信 - テキストとして読み取り試行');
+      const reader = new FileReader();
+      reader.onload = function() {
+        try {
+          const data = JSON.parse(reader.result);
+          console.log('📨 Blobから解析したメッセージ:', data);
+          
+          if (data.type === "heartEffect") {
+            console.log('💖 受信側からハートエフェクト指示を受信（Blob経由）');
+            createHeart();
+          }
+        } catch (error) {
+          console.log('⚠️ Blob解析エラー:', error.message);
+        }
+      };
+      reader.readAsText(event.data);
+      return;
+    }
+    
+    const data = JSON.parse(event.data);
+    console.log('📨 送信側で受信したメッセージ:', data);
+    
+    if (data.type === "heartEffect") {
+      console.log('💖 受信側からハートエフェクト指示を受信');
+      createHeart();
+    }
+  } catch (error) {
+    console.log('⚠️ メッセージ解析エラー:', error.message);
+    console.log('📄 受信データ:', event.data);
+  }
+};
+
+// 送信側でもlキーでハートを表示（テスト用）
+document.addEventListener('keydown', function(event) {
+  if (event.key.toLowerCase() === 'l') {
+    console.log('💖 送信側でlキーが押されました - テスト用ハート表示');
+    createHeart();
+  }
+});
+
+// テスト用：5秒後に自動でハートを表示
+setTimeout(() => {
+  console.log('🧪 テスト: 自動ハート表示（送信側）');
+  createHeart();
+}, 5000);
 
 // 🔸 用紙サイズ設定関数
 function setPaperSize(size) {
@@ -436,6 +688,107 @@ function getNeonColor() {
   return interpolatedColor;
 }
 
+// 星エフェクトのON/OFF切り替え
+function toggleStarEffect() {
+  starEffectEnabled = document.getElementById('starEffect').checked;
+  console.log(`⭐ 星エフェクト: ${starEffectEnabled ? 'ON' : 'OFF'}`);
+  
+  // 受信側に星エフェクト状態を送信
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ 
+      type: "starEffect", 
+      enabled: starEffectEnabled 
+    }));
+  }
+}
+
+// 妖精の粉エフェクトのON/OFF切り替え
+function toggleFairyDustEffect() {
+  fairyDustEffectEnabled = document.getElementById('fairyDustEffect').checked;
+  console.log(`✨ 妖精の粉エフェクト: ${fairyDustEffectEnabled ? 'ON' : 'OFF'}`);
+  
+  // 受信側に妖精の粉エフェクト状態を送信
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ 
+      type: "fairyDustEffect", 
+      enabled: fairyDustEffectEnabled 
+    }));
+  }
+}
+
+// 妖精の粉を生成する関数
+function createFairyDust(x, y) {
+  // 妖精の粉を極少数生成（1-2個）
+  const dustCount = Math.floor(Math.random() * 2) + 1;
+  
+  for (let i = 0; i < dustCount; i++) {
+    const dust = document.createElement('div');
+    dust.className = 'fairy-dust';
+    
+    // 広範囲にランダム配置（80px範囲）
+    const offsetX = (Math.random() - 0.5) * 80;
+    const offsetY = (Math.random() - 0.5) * 80;
+    
+    dust.style.left = (x + offsetX) + 'px';
+    dust.style.top = (y + offsetY) + 'px';
+    
+    // ランダムな色（キラキラした色）
+    const colors = ['#fff', '#f0f8ff', '#e6e6fa', '#fffacd', '#f5f5dc', '#ffefd5'];
+    dust.style.background = colors[Math.floor(Math.random() * colors.length)];
+    dust.style.boxShadow = `0 0 6px ${dust.style.background}, 0 0 12px ${dust.style.background}, 0 0 18px ${dust.style.background}`;
+    
+    // ランダムな遅延でアニメーション開始
+    dust.style.animationDelay = (Math.random() * 0.5) + 's';
+    
+    document.body.appendChild(dust);
+    
+    // アニメーション終了後に妖精の粉を削除
+    setTimeout(() => {
+      if (dust.parentNode) {
+        dust.parentNode.removeChild(dust);
+      }
+    }, 3000);
+  }
+}
+
+// 星を生成する関数（飛び散る効果）
+function createStar(x, y) {
+  // 星の数をさらに減らす（1個、たまに2個）
+  const starCount = Math.random() < 0.3 ? 2 : 1;
+  
+  for (let i = 0; i < starCount; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    
+    // より広範囲にランダム配置（50px範囲）
+    const offsetX = (Math.random() - 0.5) * 50;
+    const offsetY = (Math.random() - 0.5) * 50;
+    
+    star.style.left = (x + offsetX) + 'px';
+    star.style.top = (y + offsetY) + 'px';
+    
+    // ランダムな色（金色系）
+    const colors = ['gold', '#FFD700', '#FFA500', '#FFFF00', '#FFE4B5', '#FFFACD'];
+    star.style.background = colors[Math.floor(Math.random() * colors.length)];
+    
+    // ランダムな飛び散り方向
+    const direction = Math.random() * 360;
+    star.style.setProperty('--fly-direction', direction + 'deg');
+    
+    // ランダムな遅延でアニメーション開始
+    star.style.animationDelay = (Math.random() * 0.3) + 's';
+    
+    document.body.appendChild(star);
+    
+    // アニメーション終了後に星を削除
+    setTimeout(() => {
+      if (star.parentNode) {
+        star.parentNode.removeChild(star);
+      }
+    }, 1000);
+  }
+}
+
 canvas.addEventListener("mousedown", (e) => {
   drawing = true;
   const x = e.offsetX;
@@ -459,10 +812,22 @@ canvas.addEventListener("mousedown", (e) => {
     x, 
     y,
     thickness: currentPenThickness,
-    color: currentPenColor
+    color: currentPenColor,
+    starEffect: starEffectEnabled,
+    fairyDustEffect: fairyDustEffectEnabled
   };
   socket.send(JSON.stringify(startMsg));
   console.log("📤 送信 start:", startMsg);
+  
+  // 星エフェクトが有効な場合は星を生成
+  if (starEffectEnabled) {
+    createStar(x, y);
+  }
+  
+  // 妖精の粉エフェクトが有効な場合は妖精の粉を生成
+  if (fairyDustEffectEnabled) {
+    createFairyDust(x, y);
+  }
 });
 
 canvas.addEventListener("mouseup", () => {
@@ -517,10 +882,21 @@ canvas.addEventListener("mousemove", (e) => {
     y,
     thickness: currentPenThickness,
     color: currentPenColor,
-    neonIndex: currentPenColor === 'neon' ? neonColorIndex : null
+    neonIndex: currentPenColor === 'neon' ? neonColorIndex : null,
+    starEffect: starEffectEnabled
   };
   socket.send(JSON.stringify(drawMsg));
   console.log("📤 送信 draw:", drawMsg);
+  
+  // 星エフェクトが有効な場合は星を生成（2回に1回の頻度）
+  if (starEffectEnabled && Math.random() < 0.5) {
+    createStar(x, y);
+  }
+  
+  // 妖精の粉エフェクトが有効な場合は妖精の粉を生成（3回に1回の頻度）
+  if (fairyDustEffectEnabled && Math.random() < 0.33) {
+    createFairyDust(x, y);
+  }
 });
 
 // 🔸 スマホ対応：タッチイベントを追加
@@ -550,10 +926,22 @@ canvas.addEventListener("touchstart", (e) => {
     x, 
     y,
     thickness: currentPenThickness,
-    color: currentPenColor
+    color: currentPenColor,
+    starEffect: starEffectEnabled,
+    fairyDustEffect: fairyDustEffectEnabled
   };
   socket.send(JSON.stringify(touchStartMsg));
   console.log("📤 送信 touch start:", touchStartMsg);
+  
+  // 星エフェクトが有効な場合は星を生成
+  if (starEffectEnabled) {
+    createStar(x, y);
+  }
+  
+  // 妖精の粉エフェクトが有効な場合は妖精の粉を生成
+  if (fairyDustEffectEnabled) {
+    createFairyDust(x, y);
+  }
 });
 
 canvas.addEventListener("touchend", (e) => {
@@ -609,10 +997,21 @@ canvas.addEventListener("touchmove", (e) => {
     y,
     thickness: currentPenThickness,
     color: currentPenColor,
-    neonIndex: currentPenColor === 'neon' ? neonColorIndex : null
+    neonIndex: currentPenColor === 'neon' ? neonColorIndex : null,
+    starEffect: starEffectEnabled
   };
   socket.send(JSON.stringify(touchDrawMsg));
   console.log("📤 送信 touch draw:", touchDrawMsg);
+  
+  // 星エフェクトが有効な場合は星を生成（2回に1回の頻度）
+  if (starEffectEnabled && Math.random() < 0.5) {
+    createStar(x, y);
+  }
+  
+  // 妖精の粉エフェクトが有効な場合は妖精の粉を生成（3回に1回の頻度）
+  if (fairyDustEffectEnabled && Math.random() < 0.33) {
+    createFairyDust(x, y);
+  }
 });
 
 // 🔸 ビデオサイズ設定関数
@@ -674,7 +1073,7 @@ function sendDevSettings() {
       rotationWaitTime: rotationWaitTime
     }));
     console.log(`🔧 Dev設定送信: scale=${canvasScale}, wait=${rotationWaitTime}`);
-    alert("設定を受信側に送信しました");
+    console.log("✅ 設定を受信側に送信しました");
   } else {
     console.error("❌ WebSocket接続なし");
   }
