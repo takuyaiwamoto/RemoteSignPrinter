@@ -477,6 +477,8 @@ socket.onmessage = function(event) {
     } else if (data.type === "specialHeartEffect") {
       console.log('🎉 受信側から特別ハートエフェクト指示を受信');
       createSpecialHeart();
+    } else {
+      console.log('⚠️ 不明なメッセージタイプ:', data.type);
     }
   } catch (error) {
     console.log('⚠️ メッセージ解析エラー:', error.message);
@@ -485,10 +487,30 @@ socket.onmessage = function(event) {
 };
 
 // 送信側でもlキーでハートを表示（テスト用）
+let senderLKeyCount = 0;
+let senderLKeyTimer = null;
+
 document.addEventListener('keydown', function(event) {
   if (event.key.toLowerCase() === 'l') {
-    console.log('💖 送信側でlキーが押されました - テスト用ハート表示');
-    createHeart();
+    senderLKeyCount++;
+    console.log('💖 送信側でlキーが押されました - カウント:', senderLKeyCount);
+    
+    if (senderLKeyTimer) {
+      clearTimeout(senderLKeyTimer);
+    }
+    
+    if (senderLKeyCount >= 10) {
+      console.log('🎉 送信側でl10回達成 - 特別演出テスト');
+      createSpecialHeart();
+      senderLKeyCount = 0;
+    } else {
+      createHeart();
+    }
+    
+    senderLKeyTimer = setTimeout(() => {
+      senderLKeyCount = 0;
+      console.log('⏰ 送信側lキーカウントリセット');
+    }, 3000);
   }
 });
 
