@@ -166,6 +166,36 @@
       top: 0;
       left: -12.5px;
     }
+    
+    /* 特別演出用の大きなハート */
+    .special-heart {
+      position: fixed;
+      width: 120px;
+      height: 120px;
+      background: #ff1493;
+      pointer-events: none;
+      z-index: 99999;
+      transform: rotate(45deg);
+      box-shadow: 0 0 20px #ff1493, 0 0 40px #ff1493, 0 0 60px #ff1493;
+    }
+    .special-heart::before,
+    .special-heart::after {
+      content: '';
+      width: 120px;
+      height: 120px;
+      position: absolute;
+      background: #ff1493;
+      border-radius: 50%;
+      box-shadow: 0 0 20px #ff1493;
+    }
+    .special-heart::before {
+      top: -60px;
+      left: 0;
+    }
+    .special-heart::after {
+      top: 0;
+      left: -60px;
+    }
   </style>
 </head>
 <body>
@@ -354,6 +384,63 @@ function createHeart() {
   }, 3000);
 }
 
+// 特別演出用の大きなハート生成関数
+function createSpecialHeart() {
+  console.log('🎉 特別演出開始！送信側に30個の大きなハートを生成');
+  
+  // 30個のハートを30ms間隔で生成
+  for (let i = 0; i < 30; i++) {
+    setTimeout(() => {
+      const heart = document.createElement('div');
+      heart.className = 'special-heart';
+      
+      // ランダムなアニメーション名を生成
+      const randomAnimationName = `specialHeartFloat_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // 中央から±300px（合計600px）の範囲でランダム配置
+      const windowCenterX = window.innerWidth / 2;
+      const randomX = windowCenterX + (Math.random() - 0.5) * 600; // -300px to +300px
+      
+      console.log(`🎉 特別ハート${i+1}配置位置:`, { windowCenterX, randomX, windowWidth: window.innerWidth });
+      
+      // 個別のキーフレームアニメーションを動的に生成
+      const style = document.createElement('style');
+      style.textContent = `
+        @keyframes ${randomAnimationName} {
+          0% {
+            transform: rotate(45deg);
+            bottom: -150px;
+            left: ${randomX}px;
+          }
+          100% {
+            transform: rotate(45deg);
+            bottom: ${window.innerHeight + 150}px;
+            left: ${randomX}px;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+      
+      heart.style.animation = `${randomAnimationName} 1s linear forwards`;
+      heart.style.position = 'fixed';
+      
+      document.body.appendChild(heart);
+      console.log(`🎉 送信側に特別ハート${i+1}追加完了`);
+      
+      // アニメーション終了後に削除
+      setTimeout(() => {
+        if (heart.parentNode) {
+          heart.parentNode.removeChild(heart);
+        }
+        if (style.parentNode) {
+          style.parentNode.removeChild(style);
+        }
+        console.log(`🎉 特別ハート${i+1}削除完了`);
+      }, 1000);
+    }, i * 30); // 30ms間隔で順次生成
+  }
+}
+
 // 受信側からのメッセージ処理
 socket.onmessage = function(event) {
   try {
@@ -369,6 +456,9 @@ socket.onmessage = function(event) {
           if (data.type === "heartEffect") {
             console.log('💖 受信側からハートエフェクト指示を受信（Blob経由）');
             createHeart();
+          } else if (data.type === "specialHeartEffect") {
+            console.log('🎉 受信側から特別ハートエフェクト指示を受信（Blob経由）');
+            createSpecialHeart();
           }
         } catch (error) {
           console.log('⚠️ Blob解析エラー:', error.message);
@@ -384,6 +474,9 @@ socket.onmessage = function(event) {
     if (data.type === "heartEffect") {
       console.log('💖 受信側からハートエフェクト指示を受信');
       createHeart();
+    } else if (data.type === "specialHeartEffect") {
+      console.log('🎉 受信側から特別ハートエフェクト指示を受信');
+      createSpecialHeart();
     }
   } catch (error) {
     console.log('⚠️ メッセージ解析エラー:', error.message);

@@ -475,6 +475,17 @@ function createSpecialHeart() {
 async function triggerSpecialEffect() {
   console.log('🎉 特別演出開始！30個の大きなハートを生成');
   
+  // 送信側にも特別演出開始を通知
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    const specialEffectMessage = JSON.stringify({
+      type: "specialHeartEffect"
+    });
+    socket.send(specialEffectMessage);
+    console.log('🎉 送信側に特別演出開始を通知:', specialEffectMessage);
+  } else {
+    console.log('❌ WebSocket接続なし - 特別演出通知送信失敗');
+  }
+  
   // 既存の透明ウィンドウがない場合のみ新規作成
   try {
     await createTransparentWindow();
