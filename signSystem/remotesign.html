@@ -232,6 +232,7 @@
 <div class="button-group">
   <label>色:</label>
   <button class="color-btn selected" style="background: black;" onclick="setPenColor('black')"></button>
+  <button class="color-btn" style="background: white; border: 3px solid #333;" onclick="setPenColor('white')"></button>
   <button class="color-btn" style="background: red;" onclick="setPenColor('red')"></button>
   <button class="color-btn" style="background: blue;" onclick="setPenColor('blue')"></button>
   <button class="color-btn neon" onclick="setPenColor('neon')"></button>
@@ -992,7 +993,7 @@ canvas.addEventListener("mousemove", (e) => {
     
     console.log(`🎨 ネオンセグメント: from(${lastPosition?.x}, ${lastPosition?.y}) to(${x}, ${y}), color=${neonColor}`);
   } else {
-    actualColor = currentPenColor === 'black' ? '#000' : currentPenColor;
+    actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : currentPenColor);
     ctx.lineWidth = currentPenThickness;
     ctx.strokeStyle = actualColor;
     ctx.shadowBlur = 0;
@@ -1131,7 +1132,7 @@ canvas.addEventListener("touchmove", (e) => {
     ctx.lineTo(x, y);
     ctx.stroke();
   } else {
-    actualColor = currentPenColor === 'black' ? '#000' : currentPenColor;
+    actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : currentPenColor);
     ctx.lineWidth = currentPenThickness;
     ctx.strokeStyle = actualColor;
     ctx.shadowBlur = 0;

@@ -773,7 +773,7 @@ function redrawCanvas(withBackground = true) {
       } else {
         // 通常の色の場合
         ctx.lineWidth = (cmd.thickness || 4) * (drawingAreaSize.width / senderCanvasSize.width);
-        ctx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
+        ctx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color || '#000'));
         ctx.shadowBlur = 0;
         ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
         ctx.stroke();
@@ -989,7 +989,7 @@ function handleMessage(data) {
     } else {
       // 通常の色の場合
       ctx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
-      ctx.strokeStyle = data.color === 'black' ? '#000' : (data.color || '#000');
+      ctx.strokeStyle = data.color === 'black' ? '#000' : (data.color === 'white' ? '#fff' : (data.color || '#000'));
       ctx.shadowBlur = 0;
       ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
       ctx.stroke();
@@ -1163,7 +1163,7 @@ function sendCanvasToMainProcess() {
         const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
         printCtx.strokeStyle = interpolatedColor;
       } else {
-        printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
+        printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color || '#000'));
       }
       
       const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
@@ -1731,7 +1731,7 @@ function showPrintPreview() {
         previewCtx.shadowBlur = 5;
         previewCtx.shadowColor = interpolatedColor;
       } else {
-        previewCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
+        previewCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color || '#000'));
         previewCtx.shadowBlur = 0;
       }
       
@@ -1865,7 +1865,7 @@ function printPen() {
         const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
         printCtx.strokeStyle = interpolatedColor;
       } else {
-        printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
+        printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color || '#000'));
       }
       
       const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
@@ -1952,7 +1952,7 @@ function downloadRotated() {
         const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
         downloadCtx.strokeStyle = interpolatedColor;
       } else {
-        downloadCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color || '#000');
+        downloadCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color || '#000'));
       }
       
       const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
