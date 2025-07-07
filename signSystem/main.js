@@ -205,9 +205,23 @@ ipcMain.on("save-pdf", (event, data) => {
         }
       });
       
-      // lprコマンドで印刷
-      const printCommand = `lpr -P "${printerName}" "${savePath}"`;
-      console.log(`🖨️ lprコマンド実行: ${printCommand}`);
+      // 用紙サイズに応じてlprコマンドを変更
+      const paperSize = data.paperSize || 'A4'; // デフォルトはA4
+      let printCommand;
+      
+      if (paperSize === 'L') {
+        // L判用紙トレイを指定
+        printCommand = `lpr -P "${printerName}" -o media=l-photo -o InputSlot=Tray2 "${savePath}"`;
+        console.log(`🖨️ L判印刷コマンド実行: ${printCommand}`);
+      } else if (paperSize === 'A4') {
+        // A4用紙トレイを指定
+        printCommand = `lpr -P "${printerName}" -o media=a4 -o InputSlot=Tray1 "${savePath}"`;
+        console.log(`🖨️ A4印刷コマンド実行: ${printCommand}`);
+      } else {
+        // ポストカードやその他（デフォルト）
+        printCommand = `lpr -P "${printerName}" "${savePath}"`;
+        console.log(`🖨️ デフォルト印刷コマンド実行: ${printCommand}`);
+      }
       
       exec(printCommand, (error, stdout, stderr) => {
         if (error) {

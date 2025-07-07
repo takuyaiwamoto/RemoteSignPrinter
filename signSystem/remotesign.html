@@ -1448,7 +1448,8 @@ function actualPrintProcess() {
       socket.send(JSON.stringify({
         type: "printRotatedImage",
         imageData: imageDataUrl,
-        printType: 'double_rotated'
+        printType: 'double_rotated',
+        paperSize: currentPaperSize
       }));
       console.log('✅ 更に180度回転画像の印刷処理を開始');
     } else {
