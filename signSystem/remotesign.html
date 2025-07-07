@@ -205,6 +205,7 @@
   <label>背景:</label>
   <button onclick="setBackground('./back3.png')">背景1</button>
   <button onclick="setBackground('./back2.png')">背景2</button>
+  <button onclick="setBackground('./back4.png')">背景3</button>
   <button onclick="setBackground(null)">白</button>
 </div>
 
@@ -297,6 +298,7 @@ let fairyDustEffectEnabled = true; // 妖精の粉エフェクトの有効/無�
 const backgroundSizes = {
   'back3': { width: 859, height: 607 },    // 背景1 (842*0.6*1.7, 595*0.6*1.7)
   'back2': { width: 607, height: 859 },    // 背景2（縦向き） (595*0.6*1.7, 842*0.6*1.7)
+  'back4': { width: 859, height: 607 },    // 背景3 (842*0.6*1.7, 595*0.6*1.7)
   'white': { width: 859, height: 607 }     // 白背景 (842*0.6*1.7, 595*0.6*1.7)
 };
 socket.onopen = () => console.log("✅ WebSocket接続完了（送信側）");
@@ -597,7 +599,7 @@ function setBackground(src) {
       backgroundImage = img;
       
       // 🔸 背景に応じたキャンバスサイズを設定
-      const backgroundKey = src.includes('back3') ? 'back3' : 'back2';
+      const backgroundKey = src.includes('back3') ? 'back3' : (src.includes('back4') ? 'back4' : 'back2');
       setCanvasSize(backgroundKey);
       
       ctx.clearRect(0, 0, canvas.width, canvas.height);
