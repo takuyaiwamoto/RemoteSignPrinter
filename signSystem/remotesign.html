@@ -918,6 +918,11 @@ canvas.addEventListener("mousedown", (e) => {
   
   ctx.beginPath();
   ctx.moveTo(x, y);
+  
+  // 線の端と結合部を滑らかに
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  
   drawDistance = 0; // 新しいストロークの開始時に距離をリセット
   lastPosition = { x, y }; // 初期位置を記録
   
@@ -966,39 +971,77 @@ canvas.addEventListener("mousemove", (e) => {
   
   let actualColor;
   
-  if (currentPenColor === 'neon') {
-    // 前の位置からの距離を計算
-    if (lastPosition) {
-      const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
-      drawDistance += distance;
-      
-      // 100ピクセルごとに色を変更（非常になだらかな変化）
-      neonColorIndex = drawDistance / 100;
+  // 補間処理：前の位置から現在の位置までの距離を計算
+  if (lastPosition) {
+    const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
+    
+    // 距離が大きい場合は中間点を補間
+    if (distance > 5) {
+      const steps = Math.ceil(distance / 3);
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const interpX = lastPosition.x + (x - lastPosition.x) * t;
+        const interpY = lastPosition.y + (y - lastPosition.y) * t;
+        
+        if (currentPenColor === 'neon') {
+          drawDistance += distance / steps;
+          neonColorIndex = drawDistance / 100;
+          
+          ctx.beginPath();
+          ctx.moveTo(lastPosition.x + (x - lastPosition.x) * ((i-1) / steps), 
+                     lastPosition.y + (y - lastPosition.y) * ((i-1) / steps));
+          
+          const neonColor = getNeonColor();
+          actualColor = neonColor;
+          ctx.lineWidth = currentPenThickness;
+          ctx.strokeStyle = neonColor;
+          ctx.shadowBlur = 5;
+          ctx.shadowColor = neonColor;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.lineTo(interpX, interpY);
+          ctx.stroke();
+        } else {
+          actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : currentPenColor);
+          ctx.lineWidth = currentPenThickness;
+          ctx.strokeStyle = actualColor;
+          ctx.shadowBlur = 0;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.lineTo(interpX, interpY);
+          ctx.stroke();
+        }
+      }
+    } else {
+      // 距離が小さい場合は通常の描画
+      if (currentPenColor === 'neon') {
+        drawDistance += distance;
+        neonColorIndex = drawDistance / 100;
+        
+        ctx.beginPath();
+        ctx.moveTo(lastPosition.x, lastPosition.y);
+        
+        const neonColor = getNeonColor();
+        actualColor = neonColor;
+        ctx.lineWidth = currentPenThickness;
+        ctx.strokeStyle = neonColor;
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = neonColor;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      } else {
+        actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : currentPenColor);
+        ctx.lineWidth = currentPenThickness;
+        ctx.strokeStyle = actualColor;
+        ctx.shadowBlur = 0;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      }
     }
-    
-    // 新しいパスを開始して短いセグメントを描画
-    ctx.beginPath();
-    if (lastPosition) {
-      ctx.moveTo(lastPosition.x, lastPosition.y);
-    }
-    
-    const neonColor = getNeonColor();
-    actualColor = neonColor;
-    ctx.lineWidth = currentPenThickness;
-    ctx.strokeStyle = neonColor;
-    ctx.shadowBlur = 5; // シャドウを小さくして汚れを軽減
-    ctx.shadowColor = neonColor;
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    
-    console.log(`🎨 ネオンセグメント: from(${lastPosition?.x}, ${lastPosition?.y}) to(${x}, ${y}), color=${neonColor}`);
-  } else {
-    actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : currentPenColor);
-    ctx.lineWidth = currentPenThickness;
-    ctx.strokeStyle = actualColor;
-    ctx.shadowBlur = 0;
-    ctx.lineTo(x, y);
-    ctx.stroke();
   }
   
   // 描画コマンドを記録
@@ -1024,7 +1067,7 @@ canvas.addEventListener("mousemove", (e) => {
     starEffect: starEffectEnabled
   };
   socket.send(JSON.stringify(drawMsg));
-  console.log("📤 送信 draw:", drawMsg);
+  // console.log("📤 送信 draw:", drawMsg); // パフォーマンスのためコメントアウト
   
   // 星エフェクトが有効な場合は星を生成（2回に1回の頻度）
   if (starEffectEnabled && Math.random() < 0.5) {
@@ -1056,6 +1099,11 @@ canvas.addEventListener("touchstart", (e) => {
   
   ctx.beginPath();
   ctx.moveTo(x, y);
+  
+  // 線の端と結合部を滑らかに
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  
   drawDistance = 0; // 新しいストロークの開始時に距離をリセット
   lastPosition = { x, y }; // 初期位置を記録
   
