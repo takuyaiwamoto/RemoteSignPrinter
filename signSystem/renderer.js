@@ -702,6 +702,19 @@ function redrawCanvas(withBackground = true) {
       // 背景1,3のポストカードは背景2より少し小さく（0.9倍）
       drawWidth = canvas.width * 0.9;
       drawHeight = canvas.height * 0.9;
+    } else if (currentPaperSize === "L") {
+      // L判モードでの背景サイズ調整
+      if (lastBackgroundSrc && (lastBackgroundSrc.includes('back3') || lastBackgroundSrc.includes('back4'))) {
+        // 背景1,3のL判はベースより10%小さく
+        drawWidth = canvas.width * 0.90;
+        drawHeight = canvas.height * 0.90;
+        console.log("🔍 背景1,3のL判サイズ調整: 0.90倍");
+      } else if (lastBackgroundSrc && lastBackgroundSrc.includes('back2')) {
+        // 背景2のL判はベースより14%小さく
+        drawWidth = canvas.width * 0.86;
+        drawHeight = canvas.height * 0.86;
+        console.log("🔍 背景2のL判サイズ調整: 0.86倍");
+      }
     } else if (currentPaperSize === "A4") {
       // A4モードでの背景サイズ調整
       if (lastBackgroundSrc && (lastBackgroundSrc.includes('back3') || lastBackgroundSrc.includes('back4'))) {
@@ -825,6 +838,9 @@ function handleMessage(data) {
     if (data.size === "poster") {
       SCALE_FACTOR = 2.4; // A4の4.0倍の60% = 2.4倍
       console.log("🔍 拡大率を2.4倍に変更（ポストカードモード - A4の60%サイズ）");
+    } else if (data.size === "L") {
+      SCALE_FACTOR = 3.2; // A4の4.0倍の80% = 3.2倍
+      console.log("🔍 拡大率を3.2倍に変更（L判モード - A4の80%サイズ）");
     } else {
       SCALE_FACTOR = 4.0;
       console.log("🔍 拡大率を4.0倍に変更（A4モード）");

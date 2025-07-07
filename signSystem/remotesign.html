@@ -212,6 +212,7 @@
 <div class="button-group">
   <label>用紙サイズ:</label>
   <button id="a4Btn" class="selected" onclick="setPaperSize('A4')">A4</button>
+  <button id="lBtn" onclick="setPaperSize('L')">L判</button>
   <button id="posterBtn" onclick="setPaperSize('poster')">ポストカード</button>
 </div>
 
@@ -529,11 +530,15 @@ function setPaperSize(size) {
   
   // ボタンの選択状態を更新
   document.getElementById("a4Btn").classList.remove("selected");
+  document.getElementById("lBtn").classList.remove("selected");
   document.getElementById("posterBtn").classList.remove("selected");
   
   if (size === "A4") {
     document.getElementById("a4Btn").classList.add("selected");
     console.log("📄 用紙サイズをA4に設定");
+  } else if (size === "L") {
+    document.getElementById("lBtn").classList.add("selected");
+    console.log("📄 用紙サイズをL判に設定");
   } else if (size === "poster") {
     document.getElementById("posterBtn").classList.add("selected");
     console.log("📄 用紙サイズをポストカードに設定");
@@ -643,6 +648,8 @@ function startCountdown() {
   let totalSeconds;
   if (currentPaperSize === "poster") {
     totalSeconds = 8; // ポスター：3秒短縮（11秒→8秒）
+  } else if (currentPaperSize === "L") {
+    totalSeconds = 9; // L判：2秒短縮（11秒→9秒）
   } else {
     totalSeconds = 11; // A4：従来通り11秒
   }
