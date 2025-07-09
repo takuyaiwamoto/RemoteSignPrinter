@@ -108,6 +108,7 @@ app.on("window-all-closed", () => {
 ipcMain.on("save-pdf", (event, data) => {
   console.log("📥 画像データ受信");
   console.log("📥 受信データタイプ:", data.printType || "不明");
+  console.log("📄 受信用紙サイズ:", data.paperSize || "不明");
  
   let imageDataUrl;
   if (typeof data === 'string') {
@@ -172,7 +173,7 @@ ipcMain.on("save-pdf", (event, data) => {
     }
     
     // 🔸 OS別の印刷処理
-    const printerName = "Brother MFC-J6983CDW";
+    const printerName = "Brother_MFC_J6983CDW";
     console.log(`🖨️ 使用予定プリンター名: "${printerName}"`);
     
     if (process.platform === 'darwin') {
@@ -209,18 +210,28 @@ ipcMain.on("save-pdf", (event, data) => {
       const paperSize = data.paperSize || 'A4'; // デフォルトはA4
       let printCommand;
       
+      console.log(`🔍 用紙サイズ判定: paperSize="${paperSize}" (型: ${typeof paperSize})`);
+      
       if (paperSize === 'L') {
-        // L判用紙トレイを指定
-        printCommand = `lpr -P "${printerName}" -o media=l-photo -o InputSlot=Tray2 "${savePath}"`;
-        console.log(`🖨️ L判印刷コマンド実行: ${printCommand}`);
+        // L判用紙トレイを指定 (トレイ1がL版) + 180度回転
+        printCommand = `lpr -P "${printerName}" -o PageSize=4x6 -o InputSlot=tray-1 -o orientation-requested=6 "${savePath}"`;
+        console.log(`🖨️ L判印刷コマンド実行（180度回転）: ${printCommand}`);
+        
+        // プリンタのメディアサイズ確認用コマンド実行
+        exec(`lpoptions -p "${printerName}" -l | grep -i media`, (error, stdout, stderr) => {
+          if (!error) {
+            console.log(`📋 プリンタ"${printerName}"で利用可能なメディアサイズ:`);
+            console.log(stdout);
+          }
+        });
       } else if (paperSize === 'A4') {
-        // A4用紙トレイを指定
-        printCommand = `lpr -P "${printerName}" -o media=a4 -o InputSlot=Tray1 "${savePath}"`;
+        // A4用紙トレイを指定 (トレイ2がA4)
+        printCommand = `lpr -P "${printerName}" -o PageSize=A4 -o InputSlot=tray-2 "${savePath}"`;
         console.log(`🖨️ A4印刷コマンド実行: ${printCommand}`);
       } else {
         // ポストカードやその他（デフォルト）
         printCommand = `lpr -P "${printerName}" "${savePath}"`;
-        console.log(`🖨️ デフォルト印刷コマンド実行: ${printCommand}`);
+        console.log(`🖨️ デフォルト印刷コマンド実行: ${printCommand} (paperSize不明: "${paperSize}")`);
       }
       
       exec(printCommand, (error, stdout, stderr) => {
@@ -228,25 +239,60 @@ ipcMain.on("save-pdf", (event, data) => {
           console.error("❌ lpr印刷エラー:", error);
           console.error("❌ エラー詳細:", error.message);
           
-          // フォールバック: デフォルトプリンターで印刷
-          const fallbackCommand = `lpr "${savePath}"`;
-          console.log(`🔄 デフォルトプリンターで印刷: ${fallbackCommand}`);
-          
-          exec(fallbackCommand, (fbError, fbStdout, fbStderr) => {
-            if (fbError) {
-              console.error("❌ デフォルトプリンター印刷エラー:", fbError);
-              // 最終手段: Previewアプリで開く
-              exec(`open -a Preview "${savePath}"`, (previewError) => {
-                if (previewError) {
-                  console.error("❌ Preview起動エラー:", previewError);
-                } else {
-                  console.log("✅ Previewアプリで画像を開きました（手動印刷してください）");
-                }
-              });
-            } else {
-              console.log("✅ デフォルトプリンターで印刷完了");
-            }
-          });
+          // L判の場合は別のコマンドを試行
+          if (paperSize === 'L') {
+            const fallbackCommand = `lpr -P "${printerName}" -o PageSize=4x6 -o orientation-requested=6 "${savePath}"`;
+            console.log(`🔄 L判フォールバック印刷（180度回転）: ${fallbackCommand}`);
+            
+            exec(fallbackCommand, (fbError, fbStdout, fbStderr) => {
+              if (fbError) {
+                console.error("❌ L判フォールバック印刷エラー:", fbError);
+                // さらにフォールバック: デフォルトプリンターで印刷
+                const defaultCommand = `lpr "${savePath}"`;
+                console.log(`🔄 デフォルトプリンターで印刷: ${defaultCommand}`);
+                
+                exec(defaultCommand, (dfError, dfStdout, dfStderr) => {
+                  if (dfError) {
+                    console.error("❌ デフォルトプリンター印刷エラー:", dfError);
+                    // 最終手段: Previewアプリで開く
+                    exec(`open -a Preview "${savePath}"`, (previewError) => {
+                      if (previewError) {
+                        console.error("❌ Preview起動エラー:", previewError);
+                      } else {
+                        console.log("✅ Previewアプリで画像を開きました（手動印刷してください）");
+                      }
+                    });
+                  } else {
+                    console.log("✅ デフォルトプリンターで印刷完了");
+                  }
+                });
+              } else {
+                console.log("✅ L判フォールバック印刷完了");
+                console.log("📋 stdout:", fbStdout);
+                console.log("📋 stderr:", fbStderr);
+              }
+            });
+          } else {
+            // A4などの通常フォールバック
+            const fallbackCommand = `lpr "${savePath}"`;
+            console.log(`🔄 デフォルトプリンターで印刷: ${fallbackCommand}`);
+            
+            exec(fallbackCommand, (fbError, fbStdout, fbStderr) => {
+              if (fbError) {
+                console.error("❌ デフォルトプリンター印刷エラー:", fbError);
+                // 最終手段: Previewアプリで開く
+                exec(`open -a Preview "${savePath}"`, (previewError) => {
+                  if (previewError) {
+                    console.error("❌ Preview起動エラー:", previewError);
+                  } else {
+                    console.log("✅ Previewアプリで画像を開きました（手動印刷してください）");
+                  }
+                });
+              } else {
+                console.log("✅ デフォルトプリンターで印刷完了");
+              }
+            });
+          }
         } else {
           console.log(`✅ Brother印刷完了（lpr）`);
           console.log("📋 stdout:", stdout);
@@ -644,7 +690,7 @@ ipcMain.on("print-transparent-image", (event, data) => {
     console.log("✅ 透過PNG保存完了:", savePath);
     
     // 🔸 OS別の透過画像印刷処理
-    const printerName = "Brother MFC-J6983CDW";
+    const printerName = "Brother_MFC_J6983CDW";
     
     if (process.platform === 'darwin') {
       // macOS用の透過画像印刷処理

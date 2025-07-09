@@ -660,6 +660,9 @@ function updateCanvasSize() {
     resetCanvasToNormalSize();
   }
   
+  // 🔸 用紙サイズに応じて受信側キャンバスサイズを調整
+  setReceiverCanvasSize();
+  
   // キャンバスを再描画
   redrawCanvas();
 }
@@ -831,8 +834,10 @@ function handleMessage(data) {
     prepareAndRunAnimation();
   } else if (data.type === "paperSize") {
     // 🔸 用紙サイズ変更の通知を受信
+    const oldPaperSize = currentPaperSize;
+    const oldScaleFactor = SCALE_FACTOR;
     currentPaperSize = data.size;
-    console.log(`用紙サイズが${data.size}に変更されました`);
+    console.log(`📄 用紙サイズが${oldPaperSize}から${data.size}に変更されました`);
     
     // 🔸 用紙サイズに応じて拡大率を変更
     if (data.size === "poster") {
@@ -845,6 +850,8 @@ function handleMessage(data) {
       SCALE_FACTOR = 4.0;
       console.log("🔍 拡大率を4.0倍に変更（A4モード）");
     }
+    
+    console.log(`📊 SCALE_FACTOR変更: ${oldScaleFactor} → ${SCALE_FACTOR}`);
     
     // 🔸 キャンバスサイズを再計算
     updateCanvasSize();
@@ -1116,12 +1123,14 @@ function handleMessage(data) {
     // 🔸 更に180度回転画像の印刷処理
     console.log("🖨️ 受信側: printRotatedImage メッセージを受信");
     console.log("📥 受信データタイプ:", data.printType);
+    console.log("📄 受信用紙サイズ:", data.paperSize);
     
     // ElectronのメインプロセスにWebSocketで受信した画像データを送信
     const { ipcRenderer } = require('electron');
     ipcRenderer.send('save-pdf', {
       imageData: data.imageData,
-      printType: data.printType || 'double_rotated'
+      printType: data.printType || 'double_rotated',
+      paperSize: data.paperSize || 'A4'
     });
     
     console.log("✅ 更に180度回転画像をElectronに送信完了");
@@ -1189,8 +1198,32 @@ function sendCanvasToMainProcess() {
     }
   });
   
+  // 🔸 Canvas変換を使った180度回転（printPen()と同じ方法）
+  console.log(`🔄 送信ボタン印刷: 180度回転処理開始 - キャンバスサイズ: ${printCanvas.width}x${printCanvas.height}`);
+  
+  const rotatedCanvas = document.createElement('canvas');
+  const rotatedCtx = rotatedCanvas.getContext('2d');
+  rotatedCanvas.width = printCanvas.width;
+  rotatedCanvas.height = printCanvas.height;
+  
+  // デバッグ: 元画像の内容確認
+  const originalData = printCanvas.toDataURL("image/png");
+  console.log('🔄 元画像データ:', originalData.substring(0, 100) + '...');
+  
+  // 現在の印刷キャンバス内容を180度回転してコピー
+  rotatedCtx.save();
+  rotatedCtx.translate(rotatedCanvas.width, rotatedCanvas.height);
+  rotatedCtx.rotate(Math.PI);
+  rotatedCtx.drawImage(printCanvas, 0, 0);
+  rotatedCtx.restore();
+  
+  // デバッグ: 回転後画像の内容確認
+  const rotatedData = rotatedCanvas.toDataURL("image/png");
+  console.log('🔄 回転後画像データ:', rotatedData.substring(0, 100) + '...');
+  console.log('🔄 送信ボタン印刷: 180度回転完了');
+  
   // 印刷用データを作成
-  const imageDataUrl = printCanvas.toDataURL("image/png");
+  const imageDataUrl = rotatedCanvas.toDataURL("image/png");
   
   // 🔸 印刷時に用紙サイズ情報も送信
   ipcRenderer.send("save-pdf", {
@@ -1199,7 +1232,7 @@ function sendCanvasToMainProcess() {
     printType: "pen"
   });
   
-  console.log('🖨️ 送信ボタン印刷（描画データのみ）を実行');
+  console.log('🖨️ 送信ボタン印刷（180度回転描画データのみ）を実行');
 }
 
 // 🔸 受信側キャンバスサイズ設定関数
@@ -1207,6 +1240,9 @@ function setReceiverCanvasSize() {
   // Dev Tool設定を適用したサイズを計算
   const newWidth = Math.floor(senderCanvasSize.width * SCALE_FACTOR * devCanvasScale);
   const newHeight = Math.floor(senderCanvasSize.height * SCALE_FACTOR * devCanvasScale);
+  
+  const oldWidth = canvas.width;
+  const oldHeight = canvas.height;
   
   canvas.width = newWidth;
   canvas.height = newHeight;
@@ -1216,7 +1252,8 @@ function setReceiverCanvasSize() {
   // 受信側のキャンバスサイズを記録
   receiverCanvasSize = { width: newWidth, height: newHeight };
   
-  console.log(`📐 受信側キャンバスサイズ変更: ${newWidth} x ${newHeight}`);
+  console.log(`📐 受信側キャンバスサイズ変更: ${oldWidth}x${oldHeight} → ${newWidth}x${newHeight}`);
+  console.log(`📊 計算: ${senderCanvasSize.width} x ${SCALE_FACTOR} x ${devCanvasScale} = ${newWidth}`);
   console.log(`📊 送信側: ${senderCanvasSize.width} x ${senderCanvasSize.height}`);
   console.log(`📊 受信側: ${receiverCanvasSize.width} x ${receiverCanvasSize.height}`);
 }
@@ -1272,7 +1309,7 @@ function runAnimationSequence(waitTime = null) {
     console.log("🎬 ポスターモード：3.8秒でアニメーション開始");
   } else {
     animationStartDelay = 6000; // A4：従来通り6秒で開始
-    console.log("🎬 A4モード：6秒でアニメーション開始");
+    console.log(`🎬 ${currentPaperSize}モード：6秒でアニメーション開始`);
   }
 
   // 🔸 調整されたタイミングでアニメーション開始
@@ -1290,7 +1327,7 @@ function runAnimationSequence(waitTime = null) {
       console.log(`⏰ 書き手側設定：回転後${waitTime}秒待機してから移動開始`);
     } else if (currentPaperSize === "A4") {
       rotationWaitTime = devRotationWaitTime * 1000; // Dev設定の秒数をmsに変換
-      console.log(`⏰ A4モード：回転後${devRotationWaitTime}秒待機してから移動開始`);
+      console.log(`⏰ ${currentPaperSize}モード：回転後${devRotationWaitTime}秒待機してから移動開始`);
     } else {
       rotationWaitTime = 1100; // ポスター：従来通り1.1秒
       console.log("⏰ ポスターモード：回転後1.1秒待機してから移動開始");
@@ -1307,6 +1344,9 @@ function runAnimationSequence(waitTime = null) {
       if (currentPaperSize === "poster") {
         moveDistance = -(windowHeight + extraDistance); // ウィンドウ高さ + 500px
         console.log(`📦 ポスターモード：移動距離 ${moveDistance}px（ウィンドウ高さ: ${windowHeight}px）`);
+      } else if (currentPaperSize === "L") {
+        moveDistance = -(windowHeight + extraDistance); // ウィンドウ高さ + 500px  
+        console.log(`📦 L版モード：移動距離 ${moveDistance}px（ウィンドウ高さ: ${windowHeight}px）`);
       } else {
         moveDistance = -(windowHeight + extraDistance); // ウィンドウ高さ + 500px  
         console.log(`📦 A4モード：移動距離 ${moveDistance}px（ウィンドウ高さ: ${windowHeight}px）`);
@@ -1320,6 +1360,9 @@ function runAnimationSequence(waitTime = null) {
       if (currentPaperSize === "poster") {
         waitTime = 4000; // ポスター：移動完了後2秒待機（2秒 + 2秒 = 4秒）
         console.log("⏰ ポスターモード：移動後4秒待機");
+      } else if (currentPaperSize === "L") {
+        waitTime = 2000; // L版：従来通り2秒
+        console.log("⏰ L版モード：移動後2秒待機");
       } else {
         waitTime = 2000; // A4：従来通り2秒
         console.log("⏰ A4モード：移動後2秒待機");

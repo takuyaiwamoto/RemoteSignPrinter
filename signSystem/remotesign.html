@@ -1378,6 +1378,10 @@ function saveRotatedImage() {
 function saveDoubleRotatedImage() {
   console.log('🔄 送信ボタン: 回転アニメーション開始');
   
+  // 🔸 送信ボタンを押したと同時にクリアを実行
+  console.log('🧹 送信ボタン押下と同時にクリア実行');
+  console.log(`🧹 クリア前の描画コマンド数: ${drawingCommands.length}`);
+  
   // WebSocket経由で受信側にアニメーション開始を通知
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
@@ -1392,6 +1396,32 @@ function saveDoubleRotatedImage() {
     console.log('🔄 更に180度回転: ペイントデータをさらに180度回転');
     actualPrintProcess();
   }, rotationWaitTime * 1000);
+  
+  // 🔸 印刷処理完了後にクリアを実行
+  setTimeout(() => {
+    console.log('🧹 印刷処理完了後にクリア実行');
+    
+    // キャンバスを完全にクリア
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 背景画像があれば再描画
+    if (backgroundImage) {
+      ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+      console.log('🖼️ 背景画像を再描画');
+    }
+    
+    // 描画コマンドをクリア
+    drawingCommands = [];
+    console.log('🧹 drawingCommands配列をクリア:', drawingCommands.length);
+    
+    // 受信側にもクリア指示を送信
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "clear" }));
+      console.log('📤 受信側にクリア指示を送信');
+    }
+    
+    console.log('✅ 印刷処理完了後のクリア完了');
+  }, (rotationWaitTime * 1000) + 1000); // 印刷処理完了1秒後にクリア
 }
 
 // 実際の印刷処理を行う関数
@@ -1426,19 +1456,10 @@ function actualPrintProcess() {
       
       console.log('🔄 ペイントデータの360度回転処理完了（元の向き）');
     } else {
-      // 描画データがない場合のテスト描画
-      console.log('🔄 描画データがないため、テスト描画を実行');
-      cleanCtx.strokeStyle = 'black';
-      cleanCtx.lineWidth = 5;
-      cleanCtx.beginPath();
-      cleanCtx.moveTo(100, 100);
-      cleanCtx.lineTo(200, 200);
-      cleanCtx.lineTo(300, 100);
-      cleanCtx.stroke();
-      
-      cleanCtx.font = '20px Arial';
-      cleanCtx.fillStyle = 'black';
-      cleanCtx.fillText('Test Drawing (360°)', 150, 250);
+      // 描画データがない場合は何もしない
+      console.log('🔄 描画データがないため、白紙で印刷');
+      console.log('🔄 canvasには何も描画しません');
+      console.log('🔄 drawingCommands配列:', drawingCommands);
     }
     
     // 自動印刷処理
@@ -1473,6 +1494,7 @@ function actualPrintProcess() {
       
       console.log('📥 更に180度回転画像ダウンロード完了:', fileName);
     }
+    
     
   } catch (error) {
     console.error('❌ 更に180度回転画像保存エラー詳細:', error.message, error);
