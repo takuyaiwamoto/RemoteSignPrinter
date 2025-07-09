@@ -1397,9 +1397,9 @@ function saveDoubleRotatedImage() {
     actualPrintProcess();
   }, rotationWaitTime * 1000);
   
-  // 🔸 印刷処理完了後にクリアを実行
+  // 🔸 印刷処理完了の5秒後にクリアを実行
   setTimeout(() => {
-    console.log('🧹 印刷処理完了後にクリア実行');
+    console.log('🧹 印刷処理完了の5秒後にクリア実行');
     
     // キャンバスを完全にクリア
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1420,8 +1420,8 @@ function saveDoubleRotatedImage() {
       console.log('📤 受信側にクリア指示を送信');
     }
     
-    console.log('✅ 印刷処理完了後のクリア完了');
-  }, (rotationWaitTime * 1000) + 1000); // 印刷処理完了1秒後にクリア
+    console.log('✅ 印刷処理完了の5秒後のクリア完了');
+  }, (rotationWaitTime * 1000) + 5000); // 印刷処理完了5秒後にクリア
 }
 
 // 実際の印刷処理を行う関数
