@@ -237,6 +237,7 @@
   <button class="color-btn" style="background: white; border: 3px solid #333;" onclick="setPenColor('white')"></button>
   <button class="color-btn" style="background: red;" onclick="setPenColor('red')"></button>
   <button class="color-btn" style="background: blue;" onclick="setPenColor('blue')"></button>
+  <button class="color-btn" style="background: green;" onclick="setPenColor('green')"></button>
   <button class="color-btn neon" onclick="setPenColor('neon')"></button>
 </div>
 
@@ -1011,7 +1012,7 @@ canvas.addEventListener("mousemove", (e) => {
           ctx.lineTo(interpX, interpY);
           ctx.stroke();
         } else {
-          actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : currentPenColor);
+          actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : (currentPenColor === 'green' ? '#008000' : currentPenColor));
           ctx.lineWidth = currentPenThickness;
           ctx.strokeStyle = actualColor;
           ctx.shadowBlur = 0;
@@ -1041,7 +1042,7 @@ canvas.addEventListener("mousemove", (e) => {
         ctx.lineTo(x, y);
         ctx.stroke();
       } else {
-        actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : currentPenColor);
+        actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : (currentPenColor === 'green' ? '#008000' : currentPenColor));
         ctx.lineWidth = currentPenThickness;
         ctx.strokeStyle = actualColor;
         ctx.shadowBlur = 0;
