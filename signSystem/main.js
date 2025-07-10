@@ -234,6 +234,9 @@ ipcMain.on("save-pdf", (event, data) => {
         console.log(`🖨️ デフォルト印刷コマンド実行: ${printCommand} (paperSize不明: "${paperSize}")`);
       }
       
+      console.log('🚨🚨🚨 プリンターに印刷コマンドを実行！！！');
+      console.log(`📟 実行コマンド: ${printCommand}`);
+      
       exec(printCommand, (error, stdout, stderr) => {
         if (error) {
           console.error("❌ lpr印刷エラー:", error);

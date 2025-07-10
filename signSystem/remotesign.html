@@ -1376,30 +1376,28 @@ function saveRotatedImage() {
 
 // 現在の状態から更に180度回転させて保存する関数
 function saveDoubleRotatedImage() {
-  console.log('🔄 送信ボタン: 回転アニメーション開始');
+  console.log('🔄 送信ボタン: 印刷処理とアニメーションを同時開始');
   
-  // 🔸 送信ボタンを押したと同時にクリアを実行
-  console.log('🧹 送信ボタン押下と同時にクリア実行');
-  console.log(`🧹 クリア前の描画コマンド数: ${drawingCommands.length}`);
+  // 🔸 送信ボタンを押したと同時に印刷処理を実行（印刷機の起動を早くする）
+  console.log('🖨️ 印刷処理を即座に実行');
+  console.log(`📝 現在の描画コマンド数: ${drawingCommands.length}`);
+  actualPrintProcess();
   
-  // WebSocket経由で受信側にアニメーション開始を通知
+  // 🔸 印刷処理と同時に回転アニメーションを開始
+  console.log('🎬 印刷処理と同時に回転アニメーション開始');
+  
+  // WebSocket経由で受信側にアニメーション開始を通知（回転後3秒待機）
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
       type: "startRotationAnimation",
-      waitTime: rotationWaitTime // 書き手側の待機時間設定を送信
+      waitTime: 3.0 // 回転後3秒待機してから下に移動
     }));
-    console.log(`🎬 受信側にアニメーション開始を送信 (待機時間: ${rotationWaitTime}秒)`);
+    console.log(`🎬 受信側にアニメーション開始を送信 (回転後3秒待機)`);
   }
   
-  // 待機時間後に実際の印刷処理を実行
+  // 🔸 送信ボタン押下から10秒後にクリアを実行（印刷が即座に開始されるため）
   setTimeout(() => {
-    console.log('🔄 更に180度回転: ペイントデータをさらに180度回転');
-    actualPrintProcess();
-  }, rotationWaitTime * 1000);
-  
-  // 🔸 印刷処理完了の5秒後にクリアを実行
-  setTimeout(() => {
-    console.log('🧹 印刷処理完了の5秒後にクリア実行');
+    console.log('🧹 送信ボタン押下から10秒後にクリア実行');
     
     // キャンバスを完全にクリア
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1420,8 +1418,8 @@ function saveDoubleRotatedImage() {
       console.log('📤 受信側にクリア指示を送信');
     }
     
-    console.log('✅ 印刷処理完了の5秒後のクリア完了');
-  }, (rotationWaitTime * 1000) + 5000); // 印刷処理完了5秒後にクリア
+    console.log('✅ 送信ボタン押下から10秒後のクリア完了');
+  }, 10000); // 送信ボタン押下から10秒後にクリア
 }
 
 // 実際の印刷処理を行う関数

@@ -1127,12 +1127,16 @@ function handleMessage(data) {
     
     // ElectronのメインプロセスにWebSocketで受信した画像データを送信
     const { ipcRenderer } = require('electron');
+    console.log('🚨 プリンターに印刷命令を送信開始！（更に180度回転）');
+    console.log(`📊 印刷データ: 用紙サイズ=${data.paperSize || 'A4'}, タイプ=${data.printType || 'double_rotated'}`);
+    
     ipcRenderer.send('save-pdf', {
       imageData: data.imageData,
       printType: data.printType || 'double_rotated',
       paperSize: data.paperSize || 'A4'
     });
     
+    console.log('✅ プリンターへの印刷命令送信完了！（更に180度回転）');
     console.log("✅ 更に180度回転画像をElectronに送信完了");
   } else if (data.type === "startRotationAnimation") {
     // 🔸 回転アニメーション開始
@@ -1226,12 +1230,16 @@ function sendCanvasToMainProcess() {
   const imageDataUrl = rotatedCanvas.toDataURL("image/png");
   
   // 🔸 印刷時に用紙サイズ情報も送信
+  console.log('🚨 プリンターに印刷命令を送信開始！');
+  console.log(`📊 印刷データ: 用紙サイズ=${currentPaperSize}, タイプ=pen`);
+  
   ipcRenderer.send("save-pdf", {
     imageData: imageDataUrl,
     paperSize: currentPaperSize,
     printType: "pen"
   });
   
+  console.log('✅ プリンターへの印刷命令送信完了！');
   console.log('🖨️ 送信ボタン印刷（180度回転描画データのみ）を実行');
 }
 
@@ -1302,15 +1310,9 @@ function runAnimationSequence(waitTime = null) {
   animationImage.style.transition = "none";
   animationImage.style.transform = "translateX(-50%)";
 
-  // 🔸 用紙サイズに応じてアニメーション開始時間を調整
-  let animationStartDelay;
-  if (currentPaperSize === "poster") {
-    animationStartDelay = 3800; // ポスター：3.8秒で開始
-    console.log("🎬 ポスターモード：3.8秒でアニメーション開始");
-  } else {
-    animationStartDelay = 6000; // A4：従来通り6秒で開始
-    console.log(`🎬 ${currentPaperSize}モード：6秒でアニメーション開始`);
-  }
+  // 🔸 即座に回転アニメーション開始（待機なし）
+  let animationStartDelay = 100; // 0.1秒後に即座に開始
+  console.log("🎬 即座に回転アニメーション開始");
 
   // 🔸 調整されたタイミングでアニメーション開始
   setTimeout(() => {
