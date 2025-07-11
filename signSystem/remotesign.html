@@ -1031,6 +1031,117 @@ function createStar(x, y) {
   }
 }
 
+// 打ち上げ花火エフェクト生成関数
+function createFireworks() {
+  console.log('🎆 打ち上げ花火演出を開始');
+  
+  // 複数の打ち上げ花火を生成
+  for (let i = 0; i < 5; i++) {
+    setTimeout(() => {
+      // 画面下部からランダムな位置で花火を発射
+      const launchX = Math.random() * window.innerWidth;
+      const targetY = Math.random() * (window.innerHeight * 0.3) + 100; // 上部30%の範囲
+      
+      // 花火の軌道となる要素を作成
+      const firework = document.createElement('div');
+      firework.className = 'firework';
+      firework.style.cssText = `
+        position: fixed;
+        left: ${launchX}px;
+        bottom: 0;
+        width: 4px;
+        height: 4px;
+        background: #ffff00;
+        border-radius: 50%;
+        z-index: 10000;
+        pointer-events: none;
+        box-shadow: 0 0 6px #ffff00, 0 0 12px #ffff00;
+      `;
+      
+      document.body.appendChild(firework);
+      
+      // 打ち上げアニメーション
+      const launchDuration = 800 + Math.random() * 400; // 800-1200ms
+      firework.style.transition = `bottom ${launchDuration}ms ease-out`;
+      firework.style.bottom = (window.innerHeight - targetY) + 'px';
+      
+      // 花火爆発
+      setTimeout(() => {
+        firework.style.display = 'none';
+        createExplosion(launchX, targetY);
+      }, launchDuration);
+      
+      // 花火要素を削除
+      setTimeout(() => {
+        if (firework.parentNode) firework.parentNode.removeChild(firework);
+      }, launchDuration + 100);
+      
+    }, i * 300); // 300msずつ時間差で発射
+  }
+}
+
+// 花火爆発エフェクト
+function createExplosion(x, y) {
+  const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff8000', '#8000ff'];
+  const particles = 12; // 爆発する粒子数
+  
+  for (let i = 0; i < particles; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'firework-particle';
+    
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const angle = (360 / particles) * i;
+    const distance = 80 + Math.random() * 40; // 80-120px
+    const size = 3 + Math.random() * 3; // 3-6px
+    
+    particle.style.cssText = `
+      position: fixed;
+      left: ${x}px;
+      top: ${y}px;
+      width: ${size}px;
+      height: ${size}px;
+      background: ${color};
+      border-radius: 50%;
+      z-index: 10001;
+      pointer-events: none;
+      box-shadow: 0 0 6px ${color}, 0 0 12px ${color};
+      animation: explode 1s ease-out forwards;
+    `;
+    
+    // 動的にCSSアニメーションを作成
+    const randomId = Math.random().toString(36).substr(2, 9);
+    const keyframeName = `explode_${randomId}`;
+    
+    const endX = x + Math.cos(angle * Math.PI / 180) * distance;
+    const endY = y + Math.sin(angle * Math.PI / 180) * distance;
+    
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes ${keyframeName} {
+        0% {
+          transform: translate(0, 0) scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(${endX - x}px, ${endY - y}px) scale(0.3);
+          opacity: 0;
+        }
+      }
+    `;
+    
+    document.head.appendChild(style);
+    particle.style.animation = `${keyframeName} 1s ease-out forwards`;
+    
+    document.body.appendChild(particle);
+    
+    // 粒子を削除
+    setTimeout(() => {
+      if (particle.parentNode) particle.parentNode.removeChild(particle);
+      if (style.parentNode) style.parentNode.removeChild(style);
+    }, 1000);
+  }
+}
+
 canvas.addEventListener("mousedown", (e) => {
   drawing = true;
   const x = e.offsetX;
@@ -1508,6 +1619,9 @@ function saveDoubleRotatedImage() {
   sendButton.style.color = '#fff';
   sendButton.textContent = '送信中...';
   sendButton.disabled = true;
+  
+  // 🔸 打ち上げ花火演出を追加
+  createFireworks();
   
   // ボタンを元に戻す
   setTimeout(() => {
