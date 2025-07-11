@@ -207,6 +207,7 @@
   <button onclick="setBackground('./back2.png')">背景2</button>
   <button onclick="setBackground('./back4.png')">背景3</button>
   <button onclick="setBackground(null)">白</button>
+  <button onclick="setSpecialBackground('./back4.png')" style="background: linear-gradient(45deg, #ff1493, #00ffff); color: white;">特殊背景</button>
 </div>
 
 <div class="button-group">
@@ -267,9 +268,15 @@
   </div>
   
   <div class="button-group">
+    <label>アニメーション開始待機時間（秒）:</label>
+    <input type="range" id="animationStartWait" min="0.1" max="10" step="0.1" value="3.3" oninput="updateAnimationStartWait(this.value)">
+    <span id="animationStartWaitValue">3.3秒</span>
+  </div>
+  
+  <div class="button-group">
     <label>回転後待機時間（秒）:</label>
-    <input type="range" id="rotationWait" min="1" max="10" step="0.5" value="5.1" oninput="updateRotationWait(this.value)">
-    <span id="rotationWaitValue">5.1秒</span>
+    <input type="range" id="rotationWait" min="1" max="10" step="0.5" value="8.1" oninput="updateRotationWait(this.value)">
+    <span id="rotationWaitValue">8.1秒</span>
   </div>
   
   <div class="button-group">
@@ -288,7 +295,8 @@ let backgroundImage = null;
 let currentPaperSize = "A4"; // 現在の用紙サイズ
 let currentVideoSize = 100; // 現在のビデオサイズ（デフォルト100%）
 let canvasScale = 1.0; // キャンバススケール
-let rotationWaitTime = 5.1; // 回転後待機時間
+let animationStartWaitTime = 3.3; // アニメーション開始待機時間
+let rotationWaitTime = 8.1; // 回転後待機時間
 let currentPenThickness = 8; // 現在のペンの太さ（標準は太い）
 let currentPenColor = 'black'; // 現在のペンの色
 let neonColorIndex = 0; // ネオン用の色インデックス
@@ -296,6 +304,7 @@ let drawDistance = 0; // 描画距離の追跡（ネオン用）
 let lastPosition = null; // 前回の位置を記録
 let starEffectEnabled = true; // 星エフェクトの有効/無効（標準でON）
 let fairyDustEffectEnabled = true; // 妖精の粉エフェクトの有効/無効（標準でON）
+let specialBackgroundState = 'ready'; // 'ready', 'door_shown', 'door_opened'
 
 // 背景別キャンバスサイズ設定（1.02倍サイズ = 0.6*1.7）
 const backgroundSizes = {
@@ -627,6 +636,20 @@ function setBackground(src) {
   }
 }
 
+// 🔸 特殊背景設定関数（扉開く演出付き）
+function setSpecialBackground(src) {
+  console.log(`🚪 特殊背景設定開始: ${src}`);
+  
+  // 受信側に扉アニメーション開始を通知
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: "doorAnimation",
+      imageSrc: src
+    }));
+    console.log('🚪 受信側に扉アニメーション開始を送信');
+  }
+}
+
 // 🔸 キャンバスサイズ設定関数
 function setCanvasSize(backgroundKey) {
   const size = backgroundSizes[backgroundKey];
@@ -640,6 +663,100 @@ function setCanvasSize(backgroundKey) {
   canvas.style.height = size.height + 'px';
   
   console.log(`📐 送信側キャンバスサイズ変更: ${size.width} x ${size.height}`);
+}
+
+// 🎪 特殊背景設定関数（ドア開閉アニメーション付き）
+function setSpecialBackground(src) {
+  console.log('🎪 特殊背景設定開始:', src, 'State:', specialBackgroundState);
+  
+  if (specialBackgroundState === 'ready') {
+    // 第1段階: 扉を表示して停止
+    console.log('🚪 第1段階: 扉表示');
+    specialBackgroundState = 'door_shown';
+    
+    // 受信側に扉表示のみを通知
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ 
+        type: "doorAnimation", 
+        action: "show_door_only",
+        backgroundSrc: src
+      }));
+      console.log('🚪 受信側に扉表示のみを送信');
+    }
+    
+    // 送信側でも視覚的フィードバック
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // 背景画像を事前に読み込み
+    const img = new Image();
+    img.src = src;
+    img.onload = () => {
+      backgroundImage = img;
+      console.log("✅ 特殊背景画像読み込み成功（待機中）:", src);
+    };
+    
+  } else if (specialBackgroundState === 'door_shown') {
+    // 第2段階: 扉を開く
+    console.log('🚪 第2段階: 扉開放');
+    specialBackgroundState = 'door_opened';
+    
+    // 受信側に扉開放を通知
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ 
+        type: "doorAnimation", 
+        action: "open_door",
+        backgroundSrc: src
+      }));
+      console.log('🚪 受信側に扉開放を送信');
+    }
+    
+    // 1秒後に背景を設定（ドアが開くタイミング）
+    setTimeout(() => {
+      if (backgroundImage) {
+        console.log("✅ 特殊背景画像設定開始:", src);
+        
+        // 背景に応じたキャンバスサイズを設定
+        const backgroundKey = src.includes('back3') ? 'back3' : (src.includes('back4') ? 'back4' : 'back2');
+        setCanvasSize(backgroundKey);
+        
+        // キャンバスをクリアして背景を描画
+        ctx.restore();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+        
+        // 受信側に背景変更を通知
+        socket.send(JSON.stringify({ 
+          type: "specialBackground", 
+          src: src,
+          canvasSize: backgroundSizes[backgroundKey],
+          doorAction: "opened"
+        }));
+        
+        // 特別なエフェクトを追加（星や妖精の粉を散らす）
+        for (let i = 0; i < 10; i++) {
+          setTimeout(() => {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            if (starEffectEnabled) {
+              createStar(x, y);
+            }
+            if (fairyDustEffectEnabled) {
+              createFairyDust(x, y);
+            }
+          }, i * 100);
+        }
+        
+        // 特別な音を再生（オプション）
+        const audio = new Audio('./sound1.mp3');
+        audio.play().catch(e => console.log('特殊背景音楽再生エラー:', e));
+        
+        // 状態をリセット
+        specialBackgroundState = 'ready';
+      }
+    }, 1000); // ドア開閉アニメーションの時間
+  }
 }
 
 
@@ -1281,6 +1398,11 @@ function updateCanvasScale(value) {
   document.getElementById("canvasScaleValue").textContent = value + "x";
 }
 
+function updateAnimationStartWait(value) {
+  animationStartWaitTime = parseFloat(value);
+  document.getElementById("animationStartWaitValue").textContent = value + "秒";
+}
+
 function updateRotationWait(value) {
   rotationWaitTime = parseFloat(value);
   document.getElementById("rotationWaitValue").textContent = value + "秒";
@@ -1291,9 +1413,10 @@ function sendDevSettings() {
     socket.send(JSON.stringify({
       type: "devSettings",
       canvasScale: canvasScale,
+      animationStartWaitTime: animationStartWaitTime,
       rotationWaitTime: rotationWaitTime
     }));
-    console.log(`🔧 Dev設定送信: scale=${canvasScale}, wait=${rotationWaitTime}`);
+    console.log(`🔧 Dev設定送信: scale=${canvasScale}, animationWait=${animationStartWaitTime}, rotationWait=${rotationWaitTime}`);
     console.log("✅ 設定を受信側に送信しました");
   } else {
     console.error("❌ WebSocket接続なし");
@@ -1376,24 +1499,43 @@ function saveRotatedImage() {
 
 // 現在の状態から更に180度回転させて保存する関数
 function saveDoubleRotatedImage() {
-  console.log('🔄 送信ボタン: 印刷処理とアニメーションを同時開始');
+  console.log(`🔄 送信ボタン: 印刷処理開始→${animationStartWaitTime}秒後にアニメーション開始`);
+  
+  // 🔸 送信ボタンの視覚的フィードバック
+  const sendButton = event.target;
+  sendButton.style.transform = 'scale(0.95)';
+  sendButton.style.backgroundColor = '#ff1493';
+  sendButton.style.color = '#fff';
+  sendButton.textContent = '送信中...';
+  sendButton.disabled = true;
+  
+  // ボタンを元に戻す
+  setTimeout(() => {
+    sendButton.style.transform = 'scale(1)';
+    sendButton.style.backgroundColor = '';
+    sendButton.style.color = '';
+    sendButton.textContent = '送信';
+    sendButton.disabled = false;
+  }, 2000);
   
   // 🔸 送信ボタンを押したと同時に印刷処理を実行（印刷機の起動を早くする）
   console.log('🖨️ 印刷処理を即座に実行');
   console.log(`📝 現在の描画コマンド数: ${drawingCommands.length}`);
   actualPrintProcess();
   
-  // 🔸 印刷処理と同時に回転アニメーションを開始
-  console.log('🎬 印刷処理と同時に回転アニメーション開始');
+  // 🔸 印刷処理開始の設定時間後に回転アニメーションを開始
+  console.log(`🎬 印刷処理開始から${animationStartWaitTime}秒後に回転アニメーション実行予定`);
   
-  // WebSocket経由で受信側にアニメーション開始を通知（回転後3秒待機）
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({
-      type: "startRotationAnimation",
-      waitTime: 3.0 // 回転後3秒待機してから下に移動
-    }));
-    console.log(`🎬 受信側にアニメーション開始を送信 (回転後3秒待機)`);
-  }
+  // 設定時間後にWebSocket経由で受信側にアニメーション開始を通知
+  setTimeout(() => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: "startRotationAnimation",
+        waitTime: rotationWaitTime // 回転後待機時間を設定値から取得
+      }));
+      console.log(`🎬 印刷開始から${animationStartWaitTime}秒後に受信側にアニメーション開始を送信 (回転後${rotationWaitTime}秒待機)`);
+    }
+  }, animationStartWaitTime * 1000); // アニメーション開始待機時間（秒をミリ秒に変換）
   
   // 🔸 送信ボタン押下から10秒後にクリアを実行（印刷が即座に開始されるため）
   setTimeout(() => {

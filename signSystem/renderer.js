@@ -1086,11 +1086,22 @@ function handleMessage(data) {
     console.log("🔄 送信ボタン押下 → 180度回転ダウンロード処理実行");
     downloadRotated();
   } else if (data.type === "doorAnimation") {
-    // 🔸 扉開く演出を開始
+    // 🔸 扉演出を開始
     const imageSrc = data.imageSrc || data.backgroundSrc;
-    console.log('🚪 扉開く演出を開始:', imageSrc);
+    const action = data.action || "start";
+    console.log('🚪 扉演出を開始:', imageSrc, 'Action:', action);
     console.log('🚪 受信データ全体:', data);
-    startDoorAnimation(imageSrc);
+    
+    if (action === "show_door_only") {
+      // 第1段階: 扉表示のみ
+      startDoorAnimationPhase1(imageSrc);
+    } else if (action === "open_door") {
+      // 第2段階: 扉開放
+      startDoorAnimationPhase2(imageSrc);
+    } else {
+      // 従来の一括処理
+      startDoorAnimation(imageSrc);
+    }
   } else if (data.type === "specialBackground") {
     // 🔸 特殊背景を設定（扉演出後）
     console.log('🚪 特殊背景を設定:', data.src);
@@ -1802,7 +1813,7 @@ function startDoorAnimation(imageSrc) {
         width: 4px;
         height: 100vh;
         background: #000;
-        z-index: 10001;
+        z-index: 10003;
         transform: translateX(-50%);
       `;
       document.body.appendChild(centerLine);
@@ -1885,6 +1896,155 @@ function startDoorAnimation(imageSrc) {
   };
 }
 
+// 🔸 扉演出第1段階: 扉表示のみ
+function startDoorAnimationPhase1(imageSrc) {
+  console.log('🚪 扉演出第1段階: 扉表示のみ:', imageSrc);
+  
+  const img = new Image();
+  img.src = imageSrc;
+  
+  img.onload = () => {
+    // 1. 背景画像を180度回転してキャンバスに描画
+    const scaledWidth = drawingAreaSize.width * devCanvasScale;
+    const scaledHeight = drawingAreaSize.height * devCanvasScale;
+    
+    // 実際のキャンバスに180度回転した背景を描画
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(Math.PI);
+    ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+    ctx.restore();
+    
+    // 背景画像を保存
+    backgroundImage = img;
+    lastBackgroundSrc = imageSrc;
+    redrawCanvas();
+    
+    console.log('🚪 背景画像を180度回転してキャンバスに描画');
+    
+    // 2. ウィンドウ全体を覆う立体的な最上面レイヤーを作成
+    const grayOverlay = document.createElement('div');
+    grayOverlay.id = 'grayOverlay';
+    grayOverlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(135deg, #3a3a3a 0%, #2c2c2c 25%, #1a1a1a 50%, #2c2c2c 75%, #3a3a3a 100%);
+      box-shadow: inset 0 0 50px rgba(0,0,0,0.5), inset 0 0 100px rgba(0,0,0,0.3);
+      z-index: 10000;
+      pointer-events: none;
+    `;
+    document.body.appendChild(grayOverlay);
+    
+    console.log('🚪 グレーオーバーレイを作成（ウィンドウ全体）');
+    
+    // 3. 1秒後に中央に黒い線を追加して停止
+    setTimeout(() => {
+      const centerLine = document.createElement('div');
+      centerLine.id = 'centerLine';
+      centerLine.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 50%;
+        width: 4px;
+        height: 100vh;
+        background: #000;
+        z-index: 10003;
+        transform: translateX(-50%);
+      `;
+      document.body.appendChild(centerLine);
+      
+      console.log('🚪 中央に黒い線を追加（第1段階完了）');
+      
+      // 青色LEDを追加
+      createBlueLEDLighting();
+    }, 1000);
+  };
+  
+  img.onerror = () => {
+    console.error('❌ 扉用背景画像の読み込みに失敗:', imageSrc);
+  };
+}
+
+// 🔸 扉演出第2段階: 扉開放
+function startDoorAnimationPhase2(imageSrc) {
+  console.log('🚪 扉演出第2段階: 扉開放:', imageSrc);
+  
+  // 既存の要素を取得
+  const grayOverlay = document.getElementById('grayOverlay');
+  const centerLine = document.getElementById('centerLine');
+  
+  if (!grayOverlay || !centerLine) {
+    console.error('❌ 扉要素が見つかりません。第1段階が実行されていない可能性があります。');
+    return;
+  }
+  
+  // グレーオーバーレイを左右の扉に分割
+  grayOverlay.style.display = 'none'; // 元のオーバーレイを非表示
+  
+  // 左の扉（中央から左に開く）- 重厚感のあるデザイン
+  const leftDoor = document.createElement('div');
+  leftDoor.id = 'leftDoor';
+  leftDoor.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 50vw;
+    height: 100vh;
+    background: linear-gradient(45deg, #2c2c2c, #1a1a1a, #2c2c2c);
+    z-index: 10002;
+    transform-origin: left center;
+    transition: transform 1s ease-out;
+    border-right: 3px solid #8b4513;
+    box-shadow: inset -10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
+  `;
+  document.body.appendChild(leftDoor);
+  
+  // 右の扉（中央から右に開く）- 重厚感のあるデザイン
+  const rightDoor = document.createElement('div');
+  rightDoor.id = 'rightDoor';
+  rightDoor.style.cssText = `
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 50vw;
+    height: 100vh;
+    background: linear-gradient(-45deg, #2c2c2c, #1a1a1a, #2c2c2c);
+    z-index: 10002;
+    transform-origin: right center;
+    transition: transform 1s ease-out;
+    border-left: 3px solid #8b4513;
+    box-shadow: inset 10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
+  `;
+  document.body.appendChild(rightDoor);
+  
+  console.log('🚪 扉要素を作成');
+  
+  // 効果音を再生
+  const audio = new Audio('./sound1.mp3');
+  audio.volume = 0.6;
+  audio.play().catch(e => console.log('扉効果音再生エラー:', e));
+  
+  // 黒線を消して、0.1秒後に扉を開く（中央から外側に開く）
+  centerLine.style.display = 'none';
+  setTimeout(() => {
+    leftDoor.style.transform = 'rotateY(90deg)';
+    rightDoor.style.transform = 'rotateY(-90deg)';
+    console.log('🚪 扉が開き始めました');
+  }, 100);
+  
+  // 1秒後に全ての要素を削除
+  setTimeout(() => {
+    if (grayOverlay.parentNode) grayOverlay.parentNode.removeChild(grayOverlay);
+    if (centerLine.parentNode) centerLine.parentNode.removeChild(centerLine);
+    if (leftDoor.parentNode) leftDoor.parentNode.removeChild(leftDoor);
+    if (rightDoor.parentNode) rightDoor.parentNode.removeChild(rightDoor);
+    console.log('🚪 扉演出完了');
+  }, 1100);
+}
+
 // 🔸 特殊背景設定（180度回転表示）
 function setSpecialBackgroundWithRiseEffect(src, canvasSize) {
   console.log('🚪 特殊背景を180度回転で設定:', src);
@@ -1914,11 +2074,7 @@ function setSpecialBackgroundWithRiseEffect(src, canvasSize) {
       ctx.restore();
       redrawCanvas();
       
-      // 🔸 両サイドから青色LEDの間接照明効果を追加（扉演出と同期）
-      // 扉が開くタイミング（2000ms）でLED演出開始
-      setTimeout(() => {
-        createBlueLEDLighting();
-      }, 800); // 1200ms - 800ms = 400ms後に開始 (扉演出開始前)
+      // 🔸 LEDは第1段階で既に表示されているため、ここでは呼び出さない
       
       console.log('🚪 特殊背景設定完了（180度回転）');
     }, 1200); // 扉が完全に開いた後
@@ -1950,7 +2106,7 @@ function createBlueLEDLighting() {
       transparent 100%
     );
     pointer-events: none;
-    z-index: 10001;
+    z-index: 10003;
     box-shadow: 0 0 30px rgba(0, 150, 255, 0.5), 
                 0 0 60px rgba(0, 200, 255, 0.3), 
                 0 0 90px rgba(0, 255, 255, 0.2);
@@ -1976,7 +2132,7 @@ function createBlueLEDLighting() {
       transparent 100%
     );
     pointer-events: none;
-    z-index: 10001;
+    z-index: 10003;
     box-shadow: 0 0 30px rgba(0, 150, 255, 0.5), 
                 0 0 60px rgba(0, 200, 255, 0.3), 
                 0 0 90px rgba(0, 255, 255, 0.2);
@@ -2034,13 +2190,13 @@ function createBlueLEDLighting() {
   document.body.appendChild(leftLED);
   document.body.appendChild(rightLED);
   
-  // 扉が消えるタイミング（3100ms）でLED照明も削除
+  // 扉が消えるタイミング（1200ms）でLED照明も削除
   setTimeout(() => {
     if (leftLED.parentNode) leftLED.parentNode.removeChild(leftLED);
     if (rightLED.parentNode) rightLED.parentNode.removeChild(rightLED);
     if (style.parentNode) style.parentNode.removeChild(style);
     console.log('💡 青色LED間接照明効果を終了（扉と同期）');
-  }, 3100);
+  }, 1200);
 }
 
 // 🔸 ビデオサイズ対応再生関数
