@@ -2040,7 +2040,7 @@ function startDoorAnimationPhase2(imageSrc) {
   }, 1100);
 }
 
-// 🔸 特殊背景設定（180度回転表示）
+// 🔸 特殊背景設定（180度回転表示）- 背景を表示し続ける
 function setSpecialBackgroundWithRiseEffect(src, canvasSize) {
   console.log('🚪 特殊背景を180度回転で設定:', src);
   
@@ -2058,21 +2058,15 @@ function setSpecialBackgroundWithRiseEffect(src, canvasSize) {
     backgroundImage = img;
     lastBackgroundSrc = src;
     
-    // 扉が完全に開いた後に180度回転した画像を表示
-    setTimeout(() => {
-      // 実際のキャンバスに180度回転した背景を描画
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate(Math.PI); // 180度回転
-      ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
-      ctx.restore();
-      redrawCanvas();
-      
-      // 🔸 LEDは第1段階で既に表示されているため、ここでは呼び出さない
-      
-      console.log('🚪 特殊背景設定完了（180度回転）');
-    }, 1200); // 扉が完全に開いた後
+    // 即座に180度回転した画像を表示（背景を消さない）
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(Math.PI); // 180度回転
+    ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+    ctx.restore();
+    redrawCanvas();
+    
+    console.log('🚪 特殊背景設定完了（180度回転）- 背景を表示し続ける');
   };
   
   img.onerror = () => {
@@ -2185,13 +2179,13 @@ function createBlueLEDLighting() {
   document.body.appendChild(leftLED);
   document.body.appendChild(rightLED);
   
-  // 扉が消えるタイミング（1200ms）でLED照明も削除
+  // 扉が開き始めるタイミング（1100ms）でLED照明を削除
   setTimeout(() => {
     if (leftLED.parentNode) leftLED.parentNode.removeChild(leftLED);
     if (rightLED.parentNode) rightLED.parentNode.removeChild(rightLED);
     if (style.parentNode) style.parentNode.removeChild(style);
-    console.log('💡 青色LED間接照明効果を終了（扉と同期）');
-  }, 1200);
+    console.log('💡 青色LED間接照明効果を終了（扉開放と同期）');
+  }, 1100);
 }
 
 // 🔸 ビデオサイズ対応再生関数
