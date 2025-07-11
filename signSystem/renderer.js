@@ -572,12 +572,13 @@ let starEffectEnabled = true; // 星エフェクトの状態（標準でON）
 let fairyDustEffectEnabled = true; // 妖精の粉エフェクトの状態（標準でON）
 
 // 🔸 Dev Tool設定
-let devCanvasScale = 1.0; // キャンバススケール
-let devRotationWaitTime = 5.1; // 回転後待機時間（秒）
+let devCanvasScale = 0.35; // キャンバススケール（デフォルト0.35）
+let devAnimationStartWaitTime = 3.3; // アニメーション開始待機時間（秒）
+let devRotationWaitTime = 8.1; // 回転後待機時間（秒）
 
 // 🔸 描画エリア調整設定
 let drawingAreaOffset = { x: 0, y: 0 }; // 描画エリアのオフセット
-let drawingAreaSize = { width: 630, height: 450 }; // 描画エリアのサイズ
+let drawingAreaSize = { width: 1077, height: 762 }; // 描画エリアのサイズ（1110x786の97%）
 let showDrawingAreaFrame = false; // 描画エリアの枠表示フラグ
 let isDragSetupComplete = false; // ドラッグセットアップ完了フラグ
 
@@ -1084,12 +1085,23 @@ function handleMessage(data) {
     }
     console.log("🔄 送信ボタン押下 → 180度回転ダウンロード処理実行");
     downloadRotated();
+  } else if (data.type === "doorAnimation") {
+    // 🔸 扉開く演出を開始
+    const imageSrc = data.imageSrc || data.backgroundSrc;
+    console.log('🚪 扉開く演出を開始:', imageSrc);
+    console.log('🚪 受信データ全体:', data);
+    startDoorAnimation(imageSrc);
+  } else if (data.type === "specialBackground") {
+    // 🔸 特殊背景を設定（扉演出後）
+    console.log('🚪 特殊背景を設定:', data.src);
+    setSpecialBackgroundWithRiseEffect(data.src, data.canvasSize);
   } else if (data.type === "devSettings") {
     // 🔸 Dev Tool設定受信
     const oldCanvasScale = devCanvasScale;
-    devCanvasScale = data.canvasScale || 1.0;
-    devRotationWaitTime = data.rotationWaitTime || 5.1;
-    console.log(`🔧 Dev設定受信: scale=${devCanvasScale}, wait=${devRotationWaitTime}`);
+    devCanvasScale = data.canvasScale || 0.35;
+    devAnimationStartWaitTime = data.animationStartWaitTime || 3.3;
+    devRotationWaitTime = data.rotationWaitTime || 8.1;
+    console.log(`🔧 Dev設定受信: scale=${devCanvasScale}, animationWait=${devAnimationStartWaitTime}, rotationWait=${devRotationWaitTime}`);
     
     // 🔸 キャンバススケール変更時に描画エリアも連動してスケール
     if (oldCanvasScale !== 0 && oldCanvasScale !== devCanvasScale) {
@@ -1327,13 +1339,16 @@ function runAnimationSequence(waitTime = null) {
       // 書き手側から送信された待機時間を使用
       rotationWaitTime = waitTime * 1000; // 秒をmsに変換
       console.log(`⏰ 書き手側設定：回転後${waitTime}秒待機してから移動開始`);
-    } else if (currentPaperSize === "A4") {
+    } else if (currentPaperSize === "A4" || currentPaperSize === "L") {
       rotationWaitTime = devRotationWaitTime * 1000; // Dev設定の秒数をmsに変換
       console.log(`⏰ ${currentPaperSize}モード：回転後${devRotationWaitTime}秒待機してから移動開始`);
     } else {
       rotationWaitTime = 1100; // ポスター：従来通り1.1秒
       console.log("⏰ ポスターモード：回転後1.1秒待機してから移動開始");
     }
+    
+    // 🔸 回転完了直後に紙吹雪エフェクトを追加
+    createConfettiEffect();
     
     setTimeout(() => {
       animationImage.style.transition = "transform 2s ease";
@@ -1390,11 +1405,639 @@ function runAnimationSequence(waitTime = null) {
           backgroundImage = null;
           redrawCanvas();
         }
+
+        // 🔸 アニメーション完了後にカウントダウン開始
+        // startCountdown(); // カウントダウンを無効化
       }, waitTime); // 🔸 用紙サイズに応じた待機時間
 
     }, rotationWaitTime + 1500); // 🔸 回転完了（1.5秒）+ 用紙サイズに応じた待機時間
 
   }, animationStartDelay); // 🔸 用紙サイズに応じた遅延時間
+}
+
+// 🔸 カウントダウン表示関数
+function startCountdown() {
+  console.log('⏰ カウントダウン開始');
+  
+  // カウントダウン表示用の要素を作成
+  const countdownElement = document.createElement('div');
+  countdownElement.id = 'countdownDisplay';
+  countdownElement.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 80px;
+    font-weight: bold;
+    color: #ff1493;
+    text-shadow: 3px 3px 0px #000, -3px -3px 0px #000, 3px -3px 0px #000, -3px 3px 0px #000;
+    z-index: 9999;
+    text-align: center;
+    pointer-events: none;
+    font-family: 'Arial', sans-serif;
+  `;
+  
+  document.body.appendChild(countdownElement);
+  
+  let count = 5;
+  
+  function updateCountdown() {
+    if (count > 0) {
+      countdownElement.textContent = `お渡しまで ${count}`;
+      console.log(`⏰ カウントダウン: ${count}`);
+      count--;
+      setTimeout(updateCountdown, 1000); // 1秒後に次のカウント
+    } else {
+      // カウントダウン完了
+      countdownElement.textContent = 'お渡しください';
+      console.log('⏰ カウントダウン完了');
+      
+      // 2秒後にカウントダウン表示を削除
+      setTimeout(() => {
+        if (countdownElement.parentNode) {
+          countdownElement.parentNode.removeChild(countdownElement);
+          console.log('⏰ カウントダウン表示を削除');
+        }
+      }, 2000);
+    }
+  }
+  
+  updateCountdown();
+}
+
+// 🔸 紙吹雪エフェクト関数（より派手に）
+function createConfettiEffect() {
+  console.log('🎊 紙吹雪エフェクト開始');
+  
+  // より多彩な色
+  const colors = [
+    '#ff1493', '#00ff00', '#0000ff', '#ffff00', '#ff8000', '#8000ff', '#ff0000', '#00ffff',
+    '#ff69b4', '#ffd700', '#ff00ff', '#00ff7f', '#ff4500', '#1e90ff', '#dc143c', '#ffa500'
+  ];
+  const windowWidth = window.innerWidth;
+  const windowHeight = window.innerHeight;
+  
+  // 効果音を再生
+  const audio = new Audio('./renzoku.mp3');
+  audio.volume = 0.7;
+  audio.play().catch(e => console.log('クラッカー音再生エラー:', e));
+  
+  // 左サイドから紙吹雪
+  createSideConfetti('left', colors, windowWidth, windowHeight);
+  
+  // 右サイドから紙吹雪
+  createSideConfetti('right', colors, windowWidth, windowHeight);
+  
+  // 追加：上部からも紙吹雪を降らせる
+  createTopConfetti(colors, windowWidth, windowHeight);
+  
+  // 追加：キラキラエフェクト
+  createSparkleEffect(windowWidth, windowHeight);
+}
+
+function createSideConfetti(side, colors, windowWidth, windowHeight) {
+  const confettiCount = 50; // 各サイドから50個の紙吹雪（増量）
+  
+  for (let i = 0; i < confettiCount; i++) {
+    const confetti = document.createElement('div');
+    confetti.className = 'confetti';
+    
+    // 紙吹雪のスタイル（よりバリエーション豊かに）
+    const size = Math.random() * 12 + 6; // 6-18px
+    const shape = Math.random();
+    let borderRadius = '0%';
+    if (shape < 0.3) borderRadius = '50%'; // 円形
+    else if (shape < 0.6) borderRadius = '25%'; // 角丸四角
+    
+    confetti.style.cssText = `
+      position: fixed;
+      width: ${size}px;
+      height: ${size * (Math.random() * 0.5 + 0.5)}px;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      pointer-events: none;
+      z-index: 9998;
+      border-radius: ${borderRadius};
+      opacity: ${Math.random() * 0.3 + 0.7};
+      box-shadow: 0 0 ${Math.random() * 10 + 5}px rgba(255,255,255,0.8);
+    `;
+    
+    // 開始位置を設定（下部から）
+    if (side === 'left') {
+      confetti.style.left = '0px';
+      confetti.style.bottom = Math.random() * 100 + 'px'; // 底部から0-100pxの範囲
+    } else {
+      confetti.style.right = '0px';
+      confetti.style.bottom = Math.random() * 100 + 'px'; // 底部から0-100pxの範囲
+    }
+    
+    document.body.appendChild(confetti);
+    
+    // アニメーション用の動的スタイル作成
+    const animationName = `confetti_${side}_${i}_${Date.now()}`;
+    const style = document.createElement('style');
+    
+    // 飛び散る方向と距離を計算（下から上へ噴出）
+    const horizontalDistance = Math.random() * 600 + 300; // 300-900px
+    const verticalDistance = -(Math.random() * 600 + 400); // -400から-1000px（上方向へ）
+    const rotation = Math.random() * 1440 + 720; // 720-2160度回転
+    
+    const keyframes = `
+      @keyframes ${animationName} {
+        0% {
+          transform: translate(0, 0) rotate(0deg);
+          opacity: 0.8;
+        }
+        50% {
+          opacity: 1;
+        }
+        100% {
+          transform: translate(${side === 'left' ? horizontalDistance : -horizontalDistance}px, ${verticalDistance}px) rotate(${rotation}deg);
+          opacity: 0;
+        }
+      }
+    `;
+    
+    style.textContent = keyframes;
+    document.head.appendChild(style);
+    
+    // アニメーションを適用（より長く）
+    const duration = Math.random() * 1500 + 2000; // 2-3.5秒
+    const delay = Math.random() * 300; // 0-300ms遅延
+    
+    confetti.style.animation = `${animationName} ${duration}ms ease-out ${delay}ms forwards`;
+    
+    // アニメーション完了後にクリーンアップ
+    setTimeout(() => {
+      if (confetti.parentNode) {
+        confetti.parentNode.removeChild(confetti);
+      }
+      if (style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
+    }, duration + delay + 100);
+  }
+  
+  console.log(`🎊 ${side}サイドから${confettiCount}個の紙吹雪を発射`);
+}
+
+// 🔸 上部からの紙吹雪（追加演出）
+function createTopConfetti(colors, windowWidth, windowHeight) {
+  const confettiCount = 40; // 上部から40個
+  
+  for (let i = 0; i < confettiCount; i++) {
+    const confetti = document.createElement('div');
+    confetti.className = 'confetti-top';
+    
+    // キラキラした紙吹雪のスタイル
+    const size = Math.random() * 15 + 8; // 8-23px
+    
+    confetti.style.cssText = `
+      position: fixed;
+      width: ${size}px;
+      height: ${size * 0.6}px;
+      background: linear-gradient(45deg, ${colors[Math.floor(Math.random() * colors.length)]}, ${colors[Math.floor(Math.random() * colors.length)]});
+      pointer-events: none;
+      z-index: 9998;
+      border-radius: 10%;
+      opacity: 0.9;
+      box-shadow: 0 0 15px rgba(255,255,255,1), inset 0 0 5px rgba(255,255,255,0.5);
+      top: -50px;
+      left: ${Math.random() * windowWidth}px;
+    `;
+    
+    document.body.appendChild(confetti);
+    
+    // 降ってくるアニメーション
+    const animationName = `confetti_fall_${i}_${Date.now()}`;
+    const style = document.createElement('style');
+    
+    const swayAmount = Math.random() * 200 - 100; // -100 to 100px 左右に揺れる
+    const fallDistance = windowHeight + 100;
+    const rotation = Math.random() * 720; // 0-720度回転
+    
+    const keyframes = `
+      @keyframes ${animationName} {
+        0% {
+          transform: translateY(0) translateX(0) rotate(0deg);
+          opacity: 0.9;
+        }
+        25% {
+          transform: translateY(${fallDistance * 0.25}px) translateX(${swayAmount * 0.5}px) rotate(${rotation * 0.25}deg);
+        }
+        50% {
+          transform: translateY(${fallDistance * 0.5}px) translateX(${swayAmount}px) rotate(${rotation * 0.5}deg);
+          opacity: 1;
+        }
+        75% {
+          transform: translateY(${fallDistance * 0.75}px) translateX(${swayAmount * 0.5}px) rotate(${rotation * 0.75}deg);
+        }
+        100% {
+          transform: translateY(${fallDistance}px) translateX(0) rotate(${rotation}deg);
+          opacity: 0;
+        }
+      }
+    `;
+    
+    style.textContent = keyframes;
+    document.head.appendChild(style);
+    
+    // アニメーションを適用
+    const duration = Math.random() * 2000 + 3000; // 3-5秒
+    const delay = Math.random() * 1000; // 0-1秒遅延
+    
+    confetti.style.animation = `${animationName} ${duration}ms ease-in-out ${delay}ms forwards`;
+    
+    // アニメーション完了後にクリーンアップ
+    setTimeout(() => {
+      if (confetti.parentNode) {
+        confetti.parentNode.removeChild(confetti);
+      }
+      if (style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
+    }, duration + delay + 100);
+  }
+  
+  console.log(`🎊 上部から${confettiCount}個の紙吹雪を降らせる`);
+}
+
+// 🔸 キラキラエフェクト関数
+function createSparkleEffect(windowWidth, windowHeight) {
+  const sparkleCount = 60; // 60個のキラキラ
+  
+  for (let i = 0; i < sparkleCount; i++) {
+    const sparkle = document.createElement('div');
+    sparkle.className = 'sparkle';
+    
+    // キラキラのスタイル
+    const size = Math.random() * 6 + 2; // 2-8px
+    const startX = Math.random() * windowWidth;
+    const startY = windowHeight - Math.random() * 200; // 下部200pxの範囲から
+    
+    sparkle.style.cssText = `
+      position: fixed;
+      width: ${size}px;
+      height: ${size}px;
+      background: radial-gradient(circle, #ffffff 0%, rgba(255,255,255,0) 70%);
+      pointer-events: none;
+      z-index: 9999;
+      left: ${startX}px;
+      top: ${startY}px;
+      border-radius: 50%;
+      box-shadow: 0 0 ${size * 2}px #fff, 0 0 ${size * 4}px #fff, 0 0 ${size * 6}px #fff;
+    `;
+    
+    document.body.appendChild(sparkle);
+    
+    // キラキラアニメーション
+    const animationName = `sparkle_${i}_${Date.now()}`;
+    const style = document.createElement('style');
+    
+    // ランダムな動き
+    const moveX = (Math.random() - 0.5) * 800; // -400 to 400px
+    const moveY = -(Math.random() * 600 + 200); // -200 to -800px（上方向）
+    const duration = Math.random() * 2000 + 1000; // 1-3秒
+    
+    const keyframes = `
+      @keyframes ${animationName} {
+        0% {
+          transform: translate(0, 0) scale(0);
+          opacity: 0;
+        }
+        20% {
+          transform: translate(${moveX * 0.2}px, ${moveY * 0.2}px) scale(1.5);
+          opacity: 1;
+        }
+        50% {
+          transform: translate(${moveX * 0.5}px, ${moveY * 0.5}px) scale(1);
+          opacity: 0.8;
+        }
+        100% {
+          transform: translate(${moveX}px, ${moveY}px) scale(0);
+          opacity: 0;
+        }
+      }
+    `;
+    
+    style.textContent = keyframes;
+    document.head.appendChild(style);
+    
+    // アニメーションを適用
+    const delay = Math.random() * 500; // 0-500ms遅延
+    sparkle.style.animation = `${animationName} ${duration}ms ease-out ${delay}ms forwards`;
+    
+    // 点滅エフェクトを追加
+    const blinkInterval = setInterval(() => {
+      sparkle.style.opacity = Math.random() > 0.5 ? '1' : '0.3';
+    }, 100);
+    
+    // アニメーション完了後にクリーンアップ
+    setTimeout(() => {
+      clearInterval(blinkInterval);
+      if (sparkle.parentNode) {
+        sparkle.parentNode.removeChild(sparkle);
+      }
+      if (style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
+    }, duration + delay + 100);
+  }
+  
+  console.log(`✨ ${sparkleCount}個のキラキラエフェクトを追加`);
+}
+
+// 🔸 扉開く演出関数
+function startDoorAnimation(imageSrc) {
+  console.log('🚪 扉開く演出を開始');
+  
+  // 背景画像を事前に読み込み
+  const img = new Image();
+  img.src = imageSrc;
+  
+  img.onload = () => {
+    // 1. 背景画像を180度回転してキャンバスに描画
+    const scaledWidth = drawingAreaSize.width * devCanvasScale;
+    const scaledHeight = drawingAreaSize.height * devCanvasScale;
+    
+    // 実際のキャンバスに180度回転した背景を描画
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(Math.PI);
+    ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+    ctx.restore();
+    
+    // 背景画像を保存
+    backgroundImage = img;
+    lastBackgroundSrc = imageSrc;
+    redrawCanvas();
+    
+    console.log('🚪 背景画像を180度回転してキャンバスに描画');
+    
+    // 2. ウィンドウ全体を覆う立体的な最上面レイヤーを作成
+    const grayOverlay = document.createElement('div');
+    grayOverlay.id = 'grayOverlay';
+    grayOverlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(135deg, #3a3a3a 0%, #2c2c2c 25%, #1a1a1a 50%, #2c2c2c 75%, #3a3a3a 100%);
+      box-shadow: inset 0 0 50px rgba(0,0,0,0.5), inset 0 0 100px rgba(0,0,0,0.3);
+      z-index: 10000;
+      pointer-events: none;
+    `;
+    document.body.appendChild(grayOverlay);
+    
+    console.log('🚪 グレーオーバーレイを作成（ウィンドウ全体）');
+    
+    // 3. 1秒後に中央に黒い線を追加
+    setTimeout(() => {
+      const centerLine = document.createElement('div');
+      centerLine.id = 'centerLine';
+      centerLine.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 50%;
+        width: 4px;
+        height: 100vh;
+        background: #000;
+        z-index: 10001;
+        transform: translateX(-50%);
+      `;
+      document.body.appendChild(centerLine);
+      
+      console.log('🚪 中央に黒い線を追加');
+      
+      // 4. さらに1秒後に扉が開く
+      setTimeout(() => {
+        // グレーオーバーレイを左右の扉に分割
+        grayOverlay.style.display = 'none'; // 元のオーバーレイを非表示
+        
+        // 左の扉（中央から左に開く）- 重厚感のあるデザイン
+        const leftDoor = document.createElement('div');
+        leftDoor.id = 'leftDoor';
+        leftDoor.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 50vw;
+          height: 100vh;
+          background: linear-gradient(45deg, #2c2c2c, #1a1a1a, #2c2c2c);
+          z-index: 10002;
+          transform-origin: left center;
+          transition: transform 1s ease-out;
+          border-right: 3px solid #8b4513;
+          box-shadow: inset -10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
+        `;
+        document.body.appendChild(leftDoor);
+        
+        // 右の扉（中央から右に開く）- 重厚感のあるデザイン
+        const rightDoor = document.createElement('div');
+        rightDoor.id = 'rightDoor';
+        rightDoor.style.cssText = `
+          position: fixed;
+          top: 0;
+          right: 0;
+          width: 50vw;
+          height: 100vh;
+          background: linear-gradient(-45deg, #2c2c2c, #1a1a1a, #2c2c2c);
+          z-index: 10002;
+          transform-origin: right center;
+          transition: transform 1s ease-out;
+          border-left: 3px solid #8b4513;
+          box-shadow: inset 10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
+        `;
+        document.body.appendChild(rightDoor);
+        
+        console.log('🚪 扉要素を作成');
+        
+        // 効果音を再生
+        const audio = new Audio('./sound1.mp3');
+        audio.volume = 0.6;
+        audio.play().catch(e => console.log('扉効果音再生エラー:', e));
+        
+        // 黒線を消して、0.1秒後に扉を開く（中央から外側に開く）
+        centerLine.style.display = 'none';
+        setTimeout(() => {
+          leftDoor.style.transform = 'rotateY(90deg)';
+          rightDoor.style.transform = 'rotateY(-90deg)';
+          console.log('🚪 扉が開き始めました');
+        }, 100);
+        
+        // 1秒後に全ての要素を削除
+        setTimeout(() => {
+          if (grayOverlay.parentNode) grayOverlay.parentNode.removeChild(grayOverlay);
+          if (centerLine.parentNode) centerLine.parentNode.removeChild(centerLine);
+          if (leftDoor.parentNode) leftDoor.parentNode.removeChild(leftDoor);
+          if (rightDoor.parentNode) rightDoor.parentNode.removeChild(rightDoor);
+          console.log('🚪 扉演出完了');
+        }, 1100);
+        
+      }, 1000); // 黒い線表示から1秒後に扉開始
+      
+    }, 1000); // 初期表示から1秒後に黒い線表示
+    
+  };
+  
+  img.onerror = () => {
+    console.error('❌ 扉用背景画像の読み込みに失敗:', imageSrc);
+  };
+}
+
+// 🔸 特殊背景設定（180度回転表示）
+function setSpecialBackgroundWithRiseEffect(src, canvasSize) {
+  console.log('🚪 特殊背景を180度回転で設定:', src);
+  
+  const img = new Image();
+  img.src = src;
+  
+  img.onload = () => {
+    // キャンバスサイズを調整
+    if (canvasSize) {
+      canvas.width = canvasSize.width;
+      canvas.height = canvasSize.height;
+    }
+    
+    // 背景画像を保存
+    backgroundImage = img;
+    lastBackgroundSrc = src;
+    
+    // 扉が完全に開いた後に180度回転した画像を表示
+    setTimeout(() => {
+      // 実際のキャンバスに180度回転した背景を描画
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(Math.PI); // 180度回転
+      ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+      ctx.restore();
+      redrawCanvas();
+      
+      // 🔸 両サイドから青色LEDの間接照明効果を追加
+      createBlueLEDLighting();
+      
+      console.log('🚪 特殊背景設定完了（180度回転）');
+    }, 1200); // 扉が完全に開いた後
+  };
+  
+  img.onerror = () => {
+    console.error('❌ 特殊背景画像の読み込みに失敗:', src);
+  };
+}
+
+// 🔸 青色LED間接照明効果を作成
+function createBlueLEDLighting() {
+  console.log('💡 青色LED間接照明効果を開始');
+  
+  // 左側のLED照明
+  const leftLED = document.createElement('div');
+  leftLED.className = 'blue-led-left';
+  leftLED.style.cssText = `
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 150px;
+    height: 100vh;
+    background: linear-gradient(90deg, 
+      rgba(0, 100, 255, 0.8) 0%, 
+      rgba(0, 150, 255, 0.6) 30%, 
+      rgba(0, 200, 255, 0.4) 60%, 
+      rgba(0, 255, 255, 0.2) 80%, 
+      transparent 100%
+    );
+    pointer-events: none;
+    z-index: 9999;
+    box-shadow: 0 0 50px rgba(0, 150, 255, 0.7), 
+                0 0 100px rgba(0, 200, 255, 0.5), 
+                0 0 150px rgba(0, 255, 255, 0.3);
+    animation: ledPulse 2s ease-in-out infinite, ledSlideIn 1s ease-out forwards;
+    transform: translateX(-100%);
+    opacity: 0;
+  `;
+  
+  // 右側のLED照明
+  const rightLED = document.createElement('div');
+  rightLED.className = 'blue-led-right';
+  rightLED.style.cssText = `
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: 150px;
+    height: 100vh;
+    background: linear-gradient(270deg, 
+      rgba(0, 100, 255, 0.8) 0%, 
+      rgba(0, 150, 255, 0.6) 30%, 
+      rgba(0, 200, 255, 0.4) 60%, 
+      rgba(0, 255, 255, 0.2) 80%, 
+      transparent 100%
+    );
+    pointer-events: none;
+    z-index: 9999;
+    box-shadow: 0 0 50px rgba(0, 150, 255, 0.7), 
+                0 0 100px rgba(0, 200, 255, 0.5), 
+                0 0 150px rgba(0, 255, 255, 0.3);
+    animation: ledPulse 2s ease-in-out infinite, ledSlideIn 1s ease-out forwards;
+    transform: translateX(100%);
+    opacity: 0;
+  `;
+  
+  // CSSアニメーションを動的に追加
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes ledPulse {
+      0%, 100% { 
+        filter: brightness(1) saturate(1.2);
+        box-shadow: 0 0 50px rgba(0, 150, 255, 0.7), 
+                    0 0 100px rgba(0, 200, 255, 0.5), 
+                    0 0 150px rgba(0, 255, 255, 0.3);
+      }
+      50% { 
+        filter: brightness(1.3) saturate(1.5);
+        box-shadow: 0 0 70px rgba(0, 150, 255, 0.9), 
+                    0 0 120px rgba(0, 200, 255, 0.7), 
+                    0 0 180px rgba(0, 255, 255, 0.5);
+      }
+    }
+    
+    @keyframes ledSlideIn {
+      0% {
+        transform: translateX(-100%);
+        opacity: 0;
+      }
+      100% {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    .blue-led-right {
+      animation: ledPulse 2s ease-in-out infinite, ledSlideInRight 1s ease-out forwards;
+    }
+    
+    @keyframes ledSlideInRight {
+      0% {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      100% {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+  `;
+  
+  document.head.appendChild(style);
+  document.body.appendChild(leftLED);
+  document.body.appendChild(rightLED);
+  
+  // 8秒後にLED照明を削除
+  setTimeout(() => {
+    if (leftLED.parentNode) leftLED.parentNode.removeChild(leftLED);
+    if (rightLED.parentNode) rightLED.parentNode.removeChild(rightLED);
+    if (style.parentNode) style.parentNode.removeChild(style);
+    console.log('💡 青色LED間接照明効果を終了');
+  }, 8000);
 }
 
 // 🔸 ビデオサイズ対応再生関数
