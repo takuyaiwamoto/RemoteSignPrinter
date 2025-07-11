@@ -2035,13 +2035,22 @@ function startDoorAnimationPhase2(imageSrc) {
       console.log('🚪 扉が開き始めました（4秒間）');
     }, 100);
     
-    // 4秒後に全ての要素を削除
+    // 4秒後に全ての要素を削除 + open2.mp3再生 + 心臓鼓動演出
     setTimeout(() => {
       if (grayOverlay.parentNode) grayOverlay.parentNode.removeChild(grayOverlay);
       if (centerLine.parentNode) centerLine.parentNode.removeChild(centerLine);
       if (leftDoor.parentNode) leftDoor.parentNode.removeChild(leftDoor);
       if (rightDoor.parentNode) rightDoor.parentNode.removeChild(rightDoor);
       console.log('🚪 扉演出完了');
+      
+      // 扉が開き切ったらopen2.mp3を再生
+      const audio2 = new Audio('./open2.mp3');
+      audio2.volume = 0.6;
+      audio2.play().catch(e => console.log('open2.mp3再生エラー:', e));
+      console.log('🔊 open2.mp3再生開始');
+      
+      // 心臓鼓動演出を開始
+      createHeartbeatEffect();
     }, 4100);
     
   }, 2500); // 2.5秒後に開く演出開始
@@ -2084,6 +2093,87 @@ function setSpecialBackgroundWithRiseEffect(src, canvasSize) {
 // 🔸 青色LED間接照明効果を削除
 // function createBlueLEDLighting() { ... }
 // function createBlueLEDLightingWithFadeOut() { ... }
+
+// 🔸 心臓鼓動演出を作成
+function createHeartbeatEffect() {
+  console.log('💓 心臓鼓動演出を開始');
+  
+  if (!backgroundImage) {
+    console.log('❌ 背景画像が見つかりません');
+    return;
+  }
+  
+  // 心臓鼓動用の背景画像要素を作成
+  const heartbeatBg = document.createElement('div');
+  heartbeatBg.id = 'heartbeat-background';
+  heartbeatBg.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: ${canvas.width * 1.1}px;
+    height: ${canvas.height * 1.1}px;
+    transform: translate(-50%, -50%) rotate(180deg);
+    background-image: url('${backgroundImage.src}');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.5;
+    z-index: 9999;
+    pointer-events: none;
+    animation: heartbeat 2s ease-in-out, heartbeatFadeOut 2s ease-out forwards;
+  `;
+  
+  // CSSアニメーションを動的に追加
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes heartbeat {
+      0% {
+        transform: translate(-50%, -50%) rotate(180deg) scale(1);
+        opacity: 0.5;
+      }
+      25% {
+        transform: translate(-50%, -50%) rotate(180deg) scale(1.05);
+        opacity: 0.6;
+      }
+      50% {
+        transform: translate(-50%, -50%) rotate(180deg) scale(1);
+        opacity: 0.5;
+      }
+      75% {
+        transform: translate(-50%, -50%) rotate(180deg) scale(1.08);
+        opacity: 0.65;
+      }
+      100% {
+        transform: translate(-50%, -50%) rotate(180deg) scale(1);
+        opacity: 0.5;
+      }
+    }
+    
+    @keyframes heartbeatFadeOut {
+      0% {
+        opacity: 0.5;
+      }
+      50% {
+        opacity: 0.3;
+      }
+      100% {
+        opacity: 0;
+      }
+    }
+  `;
+  
+  document.head.appendChild(style);
+  document.body.appendChild(heartbeatBg);
+  
+  console.log('💓 心臓鼓動演出を表示');
+  
+  // 2秒後に削除
+  setTimeout(() => {
+    if (heartbeatBg.parentNode) heartbeatBg.parentNode.removeChild(heartbeatBg);
+    if (style.parentNode) style.parentNode.removeChild(style);
+    console.log('💓 心臓鼓動演出を終了');
+  }, 2000);
+}
 
 // 🔸 ビデオサイズ対応再生関数
 function playVideoWithSize() {
