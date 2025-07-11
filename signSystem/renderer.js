@@ -1910,7 +1910,7 @@ function startDoorAnimationPhase1(imageSrc) {
     
     console.log('🚪 背景画像を保存（キャンバスには描画せず）');
     
-    // 1. ウィンドウ全体を覆う立体的な最上面レイヤーを作成
+    // 1. ウィンドウ全体を覆う立体的な最上面レイヤーを即座に作成
     const grayOverlay = document.createElement('div');
     grayOverlay.id = 'grayOverlay';
     grayOverlay.style.cssText = `
@@ -1926,26 +1926,22 @@ function startDoorAnimationPhase1(imageSrc) {
     `;
     document.body.appendChild(grayOverlay);
     
-    console.log('🚪 グレーオーバーレイを作成（ウィンドウ全体）');
+    // 2. 中央に黒い線を即座に追加
+    const centerLine = document.createElement('div');
+    centerLine.id = 'centerLine';
+    centerLine.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 50%;
+      width: 4px;
+      height: 100vh;
+      background: #000;
+      z-index: 10001;
+      transform: translateX(-50%);
+    `;
+    document.body.appendChild(centerLine);
     
-    // 2. 1秒後に中央に黒い線を追加して停止
-    setTimeout(() => {
-      const centerLine = document.createElement('div');
-      centerLine.id = 'centerLine';
-      centerLine.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 50%;
-        width: 4px;
-        height: 100vh;
-        background: #000;
-        z-index: 10001;
-        transform: translateX(-50%);
-      `;
-      document.body.appendChild(centerLine);
-      
-      console.log('🚪 中央に黒い線を追加（第1段階完了 - 開く直前で停止）');
-    }, 1000);
+    console.log('🚪 グレーオーバーレイと中央線を作成（第1段階完了 - 開く直前で停止）');
   };
   
   img.onerror = () => {
