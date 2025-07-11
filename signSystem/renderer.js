@@ -1973,71 +1973,78 @@ function startDoorAnimationPhase2(imageSrc) {
     console.log('🚪 背景画像を180度回転してキャンバスに描画');
   }
   
-  // 2. 青色LEDを表示
-  createBlueLEDLighting();
-  
-  // 3. グレーオーバーレイを左右の扉に分割
-  grayOverlay.style.display = 'none'; // 元のオーバーレイを非表示
-  
-  // 左の扉（中央から左に開く）- 重厚感のあるデザイン
-  const leftDoor = document.createElement('div');
-  leftDoor.id = 'leftDoor';
-  leftDoor.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 50vw;
-    height: 100vh;
-    background: linear-gradient(45deg, #2c2c2c, #1a1a1a, #2c2c2c);
-    z-index: 10002;
-    transform-origin: left center;
-    transition: transform 1s ease-out;
-    border-right: 3px solid #8b4513;
-    box-shadow: inset -10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
-  `;
-  document.body.appendChild(leftDoor);
-  
-  // 右の扉（中央から右に開く）- 重厚感のあるデザイン
-  const rightDoor = document.createElement('div');
-  rightDoor.id = 'rightDoor';
-  rightDoor.style.cssText = `
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 50vw;
-    height: 100vh;
-    background: linear-gradient(-45deg, #2c2c2c, #1a1a1a, #2c2c2c);
-    z-index: 10002;
-    transform-origin: right center;
-    transition: transform 1s ease-out;
-    border-left: 3px solid #8b4513;
-    box-shadow: inset 10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
-  `;
-  document.body.appendChild(rightDoor);
-  
-  console.log('🚪 扉要素を作成');
-  
-  // 4. 効果音を再生
-  const audio = new Audio('./sound1.mp3');
+  // 2. open.wavを再生
+  const audio = new Audio('./open.wav');
   audio.volume = 0.6;
-  audio.play().catch(e => console.log('扉効果音再生エラー:', e));
+  audio.play().catch(e => console.log('open.wav再生エラー:', e));
+  console.log('🔊 open.wav再生開始');
   
-  // 5. 黒線を消して、0.1秒後に扉を開く（中央から外側に開く）
-  centerLine.style.display = 'none';
-  setTimeout(() => {
-    leftDoor.style.transform = 'rotateY(90deg)';
-    rightDoor.style.transform = 'rotateY(-90deg)';
-    console.log('🚪 扉が開き始めました');
-  }, 100);
+  // 3. 青色LEDを表示（open.wav再生と同時）
+  createBlueLEDLightingWithFadeOut();
   
-  // 6. 1秒後に全ての要素を削除
+  // 4. 2.5秒後に開く演出開始
   setTimeout(() => {
-    if (grayOverlay.parentNode) grayOverlay.parentNode.removeChild(grayOverlay);
-    if (centerLine.parentNode) centerLine.parentNode.removeChild(centerLine);
-    if (leftDoor.parentNode) leftDoor.parentNode.removeChild(leftDoor);
-    if (rightDoor.parentNode) rightDoor.parentNode.removeChild(rightDoor);
-    console.log('🚪 扉演出完了');
-  }, 1100);
+    console.log('🚪 開く演出開始（2.5秒後）');
+    
+    // グレーオーバーレイを左右の扉に分割
+    grayOverlay.style.display = 'none'; // 元のオーバーレイを非表示
+    
+    // 左の扉（中央から左に開く）- 重厚感のあるデザイン
+    const leftDoor = document.createElement('div');
+    leftDoor.id = 'leftDoor';
+    leftDoor.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 50vw;
+      height: 100vh;
+      background: linear-gradient(45deg, #2c2c2c, #1a1a1a, #2c2c2c);
+      z-index: 10002;
+      transform-origin: left center;
+      transition: transform 4s ease-out;
+      border-right: 3px solid #8b4513;
+      box-shadow: inset -10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
+    `;
+    document.body.appendChild(leftDoor);
+    
+    // 右の扉（中央から右に開く）- 重厚感のあるデザイン
+    const rightDoor = document.createElement('div');
+    rightDoor.id = 'rightDoor';
+    rightDoor.style.cssText = `
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 50vw;
+      height: 100vh;
+      background: linear-gradient(-45deg, #2c2c2c, #1a1a1a, #2c2c2c);
+      z-index: 10002;
+      transform-origin: right center;
+      transition: transform 4s ease-out;
+      border-left: 3px solid #8b4513;
+      box-shadow: inset 10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
+    `;
+    document.body.appendChild(rightDoor);
+    
+    console.log('🚪 扉要素を作成');
+    
+    // 黒線を消して、0.1秒後に扉を開く（中央から外側に開く）
+    centerLine.style.display = 'none';
+    setTimeout(() => {
+      leftDoor.style.transform = 'rotateY(90deg)';
+      rightDoor.style.transform = 'rotateY(-90deg)';
+      console.log('🚪 扉が開き始めました（4秒間）');
+    }, 100);
+    
+    // 4秒後に全ての要素を削除
+    setTimeout(() => {
+      if (grayOverlay.parentNode) grayOverlay.parentNode.removeChild(grayOverlay);
+      if (centerLine.parentNode) centerLine.parentNode.removeChild(centerLine);
+      if (leftDoor.parentNode) leftDoor.parentNode.removeChild(leftDoor);
+      if (rightDoor.parentNode) rightDoor.parentNode.removeChild(rightDoor);
+      console.log('🚪 扉演出完了');
+    }, 4100);
+    
+  }, 2500); // 2.5秒後に開く演出開始
 }
 
 // 🔸 特殊背景設定（180度回転表示）- 背景を表示し続ける
@@ -2186,6 +2193,132 @@ function createBlueLEDLighting() {
     if (style.parentNode) style.parentNode.removeChild(style);
     console.log('💡 青色LED間接照明効果を終了（扉開放と同期）');
   }, 1100);
+}
+
+// 🔸 青色LED間接照明効果を作成（フェードアウト付き）
+function createBlueLEDLightingWithFadeOut() {
+  console.log('💡 青色LED間接照明効果を開始（フェードアウト付き）');
+  
+  // 左側のLED照明（小さくした）
+  const leftLED = document.createElement('div');
+  leftLED.className = 'blue-led-left-fadeout';
+  leftLED.style.cssText = `
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 80px;
+    height: 100vh;
+    background: linear-gradient(90deg, 
+      rgba(0, 100, 255, 0.6) 0%, 
+      rgba(0, 150, 255, 0.4) 30%, 
+      rgba(0, 200, 255, 0.3) 60%, 
+      rgba(0, 255, 255, 0.1) 80%, 
+      transparent 100%
+    );
+    pointer-events: none;
+    z-index: 10003;
+    box-shadow: 0 0 30px rgba(0, 150, 255, 0.5), 
+                0 0 60px rgba(0, 200, 255, 0.3), 
+                0 0 90px rgba(0, 255, 255, 0.2);
+    animation: ledPulse 2s ease-in-out infinite, ledSlideIn 1s ease-out forwards;
+    transform: translateX(-100%);
+    opacity: 0;
+  `;
+  
+  // 右側のLED照明（小さくした）
+  const rightLED = document.createElement('div');
+  rightLED.className = 'blue-led-right-fadeout';
+  rightLED.style.cssText = `
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: 80px;
+    height: 100vh;
+    background: linear-gradient(270deg, 
+      rgba(0, 100, 255, 0.6) 0%, 
+      rgba(0, 150, 255, 0.4) 30%, 
+      rgba(0, 200, 255, 0.3) 60%, 
+      rgba(0, 255, 255, 0.1) 80%, 
+      transparent 100%
+    );
+    pointer-events: none;
+    z-index: 10003;
+    box-shadow: 0 0 30px rgba(0, 150, 255, 0.5), 
+                0 0 60px rgba(0, 200, 255, 0.3), 
+                0 0 90px rgba(0, 255, 255, 0.2);
+    animation: ledPulse 2s ease-in-out infinite, ledSlideInRight 1s ease-out forwards;
+    transform: translateX(100%);
+    opacity: 0;
+  `;
+  
+  // CSSアニメーションを動的に追加
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes ledPulse {
+      0%, 100% { 
+        filter: brightness(1) saturate(1.2);
+        box-shadow: 0 0 30px rgba(0, 150, 255, 0.5), 
+                    0 0 60px rgba(0, 200, 255, 0.3), 
+                    0 0 90px rgba(0, 255, 255, 0.2);
+      }
+      50% { 
+        filter: brightness(1.3) saturate(1.5);
+        box-shadow: 0 0 40px rgba(0, 150, 255, 0.7), 
+                    0 0 80px rgba(0, 200, 255, 0.5), 
+                    0 0 120px rgba(0, 255, 255, 0.3);
+      }
+    }
+    
+    @keyframes ledSlideIn {
+      0% {
+        transform: translateX(-100%);
+        opacity: 0;
+      }
+      100% {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes ledSlideInRight {
+      0% {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      100% {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes ledFadeOut {
+      0% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+      }
+    }
+  `;
+  
+  document.head.appendChild(style);
+  document.body.appendChild(leftLED);
+  document.body.appendChild(rightLED);
+  
+  // 6.5秒後（2.5秒待機 + 4秒開く）にフェードアウト開始
+  setTimeout(() => {
+    leftLED.style.animation = 'ledPulse 2s ease-in-out infinite, ledFadeOut 1s ease-out forwards';
+    rightLED.style.animation = 'ledPulse 2s ease-in-out infinite, ledFadeOut 1s ease-out forwards';
+    console.log('💡 青色LED間接照明効果フェードアウト開始');
+    
+    // フェードアウト完了後に削除
+    setTimeout(() => {
+      if (leftLED.parentNode) leftLED.parentNode.removeChild(leftLED);
+      if (rightLED.parentNode) rightLED.parentNode.removeChild(rightLED);
+      if (style.parentNode) style.parentNode.removeChild(style);
+      console.log('💡 青色LED間接照明効果を終了（フェードアウト完了）');
+    }, 1000);
+  }, 6500);
 }
 
 // 🔸 ビデオサイズ対応再生関数
