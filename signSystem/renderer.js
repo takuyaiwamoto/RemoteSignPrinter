@@ -1914,8 +1914,11 @@ function setSpecialBackgroundWithRiseEffect(src, canvasSize) {
       ctx.restore();
       redrawCanvas();
       
-      // 🔸 両サイドから青色LEDの間接照明効果を追加
-      createBlueLEDLighting();
+      // 🔸 両サイドから青色LEDの間接照明効果を追加（扉演出と同期）
+      // 扉が開くタイミング（2000ms）でLED演出開始
+      setTimeout(() => {
+        createBlueLEDLighting();
+      }, 800); // 1200ms - 800ms = 400ms後に開始 (扉演出開始前)
       
       console.log('🚪 特殊背景設定完了（180度回転）');
     }, 1200); // 扉が完全に開いた後
@@ -1926,57 +1929,57 @@ function setSpecialBackgroundWithRiseEffect(src, canvasSize) {
   };
 }
 
-// 🔸 青色LED間接照明効果を作成
+// 🔸 青色LED間接照明効果を作成（扉の演出と同期）
 function createBlueLEDLighting() {
-  console.log('💡 青色LED間接照明効果を開始');
+  console.log('💡 青色LED間接照明効果を開始（扉の演出の上）');
   
-  // 左側のLED照明
+  // 左側のLED照明（小さくした）
   const leftLED = document.createElement('div');
   leftLED.className = 'blue-led-left';
   leftLED.style.cssText = `
     position: fixed;
     left: 0;
     top: 0;
-    width: 150px;
+    width: 80px;
     height: 100vh;
     background: linear-gradient(90deg, 
-      rgba(0, 100, 255, 0.8) 0%, 
-      rgba(0, 150, 255, 0.6) 30%, 
-      rgba(0, 200, 255, 0.4) 60%, 
-      rgba(0, 255, 255, 0.2) 80%, 
+      rgba(0, 100, 255, 0.6) 0%, 
+      rgba(0, 150, 255, 0.4) 30%, 
+      rgba(0, 200, 255, 0.3) 60%, 
+      rgba(0, 255, 255, 0.1) 80%, 
       transparent 100%
     );
     pointer-events: none;
-    z-index: 9999;
-    box-shadow: 0 0 50px rgba(0, 150, 255, 0.7), 
-                0 0 100px rgba(0, 200, 255, 0.5), 
-                0 0 150px rgba(0, 255, 255, 0.3);
+    z-index: 10001;
+    box-shadow: 0 0 30px rgba(0, 150, 255, 0.5), 
+                0 0 60px rgba(0, 200, 255, 0.3), 
+                0 0 90px rgba(0, 255, 255, 0.2);
     animation: ledPulse 2s ease-in-out infinite, ledSlideIn 1s ease-out forwards;
     transform: translateX(-100%);
     opacity: 0;
   `;
   
-  // 右側のLED照明
+  // 右側のLED照明（小さくした）
   const rightLED = document.createElement('div');
   rightLED.className = 'blue-led-right';
   rightLED.style.cssText = `
     position: fixed;
     right: 0;
     top: 0;
-    width: 150px;
+    width: 80px;
     height: 100vh;
     background: linear-gradient(270deg, 
-      rgba(0, 100, 255, 0.8) 0%, 
-      rgba(0, 150, 255, 0.6) 30%, 
-      rgba(0, 200, 255, 0.4) 60%, 
-      rgba(0, 255, 255, 0.2) 80%, 
+      rgba(0, 100, 255, 0.6) 0%, 
+      rgba(0, 150, 255, 0.4) 30%, 
+      rgba(0, 200, 255, 0.3) 60%, 
+      rgba(0, 255, 255, 0.1) 80%, 
       transparent 100%
     );
     pointer-events: none;
-    z-index: 9999;
-    box-shadow: 0 0 50px rgba(0, 150, 255, 0.7), 
-                0 0 100px rgba(0, 200, 255, 0.5), 
-                0 0 150px rgba(0, 255, 255, 0.3);
+    z-index: 10001;
+    box-shadow: 0 0 30px rgba(0, 150, 255, 0.5), 
+                0 0 60px rgba(0, 200, 255, 0.3), 
+                0 0 90px rgba(0, 255, 255, 0.2);
     animation: ledPulse 2s ease-in-out infinite, ledSlideIn 1s ease-out forwards;
     transform: translateX(100%);
     opacity: 0;
@@ -1988,15 +1991,15 @@ function createBlueLEDLighting() {
     @keyframes ledPulse {
       0%, 100% { 
         filter: brightness(1) saturate(1.2);
-        box-shadow: 0 0 50px rgba(0, 150, 255, 0.7), 
-                    0 0 100px rgba(0, 200, 255, 0.5), 
-                    0 0 150px rgba(0, 255, 255, 0.3);
+        box-shadow: 0 0 30px rgba(0, 150, 255, 0.5), 
+                    0 0 60px rgba(0, 200, 255, 0.3), 
+                    0 0 90px rgba(0, 255, 255, 0.2);
       }
       50% { 
         filter: brightness(1.3) saturate(1.5);
-        box-shadow: 0 0 70px rgba(0, 150, 255, 0.9), 
-                    0 0 120px rgba(0, 200, 255, 0.7), 
-                    0 0 180px rgba(0, 255, 255, 0.5);
+        box-shadow: 0 0 40px rgba(0, 150, 255, 0.7), 
+                    0 0 80px rgba(0, 200, 255, 0.5), 
+                    0 0 120px rgba(0, 255, 255, 0.3);
       }
     }
     
@@ -2031,13 +2034,13 @@ function createBlueLEDLighting() {
   document.body.appendChild(leftLED);
   document.body.appendChild(rightLED);
   
-  // 8秒後にLED照明を削除
+  // 扉が消えるタイミング（3100ms）でLED照明も削除
   setTimeout(() => {
     if (leftLED.parentNode) leftLED.parentNode.removeChild(leftLED);
     if (rightLED.parentNode) rightLED.parentNode.removeChild(rightLED);
     if (style.parentNode) style.parentNode.removeChild(style);
-    console.log('💡 青色LED間接照明効果を終了');
-  }, 8000);
+    console.log('💡 青色LED間接照明効果を終了（扉と同期）');
+  }, 3100);
 }
 
 // 🔸 ビデオサイズ対応再生関数
