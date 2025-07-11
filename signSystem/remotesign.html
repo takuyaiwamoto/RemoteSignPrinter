@@ -211,6 +211,12 @@
 </div>
 
 <div class="button-group">
+  <label>テスト演出:</label>
+  <button onclick="createFireworks()" style="background: linear-gradient(45deg, #ff4500, #ffd700); color: white;">🎆 花火テスト</button>
+  <button onclick="createConfetti()" style="background: linear-gradient(45deg, #ff69b4, #00fa9a); color: white;">🎊 紙吹雪テスト</button>
+</div>
+
+<div class="button-group">
   <label>用紙サイズ:</label>
   <button id="a4Btn" class="selected" onclick="setPaperSize('A4')">A4</button>
   <button id="lBtn" onclick="setPaperSize('L')">L判</button>
@@ -1039,8 +1045,10 @@ function createFireworks() {
   for (let i = 0; i < 5; i++) {
     setTimeout(() => {
       // 画面下部からランダムな位置で花火を発射
-      const launchX = Math.random() * window.innerWidth;
-      const targetY = Math.random() * (window.innerHeight * 0.3) + 100; // 上部30%の範囲
+      const launchX = Math.random() * (window.innerWidth - 100) + 50; // 端から50px離す
+      const targetY = Math.random() * (window.innerHeight * 0.4) + 100; // 上部40%の範囲
+      
+      console.log(`🎆 花火${i+1}発射: X=${launchX}, Y=${targetY}`);
       
       // 花火の軌道となる要素を作成
       const firework = document.createElement('div');
@@ -1048,40 +1056,47 @@ function createFireworks() {
       firework.style.cssText = `
         position: fixed;
         left: ${launchX}px;
-        bottom: 0;
-        width: 4px;
-        height: 4px;
+        bottom: 0px;
+        width: 6px;
+        height: 6px;
         background: #ffff00;
         border-radius: 50%;
         z-index: 10000;
         pointer-events: none;
-        box-shadow: 0 0 6px #ffff00, 0 0 12px #ffff00;
+        box-shadow: 0 0 8px #ffff00, 0 0 16px #ffff00;
       `;
       
       document.body.appendChild(firework);
+      console.log(`🎆 花火${i+1}要素を追加`);
       
-      // 打ち上げアニメーション
-      const launchDuration = 800 + Math.random() * 400; // 800-1200ms
-      firework.style.transition = `bottom ${launchDuration}ms ease-out`;
-      firework.style.bottom = (window.innerHeight - targetY) + 'px';
+      // 打ち上げアニメーション（即座に開始）
+      const launchDuration = 1000 + Math.random() * 500; // 1000-1500ms
+      setTimeout(() => {
+        firework.style.transition = `bottom ${launchDuration}ms ease-out`;
+        firework.style.bottom = (window.innerHeight - targetY) + 'px';
+        console.log(`🎆 花火${i+1}打ち上げ開始`);
+      }, 50);
       
       // 花火爆発
       setTimeout(() => {
+        console.log(`🎆 花火${i+1}爆発開始`);
         firework.style.display = 'none';
         createExplosion(launchX, targetY);
-      }, launchDuration);
+      }, launchDuration + 100);
       
       // 花火要素を削除
       setTimeout(() => {
         if (firework.parentNode) firework.parentNode.removeChild(firework);
-      }, launchDuration + 100);
+        console.log(`🎆 花火${i+1}要素削除`);
+      }, launchDuration + 200);
       
-    }, i * 300); // 300msずつ時間差で発射
+    }, i * 400); // 400msずつ時間差で発射
   }
 }
 
 // 花火爆発エフェクト
 function createExplosion(x, y) {
+  console.log(`💥 爆発エフェクト開始: X=${x}, Y=${y}`);
   const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff8000', '#8000ff'];
   const particles = 12; // 爆発する粒子数
   
@@ -1139,6 +1154,73 @@ function createExplosion(x, y) {
       if (particle.parentNode) particle.parentNode.removeChild(particle);
       if (style.parentNode) style.parentNode.removeChild(style);
     }, 1000);
+  }
+}
+
+// 紙吹雪エフェクト生成関数
+function createConfetti() {
+  console.log('🎊 紙吹雪演出を開始');
+  
+  // 40個の紙吹雪を生成
+  for (let i = 0; i < 40; i++) {
+    setTimeout(() => {
+      const confetti = document.createElement('div');
+      confetti.className = 'confetti';
+      
+      // ランダムな色とサイズ
+      const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff8000', '#8000ff', '#ff69b4', '#00fa9a'];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const size = 8 + Math.random() * 6; // 8-14px
+      const startX = Math.random() * window.innerWidth;
+      const fallDuration = 2000 + Math.random() * 2000; // 2-4秒
+      
+      confetti.style.cssText = `
+        position: fixed;
+        left: ${startX}px;
+        top: -10px;
+        width: ${size}px;
+        height: ${size}px;
+        background: ${color};
+        z-index: 10000;
+        pointer-events: none;
+        border-radius: 2px;
+        box-shadow: 0 0 3px ${color};
+        animation: confettiFall ${fallDuration}ms linear forwards;
+      `;
+      
+      // 動的にCSSアニメーションを作成
+      const randomId = Math.random().toString(36).substr(2, 9);
+      const keyframeName = `confettiFall_${randomId}`;
+      
+      const endX = startX + (Math.random() - 0.5) * 200; // 左右に揺らぎ
+      const rotation = Math.random() * 720; // 2回転
+      
+      const style = document.createElement('style');
+      style.textContent = `
+        @keyframes ${keyframeName} {
+          0% {
+            transform: translateY(0) translateX(0) rotate(0deg);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(${window.innerHeight + 20}px) translateX(${endX - startX}px) rotate(${rotation}deg);
+            opacity: 0.3;
+          }
+        }
+      `;
+      
+      document.head.appendChild(style);
+      confetti.style.animation = `${keyframeName} ${fallDuration}ms linear forwards`;
+      
+      document.body.appendChild(confetti);
+      
+      // 紙吹雪を削除
+      setTimeout(() => {
+        if (confetti.parentNode) confetti.parentNode.removeChild(confetti);
+        if (style.parentNode) style.parentNode.removeChild(style);
+      }, fallDuration);
+      
+    }, i * 100); // 100msずつ時間差で生成
   }
 }
 
