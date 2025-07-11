@@ -1896,33 +1896,21 @@ function startDoorAnimation(imageSrc) {
   };
 }
 
-// 🔸 扉演出第1段階: 扉表示のみ
+// 🔸 扉演出第1段階: 扉表示のみ（開く直前で停止）
 function startDoorAnimationPhase1(imageSrc) {
-  console.log('🚪 扉演出第1段階: 扉表示のみ:', imageSrc);
+  console.log('🚪 扉演出第1段階: 開く直前で停止:', imageSrc);
   
   const img = new Image();
   img.src = imageSrc;
   
   img.onload = () => {
-    // 1. 背景画像を180度回転してキャンバスに描画
-    const scaledWidth = drawingAreaSize.width * devCanvasScale;
-    const scaledHeight = drawingAreaSize.height * devCanvasScale;
-    
-    // 実際のキャンバスに180度回転した背景を描画
-    ctx.save();
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate(Math.PI);
-    ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
-    ctx.restore();
-    
-    // 背景画像を保存
+    // 背景画像を保存（キャンバスには描画しない）
     backgroundImage = img;
     lastBackgroundSrc = imageSrc;
-    redrawCanvas();
     
-    console.log('🚪 背景画像を180度回転してキャンバスに描画');
+    console.log('🚪 背景画像を保存（キャンバスには描画せず）');
     
-    // 2. ウィンドウ全体を覆う立体的な最上面レイヤーを作成
+    // 1. ウィンドウ全体を覆う立体的な最上面レイヤーを作成
     const grayOverlay = document.createElement('div');
     grayOverlay.id = 'grayOverlay';
     grayOverlay.style.cssText = `
@@ -1940,7 +1928,7 @@ function startDoorAnimationPhase1(imageSrc) {
     
     console.log('🚪 グレーオーバーレイを作成（ウィンドウ全体）');
     
-    // 3. 1秒後に中央に黒い線を追加して停止
+    // 2. 1秒後に中央に黒い線を追加して停止
     setTimeout(() => {
       const centerLine = document.createElement('div');
       centerLine.id = 'centerLine';
@@ -1951,15 +1939,12 @@ function startDoorAnimationPhase1(imageSrc) {
         width: 4px;
         height: 100vh;
         background: #000;
-        z-index: 10003;
+        z-index: 10001;
         transform: translateX(-50%);
       `;
       document.body.appendChild(centerLine);
       
-      console.log('🚪 中央に黒い線を追加（第1段階完了）');
-      
-      // 青色LEDを追加
-      createBlueLEDLighting();
+      console.log('🚪 中央に黒い線を追加（第1段階完了 - 開く直前で停止）');
     }, 1000);
   };
   
@@ -1968,9 +1953,9 @@ function startDoorAnimationPhase1(imageSrc) {
   };
 }
 
-// 🔸 扉演出第2段階: 扉開放
+// 🔸 扉演出第2段階: 扉開放（LED表示 + 背景描画 + 扉開放）
 function startDoorAnimationPhase2(imageSrc) {
-  console.log('🚪 扉演出第2段階: 扉開放:', imageSrc);
+  console.log('🚪 扉演出第2段階: LED表示 + 扉開放:', imageSrc);
   
   // 既存の要素を取得
   const grayOverlay = document.getElementById('grayOverlay');
@@ -1981,7 +1966,21 @@ function startDoorAnimationPhase2(imageSrc) {
     return;
   }
   
-  // グレーオーバーレイを左右の扉に分割
+  // 1. 背景画像を180度回転してキャンバスに描画
+  if (backgroundImage) {
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(Math.PI);
+    ctx.drawImage(backgroundImage, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+    ctx.restore();
+    redrawCanvas();
+    console.log('🚪 背景画像を180度回転してキャンバスに描画');
+  }
+  
+  // 2. 青色LEDを表示
+  createBlueLEDLighting();
+  
+  // 3. グレーオーバーレイを左右の扉に分割
   grayOverlay.style.display = 'none'; // 元のオーバーレイを非表示
   
   // 左の扉（中央から左に開く）- 重厚感のあるデザイン
@@ -2022,12 +2021,12 @@ function startDoorAnimationPhase2(imageSrc) {
   
   console.log('🚪 扉要素を作成');
   
-  // 効果音を再生
+  // 4. 効果音を再生
   const audio = new Audio('./sound1.mp3');
   audio.volume = 0.6;
   audio.play().catch(e => console.log('扉効果音再生エラー:', e));
   
-  // 黒線を消して、0.1秒後に扉を開く（中央から外側に開く）
+  // 5. 黒線を消して、0.1秒後に扉を開く（中央から外側に開く）
   centerLine.style.display = 'none';
   setTimeout(() => {
     leftDoor.style.transform = 'rotateY(90deg)';
@@ -2035,7 +2034,7 @@ function startDoorAnimationPhase2(imageSrc) {
     console.log('🚪 扉が開き始めました');
   }, 100);
   
-  // 1秒後に全ての要素を削除
+  // 6. 1秒後に全ての要素を削除
   setTimeout(() => {
     if (grayOverlay.parentNode) grayOverlay.parentNode.removeChild(grayOverlay);
     if (centerLine.parentNode) centerLine.parentNode.removeChild(centerLine);
