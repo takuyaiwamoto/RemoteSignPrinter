@@ -907,6 +907,13 @@ function handleMessage(data) {
       img.onload = () => {
         backgroundImage = img;
         
+        // 🔸 通常背景画像（background 1, 2, 3）が設定された時にDJ.mp3を再生
+        if (data.src.includes('back2.png') || data.src.includes('back3.png') || data.src.includes('back4.png')) {
+          const audio = new Audio('./DJ.mp3');
+          audio.play().catch(e => console.log('DJ.mp3再生エラー:', e));
+          console.log('🔊 背景画像設定時にDJ.mp3再生開始');
+        }
+        
         // 🔸 受信側キャンバスサイズを送信側に合わせて設定
         setReceiverCanvasSize();
         redrawCanvas();
@@ -2128,7 +2135,7 @@ function createHeartbeatEffect() {
   style.textContent = `
     @keyframes heartbeat {
       0% {
-        transform: translate(-50%, -50%) rotate(180deg) scale(1);
+        transform: translate(-50%, -50%) rotate(180deg) scale(0.95);
         opacity: 0.5;
       }
       25% {
@@ -2136,7 +2143,7 @@ function createHeartbeatEffect() {
         opacity: 0.6;
       }
       50% {
-        transform: translate(-50%, -50%) rotate(180deg) scale(1);
+        transform: translate(-50%, -50%) rotate(180deg) scale(0.95);
         opacity: 0.5;
       }
       75% {
@@ -2144,7 +2151,7 @@ function createHeartbeatEffect() {
         opacity: 0.65;
       }
       100% {
-        transform: translate(-50%, -50%) rotate(180deg) scale(1);
+        transform: translate(-50%, -50%) rotate(180deg) scale(0.95);
         opacity: 0.5;
       }
     }
