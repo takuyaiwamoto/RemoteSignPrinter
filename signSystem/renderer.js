@@ -370,9 +370,9 @@ function createHeart() {
   document.body.appendChild(heart);
   console.log('💖 ハートをDOMに追加（受信側）:', heart);
   
-  // 音楽再生
-  const audio = new Audio('./poyo.mp3');
-  audio.play().catch(e => console.log('音楽再生エラー:', e));
+  // 音楽再生（受信側では無効化して重複を防ぐ）
+  // const audio = new Audio('./poyo.mp3');
+  // audio.play().catch(e => console.log('音楽再生エラー:', e));
   
   // アニメーション終了後削除（スタイルも削除）
   setTimeout(() => {
@@ -450,9 +450,9 @@ function createSpecialHeart() {
   document.body.appendChild(heart);
   console.log(`✨ 特別ハートをDOMに追加: x=${randomX}px`);
   
-  // 音楽再生
-  const audio = new Audio('./poyo.mp3');
-  audio.play().catch(e => console.log('音楽再生エラー:', e));
+  // 音楽再生（受信側では無効化して重複を防ぐ）
+  // const audio = new Audio('./poyo.mp3');
+  // audio.play().catch(e => console.log('音楽再生エラー:', e));
   
   // 0.8秒後（画面上部到達時）に透明ウィンドウにハートを追加
   setTimeout(() => {
@@ -910,8 +910,9 @@ function handleMessage(data) {
         // 🔸 通常背景画像（background 1, 2, 3）が設定された時にDJ.mp3を再生
         if (data.src.includes('back2.png') || data.src.includes('back3.png') || data.src.includes('back4.png')) {
           const audio = new Audio('./DJ.mp3');
+          audio.volume = 0.8; // ボリュームを2割下げる（1.0 → 0.8）
           audio.play().catch(e => console.log('DJ.mp3再生エラー:', e));
-          console.log('🔊 背景画像設定時にDJ.mp3再生開始');
+          console.log('🔊 背景画像設定時にDJ.mp3再生開始（ボリューム0.8）');
         }
         
         // 🔸 受信側キャンバスサイズを送信側に合わせて設定
@@ -1172,9 +1173,15 @@ function handleMessage(data) {
     // 🔸 回転アニメーション開始
     console.log("🎬 回転アニメーション開始");
     console.log(`⏱️ 待機時間: ${data.waitTime}秒`);
+    console.log(`🎆 花火: ${data.fireworksEnabled ? '有効' : '無効'}`);
+    console.log(`🎊 紙吹雪: ${data.confettiEnabled ? '有効' : '無効'}`);
     
-    // アニメーション実行
-    prepareAndRunAnimation(data.waitTime);
+    // アニメーション実行（チェックボックスの状態を渡す）
+    prepareAndRunAnimation(data.waitTime, data.fireworksEnabled, data.confettiEnabled);
+  } else if (data.type === "fireworksTest") {
+    // 🔸 花火テスト指示を受信（無効化：送信ボタンでのみ花火実行）
+    console.log("🎆 送信側から花火テスト指示を受信（無効化されています）");
+    // createReceiverFireworks(); // 無効化
   }
 }
 
@@ -1303,8 +1310,8 @@ function applyCanvasScale() {
   redrawCanvas();
 }
 
-function prepareAndRunAnimation(waitTime = null) {
-  console.log(`🎬 アニメーション準備開始 (待機時間: ${waitTime}秒)`);
+function prepareAndRunAnimation(waitTime = null, fireworksEnabled = true, confettiEnabled = true) {
+  console.log(`🎬 アニメーション準備開始 (待機時間: ${waitTime}秒, 花火: ${fireworksEnabled}, 紙吹雪: ${confettiEnabled})`);
   
   const imageDataUrl = canvas.toDataURL("image/png");
   canvas.style.display = "none";
@@ -1330,10 +1337,10 @@ function prepareAndRunAnimation(waitTime = null) {
   
   container.appendChild(animationImage);
 
-  runAnimationSequence(waitTime);
+  runAnimationSequence(waitTime, fireworksEnabled, confettiEnabled);
 }
 
-function runAnimationSequence(waitTime = null) {
+function runAnimationSequence(waitTime = null, fireworksEnabled = true, confettiEnabled = true) {
   // 🔸 アニメーション画像を直接操作（containerではなく）
   
   // 初期状態を設定（その場に止まる）
@@ -1349,7 +1356,11 @@ function runAnimationSequence(waitTime = null) {
     animationImage.style.transition = "transform 1.5s ease";
     animationImage.style.transform = "translateX(-50%) rotate(180deg)"; // 180度回転
 
-    // 音声再生は削除されました
+    // 🔸 回転アニメーションと同時にrotate.mp3を再生
+    const rotateAudio = new Audio('./rotate.mp3');
+    rotateAudio.volume = 0.7;
+    rotateAudio.play().catch(e => console.log('rotate.mp3再生エラー:', e));
+    console.log('🔊 回転アニメーション開始と同時にrotate.mp3再生');
 
     // 🔸 回転完了後の待機時間（書き手側の設定またはDev Tool設定を使用）
     let rotationWaitTime;
@@ -1365,8 +1376,29 @@ function runAnimationSequence(waitTime = null) {
       console.log("⏰ ポスターモード：回転後1.1秒待機してから移動開始");
     }
     
-    // 🔸 回転完了直後に紙吹雪エフェクトを追加
-    createConfettiEffect();
+    // 🔸 回転完了後1秒で花火エフェクトを開始（チェックボックスが有効な場合のみ）
+    setTimeout(() => {
+      // 花火が有効で、既に実行中でない場合のみ実行
+      if (fireworksEnabled && !fireworksInProgress) {
+        console.log('🎆 回転アニメーション完了後1秒で花火を実行');
+        createReceiverFireworks();
+      } else if (!fireworksEnabled) {
+        console.log('🎆 花火演出は無効に設定されています');
+      } else {
+        console.log('🎆 花火は既に実行中のため、回転アニメーションでの花火実行をスキップ');
+      }
+      
+      // 🔸 紙吹雪エフェクト（チェックボックスが有効な場合のみ）
+      if (confettiEnabled) {
+        // 🔸 移動アニメーション1.5秒前に紙吹雪エフェクトを追加（clack.mp3再生）
+        const confettiDelay = rotationWaitTime - 1500; // 移動開始1.5秒前
+        setTimeout(() => {
+          createConfettiEffectWithClack();
+        }, confettiDelay);
+      } else {
+        console.log('🎊 紙吹雪演出は無効に設定されています');
+      }
+    }, 2500); // 回転完了後1秒で実行（回転1.5秒 + 1秒 = 2.5秒後）
     
     setTimeout(() => {
       animationImage.style.transition = "transform 2s ease";
@@ -1390,20 +1422,22 @@ function runAnimationSequence(waitTime = null) {
       // 🔸 下方向への移動
       animationImage.style.transform = `translateX(-50%) rotate(180deg) translateY(${moveDistance}px)`;
 
-      // 🔸 用紙サイズに応じて待機時間を調整
+      // 🔸 用紙サイズに応じて待機時間を調整（全体的に5秒延長）
       let waitTime;
       if (currentPaperSize === "poster") {
-        waitTime = 4000; // ポスター：移動完了後2秒待機（2秒 + 2秒 = 4秒）
-        console.log("⏰ ポスターモード：移動後4秒待機");
+        waitTime = 9000; // ポスター：移動完了後7秒待機（2秒 + 5秒 = 7秒）
+        console.log("⏰ ポスターモード：移動後9秒待機");
       } else if (currentPaperSize === "L") {
-        waitTime = 2000; // L版：従来通り2秒
-        console.log("⏰ L版モード：移動後2秒待機");
+        waitTime = 7000; // L版：7秒待機（2秒 + 5秒 = 7秒）
+        console.log("⏰ L版モード：移動後7秒待機");
       } else {
-        waitTime = 2000; // A4：従来通り2秒
-        console.log("⏰ A4モード：移動後2秒待機");
+        waitTime = 7000; // A4：7秒待機（2秒 + 5秒 = 7秒）
+        console.log("⏰ A4モード：移動後7秒待機");
       }
 
       setTimeout(() => {
+        console.log('🎬 アニメーション完了後5秒追加待機完了、キャンバス表示開始');
+        
         if (animationImage && animationImage.parentNode) {
           animationImage.parentNode.removeChild(animationImage);
           animationImage = null;
@@ -1411,6 +1445,7 @@ function runAnimationSequence(waitTime = null) {
 
         drawingData = [];
         canvas.style.display = "block";
+        console.log('🎨 次のキャンバスを表示');
 
         if (lastBackgroundSrc) {
           const img = new Image();
@@ -1426,7 +1461,7 @@ function runAnimationSequence(waitTime = null) {
 
         // 🔸 アニメーション完了後にカウントダウン開始
         // startCountdown(); // カウントダウンを無効化
-      }, waitTime); // 🔸 用紙サイズに応じた待機時間
+      }, waitTime); // 🔸 用紙サイズに応じた待機時間（5秒延長済み）
 
     }, rotationWaitTime + 1500); // 🔸 回転完了（1.5秒）+ 用紙サイズに応じた待機時間
 
@@ -1470,12 +1505,15 @@ function startCountdown() {
       countdownElement.textContent = 'お渡しください';
       console.log('⏰ カウントダウン完了');
       
-      // 2秒後にカウントダウン表示を削除
+      // 2秒後にカウントダウン表示を削除 + 花火演出開始
       setTimeout(() => {
         if (countdownElement.parentNode) {
           countdownElement.parentNode.removeChild(countdownElement);
           console.log('⏰ カウントダウン表示を削除');
         }
+        
+        // 🔸 花火演出を開始
+        createReceiverFireworks();
       }, 2000);
     }
   }
@@ -1484,7 +1522,7 @@ function startCountdown() {
 }
 
 // 🔸 紙吹雪エフェクト関数（より派手に）
-function createConfettiEffect() {
+function createConfettiEffect(playAudio = true) {
   console.log('🎊 紙吹雪エフェクト開始');
   
   // より多彩な色
@@ -1495,11 +1533,41 @@ function createConfettiEffect() {
   const windowWidth = window.innerWidth;
   const windowHeight = window.innerHeight;
   
-  // 効果音を再生
-  const audio = new Audio('./renzoku.mp3');
-  audio.volume = 0.7;
-  audio.play().catch(e => console.log('クラッカー音再生エラー:', e));
+  // 効果音を再生（playAudioフラグが真の場合のみ）
+  if (playAudio) {
+    const audio = new Audio('./renzoku.mp3');
+    audio.volume = 0.7;
+    audio.play().catch(e => console.log('クラッカー音再生エラー:', e));
+  }
   
+  // 紙吹雪エフェクトを実行
+  executeConfettiEffect(colors, windowWidth, windowHeight);
+}
+
+// 🔸 clack.mp3付きの紙吹雪エフェクト関数
+function createConfettiEffectWithClack() {
+  console.log('🎊 紙吹雪エフェクト開始（clack1.mp3再生）');
+  
+  // より多彩な色
+  const colors = [
+    '#ff1493', '#00ff00', '#0000ff', '#ffff00', '#ff8000', '#8000ff', '#ff0000', '#00ffff',
+    '#ff69b4', '#ffd700', '#ff00ff', '#00ff7f', '#ff4500', '#1e90ff', '#dc143c', '#ffa500'
+  ];
+  const windowWidth = window.innerWidth;
+  const windowHeight = window.innerHeight;
+  
+  // clack1.mp3を再生
+  const audio = new Audio('./clack1.mp3');
+  audio.volume = 0.7;
+  audio.play().catch(e => console.log('clack1.mp3再生エラー:', e));
+  console.log('🔊 clack1.mp3再生開始');
+  
+  // 紙吹雪エフェクトを実行
+  executeConfettiEffect(colors, windowWidth, windowHeight);
+}
+
+// 🔸 紙吹雪エフェクト実行関数（共通処理）
+function executeConfettiEffect(colors, windowWidth, windowHeight) {
   // 左サイドから紙吹雪
   createSideConfetti('left', colors, windowWidth, windowHeight);
   
@@ -1764,6 +1832,244 @@ function createSparkleEffect(windowWidth, windowHeight) {
   console.log(`✨ ${sparkleCount}個のキラキラエフェクトを追加`);
 }
 
+// 🔸 花火重複実行防止のための変数
+let fireworksInProgress = false;
+let lastFireworksTime = 0;
+
+// 🔸 花火エフェクト用のCSSアニメーションを追加
+function addFireworkAnimations() {
+  if (document.getElementById('fireworkAnimations')) return; // 既に追加済みの場合はスキップ
+  
+  const style = document.createElement('style');
+  style.id = 'fireworkAnimations';
+  style.textContent = `
+    @keyframes fireworkPulse {
+      0% { 
+        transform: scale(1);
+        filter: brightness(1);
+      }
+      100% { 
+        transform: scale(1.1);
+        filter: brightness(1.3);
+      }
+    }
+    
+    @keyframes trailFade {
+      0% { 
+        opacity: 0.6;
+        height: 20px;
+      }
+      100% { 
+        opacity: 0;
+        height: 60px;
+      }
+    }
+    
+    @keyframes particleShimmer {
+      0% { 
+        opacity: 1;
+        transform: scale(1);
+        filter: brightness(1);
+      }
+      50% { 
+        opacity: 0.8;
+        transform: scale(0.9);
+        filter: brightness(1.2);
+      }
+      100% { 
+        opacity: 0;
+        transform: scale(0.3);
+        filter: brightness(0.8);
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+// 🔸 受け手側花火演出を作成（送信側と同じ実装）
+function createReceiverFireworks() {
+  // 🔸 重複実行防止チェック
+  const now = Date.now();
+  if (fireworksInProgress || (now - lastFireworksTime < 5000)) {
+    console.log('🎆 花火演出は既に実行中またはクールダウン中のため、スキップします');
+    return;
+  }
+  
+  fireworksInProgress = true;
+  lastFireworksTime = now;
+  
+  // 🔸 花火アニメーションを追加
+  addFireworkAnimations();
+  
+  console.log('🎆 受け手側打ち上げ花火演出を開始（リッチバージョン）');
+  
+  // fire.wavを再生
+  const audio = new Audio('./fire.wav');
+  audio.volume = 0.7;
+  audio.play().catch(e => console.log('fire.wav再生エラー:', e));
+  console.log('🔊 fire.wav再生開始');
+  
+  // 複数の打ち上げ花火を生成（超派手に改良）
+  for (let i = 0; i < 18; i++) {
+    setTimeout(() => {
+      // 画面下部からランダムな位置で花火を発射
+      const launchX = Math.random() * (window.innerWidth - 100) + 50; // 端から50px離す
+      const targetY = Math.random() * (window.innerHeight * 0.5) + 80; // 上部50%の範囲に拡大
+      
+      console.log(`🎆 受信側花火${i+1}発射: X=${launchX}, Y=${targetY}`);
+      
+      // 花火の軌道となる要素を作成（より派手に）
+      const firework = document.createElement('div');
+      firework.className = 'receiver-firework';
+      
+      // ランダムな色の花火（より多彩に）
+      const colors = ['#ffff00', '#ff0000', '#00ff00', '#0000ff', '#ff00ff', '#00ffff', '#ffa500', '#ff69b4', '#ffd700', '#ff1493', '#32cd32', '#ff4500', '#8a2be2', '#00ced1', '#ff6347', '#9370db'];
+      const fireworkColor = colors[Math.floor(Math.random() * colors.length)];
+      
+      // より大きくて明るい花火（リッチな演出）
+      firework.style.cssText = `
+        position: fixed;
+        left: ${launchX}px;
+        bottom: 0px;
+        width: 12px;
+        height: 12px;
+        background: radial-gradient(circle, ${fireworkColor} 0%, ${fireworkColor}99 30%, ${fireworkColor}66 60%, transparent 100%);
+        border-radius: 50%;
+        z-index: 10000;
+        pointer-events: none;
+        box-shadow: 
+          0 0 15px ${fireworkColor}, 
+          0 0 30px ${fireworkColor}, 
+          0 0 45px ${fireworkColor}, 
+          0 0 60px ${fireworkColor},
+          0 0 75px ${fireworkColor}44,
+          inset 0 0 10px ${fireworkColor}aa;
+        animation: fireworkPulse 0.5s ease-in-out infinite alternate;
+      `;
+      
+      document.body.appendChild(firework);
+      
+      // 🔸 花火の軌跡エフェクトを追加
+      const trail = document.createElement('div');
+      trail.className = 'firework-trail';
+      trail.style.cssText = `
+        position: fixed;
+        left: ${launchX}px;
+        bottom: 0px;
+        width: 3px;
+        height: 20px;
+        background: linear-gradient(to top, ${fireworkColor}, transparent);
+        border-radius: 50%;
+        z-index: 9999;
+        pointer-events: none;
+        opacity: 0.6;
+        animation: trailFade 1s ease-out forwards;
+      `;
+      document.body.appendChild(trail);
+      
+      // 打ち上げアニメーション（より滑らかに）
+      const launchDuration = 800 + Math.random() * 400; // 800-1200ms
+      setTimeout(() => {
+        firework.style.transition = `bottom ${launchDuration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+        firework.style.bottom = (window.innerHeight - targetY) + 'px';
+        
+        // 軌跡も同時に移動
+        trail.style.transition = `bottom ${launchDuration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+        trail.style.bottom = (window.innerHeight - targetY) + 'px';
+      }, 50);
+      
+      // 花火爆発
+      setTimeout(() => {
+        firework.style.display = 'none';
+        createReceiverExplosion(launchX, targetY);
+      }, launchDuration + 100);
+      
+      // 花火要素と軌跡を削除
+      setTimeout(() => {
+        if (firework.parentNode) firework.parentNode.removeChild(firework);
+        if (trail.parentNode) trail.parentNode.removeChild(trail);
+      }, launchDuration + 200);
+      
+    }, i * 350); // 350msずつ時間差で発射（6.5秒継続: 18発 × 350ms = 6.3秒）
+  }
+  
+  // 🔸 花火演出完了後にフラグをリセット（6.5秒継続に合わせて調整）
+  setTimeout(() => {
+    fireworksInProgress = false;
+    console.log('🎆 花火演出完了、フラグをリセット');
+  }, 7000); // 7秒後（6.5秒継続 + 0.5秒マージン）
+}
+
+
+// 🔸 受け手側花火爆発エフェクト（超派手に改良）
+function createReceiverExplosion(x, y) {
+  console.log(`💥 受信側爆発エフェクト開始: X=${x}, Y=${y}`);
+  const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff8000', '#8000ff', '#ffd700', '#ff69b4', '#32cd32', '#ff4500', '#8a2be2', '#00ced1', '#ff6347', '#9370db'];
+  const particles = 24; // 爆発する粒子数を大幅増加
+  
+  for (let i = 0; i < particles; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'receiver-firework-particle';
+    
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const angle = (360 / particles) * i + Math.random() * 30; // より多くのランダム性を追加
+    const distance = 120 + Math.random() * 80; // 120-200px（爆発範囲をさらに拡大）
+    const size = 5 + Math.random() * 5; // 5-10px（パーティクルサイズをさらに拡大）
+    
+    particle.style.cssText = `
+      position: fixed;
+      left: ${x}px;
+      top: ${y}px;
+      width: ${size}px;
+      height: ${size}px;
+      background: radial-gradient(circle, ${color} 0%, ${color}cc 40%, ${color}66 70%, transparent 100%);
+      border-radius: 50%;
+      z-index: 10001;
+      pointer-events: none;
+      box-shadow: 
+        0 0 15px ${color}, 
+        0 0 30px ${color}, 
+        0 0 45px ${color}, 
+        0 0 60px ${color},
+        0 0 75px ${color}33,
+        inset 0 0 8px ${color}99;
+      animation: particleShimmer 1.2s ease-out forwards;
+    `;
+    
+    // 動的にCSSアニメーションを作成
+    const randomId = Math.random().toString(36).substr(2, 9);
+    const keyframeName = `receiverExplode_${randomId}`;
+    
+    const endX = x + Math.cos(angle * Math.PI / 180) * distance;
+    const endY = y + Math.sin(angle * Math.PI / 180) * distance;
+    
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes ${keyframeName} {
+        0% {
+          transform: translate(0, 0) scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(${endX - x}px, ${endY - y}px) scale(0.3);
+          opacity: 0;
+        }
+      }
+    `;
+    
+    document.head.appendChild(style);
+    particle.style.animation = `${keyframeName} 1s ease-out forwards`;
+    
+    document.body.appendChild(particle);
+    
+    // 粒子を削除
+    setTimeout(() => {
+      if (particle.parentNode) particle.parentNode.removeChild(particle);
+      if (style.parentNode) style.parentNode.removeChild(style);
+    }, 1000);
+  }
+}
+
 // 🔸 扉開く演出関数
 function startDoorAnimation(imageSrc) {
   console.log('🚪 扉開く演出を開始');
@@ -1800,8 +2106,8 @@ function startDoorAnimation(imageSrc) {
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: linear-gradient(135deg, #3a3a3a 0%, #2c2c2c 25%, #1a1a1a 50%, #2c2c2c 75%, #3a3a3a 100%);
-      box-shadow: inset 0 0 50px rgba(0,0,0,0.5), inset 0 0 100px rgba(0,0,0,0.3);
+      background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 25%, #e8e8e8 50%, #f5f5f5 75%, #ffffff 100%);
+      box-shadow: inset 0 0 50px rgba(0,0,0,0.2), inset 0 0 100px rgba(0,0,0,0.1), inset 0 0 80px rgba(255,255,255,0.4);
       z-index: 10000;
       pointer-events: none;
     `;
@@ -1809,26 +2115,8 @@ function startDoorAnimation(imageSrc) {
     
     console.log('🚪 グレーオーバーレイを作成（ウィンドウ全体）');
     
-    // 3. 1秒後に中央に黒い線を追加
+    // 3. 1秒後に扉が開く
     setTimeout(() => {
-      const centerLine = document.createElement('div');
-      centerLine.id = 'centerLine';
-      centerLine.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 50%;
-        width: 4px;
-        height: 100vh;
-        background: #000;
-        z-index: 10003;
-        transform: translateX(-50%);
-      `;
-      document.body.appendChild(centerLine);
-      
-      console.log('🚪 中央に黒い線を追加');
-      
-      // 4. さらに1秒後に扉が開く
-      setTimeout(() => {
         // グレーオーバーレイを左右の扉に分割
         grayOverlay.style.display = 'none'; // 元のオーバーレイを非表示
         
@@ -1841,12 +2129,12 @@ function startDoorAnimation(imageSrc) {
           left: 0;
           width: 50vw;
           height: 100vh;
-          background: linear-gradient(45deg, #2c2c2c, #1a1a1a, #2c2c2c);
+          background: linear-gradient(45deg, #ffffff, #f0f0f0, #e5e5e5, #f0f0f0, #ffffff);
           z-index: 10002;
           transform-origin: left center;
           transition: transform 1s ease-out;
-          border-right: 3px solid #8b4513;
-          box-shadow: inset -10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
+          border-right: 3px solid #d0d0d0;
+          box-shadow: inset -10px 0 30px rgba(0,0,0,0.2), 0 0 20px rgba(0,0,0,0.3), inset 0 0 50px rgba(255,255,255,0.3);
         `;
         document.body.appendChild(leftDoor);
         
@@ -1859,12 +2147,12 @@ function startDoorAnimation(imageSrc) {
           right: 0;
           width: 50vw;
           height: 100vh;
-          background: linear-gradient(-45deg, #2c2c2c, #1a1a1a, #2c2c2c);
+          background: linear-gradient(-45deg, #ffffff, #f0f0f0, #e5e5e5, #f0f0f0, #ffffff);
           z-index: 10002;
           transform-origin: right center;
           transition: transform 1s ease-out;
-          border-left: 3px solid #8b4513;
-          box-shadow: inset 10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
+          border-left: 3px solid #d0d0d0;
+          box-shadow: inset 10px 0 30px rgba(0,0,0,0.2), 0 0 20px rgba(0,0,0,0.3), inset 0 0 50px rgba(255,255,255,0.3);
         `;
         document.body.appendChild(rightDoor);
         
@@ -1875,8 +2163,7 @@ function startDoorAnimation(imageSrc) {
         audio.volume = 0.6;
         audio.play().catch(e => console.log('扉効果音再生エラー:', e));
         
-        // 黒線を消して、0.1秒後に扉を開く（中央から外側に開く）
-        centerLine.style.display = 'none';
+        // 0.1秒後に扉を開く（中央から外側に開く）
         setTimeout(() => {
           leftDoor.style.transform = 'rotateY(90deg)';
           rightDoor.style.transform = 'rotateY(-90deg)';
@@ -1886,15 +2173,12 @@ function startDoorAnimation(imageSrc) {
         // 1秒後に全ての要素を削除
         setTimeout(() => {
           if (grayOverlay.parentNode) grayOverlay.parentNode.removeChild(grayOverlay);
-          if (centerLine.parentNode) centerLine.parentNode.removeChild(centerLine);
           if (leftDoor.parentNode) leftDoor.parentNode.removeChild(leftDoor);
           if (rightDoor.parentNode) rightDoor.parentNode.removeChild(rightDoor);
           console.log('🚪 扉演出完了');
         }, 1100);
         
-      }, 1000); // 黒い線表示から1秒後に扉開始
-      
-    }, 1000); // 初期表示から1秒後に黒い線表示
+    }, 1000); // 初期表示から1秒後に扉開始
     
   };
   
@@ -1926,29 +2210,14 @@ function startDoorAnimationPhase1(imageSrc) {
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: linear-gradient(135deg, #3a3a3a 0%, #2c2c2c 25%, #1a1a1a 50%, #2c2c2c 75%, #3a3a3a 100%);
-      box-shadow: inset 0 0 50px rgba(0,0,0,0.5), inset 0 0 100px rgba(0,0,0,0.3);
+      background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 25%, #e8e8e8 50%, #f5f5f5 75%, #ffffff 100%);
+      box-shadow: inset 0 0 50px rgba(0,0,0,0.2), inset 0 0 100px rgba(0,0,0,0.1), inset 0 0 80px rgba(255,255,255,0.4);
       z-index: 10000;
       pointer-events: none;
     `;
     document.body.appendChild(grayOverlay);
     
-    // 2. 中央に黒い線を即座に追加
-    const centerLine = document.createElement('div');
-    centerLine.id = 'centerLine';
-    centerLine.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 50%;
-      width: 4px;
-      height: 100vh;
-      background: #000;
-      z-index: 10001;
-      transform: translateX(-50%);
-    `;
-    document.body.appendChild(centerLine);
-    
-    console.log('🚪 グレーオーバーレイと中央線を作成（第1段階完了 - 開く直前で停止）');
+    console.log('🚪 グレーオーバーレイを作成（第1段階完了 - 開く直前で停止）');
   };
   
   img.onerror = () => {
@@ -1962,9 +2231,8 @@ function startDoorAnimationPhase2(imageSrc) {
   
   // 既存の要素を取得
   const grayOverlay = document.getElementById('grayOverlay');
-  const centerLine = document.getElementById('centerLine');
   
-  if (!grayOverlay || !centerLine) {
+  if (!grayOverlay) {
     console.error('❌ 扉要素が見つかりません。第1段階が実行されていない可能性があります。');
     return;
   }
@@ -2005,12 +2273,12 @@ function startDoorAnimationPhase2(imageSrc) {
       left: 0;
       width: 50vw;
       height: 100vh;
-      background: linear-gradient(45deg, #2c2c2c, #1a1a1a, #2c2c2c);
+      background: linear-gradient(45deg, #ffffff, #f0f0f0, #e5e5e5, #f0f0f0, #ffffff);
       z-index: 10002;
       transform-origin: left center;
       transition: transform 4s ease-out;
-      border-right: 3px solid #8b4513;
-      box-shadow: inset -10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
+      border-right: 3px solid #d0d0d0;
+      box-shadow: inset -10px 0 30px rgba(0,0,0,0.2), 0 0 20px rgba(0,0,0,0.3), inset 0 0 50px rgba(255,255,255,0.3);
     `;
     document.body.appendChild(leftDoor);
     
@@ -2023,19 +2291,18 @@ function startDoorAnimationPhase2(imageSrc) {
       right: 0;
       width: 50vw;
       height: 100vh;
-      background: linear-gradient(-45deg, #2c2c2c, #1a1a1a, #2c2c2c);
+      background: linear-gradient(-45deg, #ffffff, #f0f0f0, #e5e5e5, #f0f0f0, #ffffff);
       z-index: 10002;
       transform-origin: right center;
       transition: transform 4s ease-out;
-      border-left: 3px solid #8b4513;
-      box-shadow: inset 10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
+      border-left: 3px solid #d0d0d0;
+      box-shadow: inset 10px 0 30px rgba(0,0,0,0.2), 0 0 20px rgba(0,0,0,0.3), inset 0 0 50px rgba(255,255,255,0.3);
     `;
     document.body.appendChild(rightDoor);
     
     console.log('🚪 扉要素を作成');
     
-    // 黒線を消して、0.1秒後に扉を開く（中央から外側に開く）
-    centerLine.style.display = 'none';
+    // 0.1秒後に扉を開く（中央から外側に開く）
     setTimeout(() => {
       leftDoor.style.transform = 'rotateY(90deg)';
       rightDoor.style.transform = 'rotateY(-90deg)';
@@ -2045,7 +2312,6 @@ function startDoorAnimationPhase2(imageSrc) {
     // 4秒後に全ての要素を削除 + open2.mp3再生 + 心臓鼓動演出
     setTimeout(() => {
       if (grayOverlay.parentNode) grayOverlay.parentNode.removeChild(grayOverlay);
-      if (centerLine.parentNode) centerLine.parentNode.removeChild(centerLine);
       if (leftDoor.parentNode) leftDoor.parentNode.removeChild(leftDoor);
       if (rightDoor.parentNode) rightDoor.parentNode.removeChild(rightDoor);
       console.log('🚪 扉演出完了');
@@ -2113,13 +2379,19 @@ function createHeartbeatEffect() {
   // 心臓鼓動用の背景画像要素を作成
   const heartbeatBg = document.createElement('div');
   heartbeatBg.id = 'heartbeat-background';
+  // キャンバスの位置情報を取得
+  const canvasRect = canvas.getBoundingClientRect();
+  const canvasTop = canvasRect.top + window.scrollY;
+  const canvasLeft = canvasRect.left + window.scrollX;
+  
   heartbeatBg.style.cssText = `
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    width: ${canvas.width * 1.1}px;
-    height: ${canvas.height * 1.1}px;
-    transform: translate(-50%, -50%) rotate(180deg);
+    position: absolute;
+    top: ${canvasTop}px;
+    left: ${canvasLeft}px;
+    width: ${canvas.width}px;
+    height: ${canvas.height}px;
+    transform: rotate(180deg);
+    transform-origin: center center;
     background-image: url('${backgroundImage.src}');
     background-size: cover;
     background-position: center;
@@ -2135,23 +2407,23 @@ function createHeartbeatEffect() {
   style.textContent = `
     @keyframes heartbeat {
       0% {
-        transform: translate(-50%, -50%) rotate(180deg) scale(0.95);
+        transform: rotate(180deg) scale(0.95);
         opacity: 0.5;
       }
       25% {
-        transform: translate(-50%, -50%) rotate(180deg) scale(1.05);
+        transform: rotate(180deg) scale(1.05);
         opacity: 0.6;
       }
       50% {
-        transform: translate(-50%, -50%) rotate(180deg) scale(0.95);
+        transform: rotate(180deg) scale(0.95);
         opacity: 0.5;
       }
       75% {
-        transform: translate(-50%, -50%) rotate(180deg) scale(1.08);
+        transform: rotate(180deg) scale(1.08);
         opacity: 0.65;
       }
       100% {
-        transform: translate(-50%, -50%) rotate(180deg) scale(0.95);
+        transform: rotate(180deg) scale(0.95);
         opacity: 0.5;
       }
     }
