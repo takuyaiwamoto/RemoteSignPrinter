@@ -212,28 +212,9 @@
   <button onclick="setBackground('./back2.png')">背景2</button>
   <button onclick="setBackground('./back4.png')">背景3</button>
   <button onclick="setBackground(null)">白</button>
-  <button onclick="setSpecialBackground('./back4.png')" style="background: linear-gradient(45deg, #ff1493, #00ffff); color: white;">特殊背景</button>
+  <button onclick="setSpecialBackgroundToggle()" style="background: linear-gradient(45deg, #ff1493, #00ffff); color: white;">特殊背景</button>
 </div>
 
-<div class="button-group">
-  <label>テスト演出:</label>
-  <button onclick="createFireworks()" style="background: linear-gradient(45deg, #ff4500, #ffd700); color: white;">🎆 花火テスト</button>
-  <button onclick="createConfetti()" style="background: linear-gradient(45deg, #ff69b4, #00fa9a); color: white;">🎊 紙吹雪テスト</button>
-</div>
-
-<div class="button-group">
-  <label>用紙サイズ:</label>
-  <button id="a4Btn" class="selected" onclick="setPaperSize('A4')">A4</button>
-  <button id="lBtn" onclick="setPaperSize('L')">L判</button>
-  <button id="posterBtn" onclick="setPaperSize('poster')">ポストカード</button>
-</div>
-
-<div class="button-group">
-  <label>ビデオサイズ:</label>
-  <button id="size100Btn" class="selected" onclick="setVideoSize(100)">100%</button>
-  <button id="size90Btn" onclick="setVideoSize(90)">90%</button>
-  <button id="size80Btn" onclick="setVideoSize(80)">80%</button>
-</div>
 
 <div class="button-group">
   <label>ペンの太さ:</label>
@@ -255,23 +236,6 @@
 </div>
 
 <div class="button-group">
-  <label>エフェクト:</label>
-  <input type="checkbox" id="starEffect" checked onchange="toggleStarEffect()">
-  <label for="starEffect">星</label>
-  <input type="checkbox" id="fairyDustEffect" onchange="toggleFairyDustEffect()" checked>
-  <label for="fairyDustEffect">妖精の粉</label>
-</div>
-
-<div class="button-group">
-  <label>送信後演出:</label>
-  <input type="checkbox" id="fireworksEffect" checked>
-  <label for="fireworksEffect">🎆 花火</label>
-  <input type="checkbox" id="confettiEffect" checked>
-  <label for="confettiEffect">🎊 紙吹雪</label>
-</div>
-
-<div class="button-group">
-  <button onclick="playVideo()" style="background-color: #FF6B6B; color: white;">📹 ビデオ再生</button>
   <button onclick="toggleDevTools()" style="background-color: #FFA500; color: white;">🔧 Dev Tool</button>
 </div>
 
@@ -299,6 +263,48 @@
   <div class="button-group">
     <button onclick="sendDevSettings()">設定を受信側に送信</button>
   </div>
+  
+  <hr style="margin: 15px 0;">
+  
+  <div class="button-group">
+    <label>テスト演出:</label>
+    <button onclick="createFireworks()" style="background: linear-gradient(45deg, #ff4500, #ffd700); color: white;">🎆 花火テスト</button>
+    <button onclick="createConfetti()" style="background: linear-gradient(45deg, #ff69b4, #00fa9a); color: white;">🎊 紙吹雪テスト</button>
+  </div>
+  
+  <div class="button-group">
+    <label>ビデオサイズ:</label>
+    <button id="size100Btn" class="selected" onclick="setVideoSize(100)">100%</button>
+    <button id="size90Btn" onclick="setVideoSize(90)">90%</button>
+    <button id="size80Btn" onclick="setVideoSize(80)">80%</button>
+  </div>
+  
+  <div class="button-group">
+    <button onclick="playVideo()" style="background-color: #FF6B6B; color: white;">📹 ビデオ再生</button>
+  </div>
+  
+  <div class="button-group">
+    <label>エフェクト:</label>
+    <input type="checkbox" id="starEffect" checked onchange="toggleStarEffect()">
+    <label for="starEffect">星</label>
+    <input type="checkbox" id="fairyDustEffect" onchange="toggleFairyDustEffect()" checked>
+    <label for="fairyDustEffect">妖精の粉</label>
+  </div>
+  
+  <div class="button-group">
+    <label>送信後演出:</label>
+    <input type="checkbox" id="fireworksEffect" checked>
+    <label for="fireworksEffect">🎆 花火</label>
+    <input type="checkbox" id="confettiEffect" checked>
+    <label for="confettiEffect">🎊 紙吹雪</label>
+  </div>
+  
+  <div class="button-group">
+    <label>用紙サイズ:</label>
+    <button id="a4Btn" class="selected" onclick="setPaperSize('A4')">A4</button>
+    <button id="lBtn" onclick="setPaperSize('L')">L判</button>
+    <button id="posterBtn" onclick="setPaperSize('poster')">ポストカード</button>
+  </div>
 </div>
 
 <div id="countdown"></div>
@@ -322,12 +328,14 @@ let lastPosition = null; // 前回の位置を記録
 let starEffectEnabled = true; // 星エフェクトの有効/無効（標準でON）
 let fairyDustEffectEnabled = true; // 妖精の粉エフェクトの有効/無効（標準でON）
 let specialBackgroundState = 'ready'; // 'ready', 'door_shown', 'door_opened'
+let specialBackgroundToggle = false; // 特殊背景の画像を切り替えるフラグ
 
 // 背景別キャンバスサイズ設定（1.02倍サイズ = 0.6*1.7）
 const backgroundSizes = {
   'back3': { width: 859, height: 607 },    // 背景1 (842*0.6*1.7, 595*0.6*1.7)
   'back2': { width: 607, height: 859 },    // 背景2（縦向き） (595*0.6*1.7, 842*0.6*1.7)
   'back4': { width: 859, height: 607 },    // 背景3 (842*0.6*1.7, 595*0.6*1.7)
+  'back5': { width: 859, height: 607 },    // 背景4 (842*0.6*1.7, 595*0.6*1.7)
   'white': { width: 859, height: 607 }     // 白背景 (842*0.6*1.7, 595*0.6*1.7)
 };
 socket.onopen = () => console.log("✅ WebSocket接続完了（送信側）");
@@ -632,7 +640,7 @@ function setBackground(src) {
       backgroundImage = img;
       
       // 🔸 背景に応じたキャンバスサイズを設定
-      const backgroundKey = src.includes('back3') ? 'back3' : (src.includes('back4') ? 'back4' : 'back2');
+      const backgroundKey = src.includes('back3') ? 'back3' : (src.includes('back4') ? 'back4' : (src.includes('back5') ? 'back5' : 'back2'));
       setCanvasSize(backgroundKey);
       
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -735,7 +743,7 @@ function setSpecialBackground(src) {
         console.log("✅ 特殊背景画像設定開始:", src);
         
         // 背景に応じたキャンバスサイズを設定
-        const backgroundKey = src.includes('back3') ? 'back3' : (src.includes('back4') ? 'back4' : 'back2');
+        const backgroundKey = src.includes('back3') ? 'back3' : (src.includes('back4') ? 'back4' : (src.includes('back5') ? 'back5' : 'back2'));
         setCanvasSize(backgroundKey);
         
         // キャンバスをクリアして背景を描画
@@ -765,9 +773,12 @@ function setSpecialBackground(src) {
           }, i * 100);
         }
         
-        // 特別な音を再生（オプション）
-        const audio = new Audio('./sound1.mp3');
-        audio.play().catch(e => console.log('特殊背景音楽再生エラー:', e));
+        // 特別な音を再生（sound1.mp3を削除）
+        
+        // 🎪 背景が正常に適用されたのでトグルフラグを反転
+        specialBackgroundToggle = !specialBackgroundToggle;
+        console.log(`🎪 背景適用完了 - フラグを反転: ${specialBackgroundToggle}`);
+        console.log(`🎪 次回使用予定: ${specialBackgroundToggle ? 'back5.png' : 'back4.png'}`);
         
         // 状態をリセット
         specialBackgroundState = 'ready';
@@ -776,6 +787,19 @@ function setSpecialBackground(src) {
   }
 }
 
+// 🎪 特殊背景設定関数（back4.pngとback5.pngを交互に切り替え）
+function setSpecialBackgroundToggle() {
+  // 現在のフラグ状態をログ出力
+  console.log(`🎪 特殊背景ボタン押下 - 現在の状態: ${specialBackgroundState}`);
+  console.log(`🎪 現在のフラグ状態: ${specialBackgroundToggle}`);
+  
+  // 背景画像を決定（トグルは背景適用時に行う）
+  const backgroundPath = specialBackgroundToggle ? './back5.png' : './back4.png';
+  console.log(`🎪 使用する背景: ${backgroundPath}`);
+  
+  // 既存の特殊背景関数を呼び出し
+  setSpecialBackground(backgroundPath);
+}
 
 function startCountdown() {
   const countdownEl = document.getElementById("countdown");
