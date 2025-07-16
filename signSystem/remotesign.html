@@ -735,12 +735,12 @@ socket.onmessage = function(event) {
   try {
     // Blobの場合は文字列として読み取る
     if (event.data instanceof Blob) {
-      console.log('📦 Blobデータを受信 - テキストとして読み取り試行');
+      // console.log('📦 Blobデータを受信 - テキストとして読み取り試行');
       const reader = new FileReader();
       reader.onload = function() {
         try {
           const data = JSON.parse(reader.result);
-          console.log('📨 Blobから解析したメッセージ:', data);
+          // console.log('📨 Blobから解析したメッセージ:', data);
           
           if (data.type === "heartEffect") {
             console.log('💖 受信側からハートエフェクト指示を受信（Blob経由）');

@@ -3283,6 +3283,11 @@ function generatePrintImageData() {
         }
       }
       
+      // 背景画像を180度回転して送信側の元の向きに戻す
+      downloadCtx.translate(drawingAreaSize.width / 2, drawingAreaSize.height / 2);
+      downloadCtx.rotate(Math.PI);
+      downloadCtx.translate(-drawingAreaSize.width / 2, -drawingAreaSize.height / 2);
+      
       // 中央配置
       const bgX = (drawingAreaSize.width - bgWidth) / 2;
       const bgY = (drawingAreaSize.height - bgHeight) / 2;
@@ -3299,11 +3304,7 @@ function generatePrintImageData() {
     downloadCtx.fillRect(0, 0, downloadCanvas.width, downloadCanvas.height);
   }
   
-  // 筆跡を描画（両モード共通）- 受信側画面表示と同じ180度回転を適用
-  downloadCtx.save();
-  downloadCtx.translate(downloadCanvas.width / 2, downloadCanvas.height / 2);
-  downloadCtx.rotate(Math.PI); // 180度回転
-  downloadCtx.translate(-downloadCanvas.width / 2, -downloadCanvas.height / 2);
+  // 筆跡を描画（両モード共通）- 送信側の元の向きで描画（回転なし）
   
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
@@ -3331,12 +3332,10 @@ function generatePrintImageData() {
     }
   });
   
-  downloadCtx.restore();
+  // 🔸 印刷用画像を送信側の元の向きで生成
+  console.log('🔄 印刷用画像を送信側の元の向きで生成完了');
   
-  // 🔸 印刷用画像を受信側画面表示と同じ向きで生成
-  console.log('🔄 印刷用画像を受信側画面表示と同じ向きで生成完了');
-  
-  // 画像データを返す（既に180度回転済み）
+  // 画像データを返す（送信側の元の向き）
   return downloadCanvas.toDataURL("image/png");
 }
 
