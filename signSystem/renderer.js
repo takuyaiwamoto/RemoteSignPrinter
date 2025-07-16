@@ -1,8 +1,92 @@
 const { ipcRenderer } = require("electron");
 const path = require("path");
+const crypto = require("crypto");
 
 // 🔸 拡大率を設定 (デフォルト4.0倍、ポスター時は2.4倍=A4の60%)
 let SCALE_FACTOR = 4.0;
+
+// 🤖 SwitchBot API設定
+const SWITCHBOT_CONFIG = {
+  token: "868df462ea398ddd4c43c4241adf95d76956fe461e364731466442bef7cbe1bb2b765c3ba74ad6d0be9f1cdc6ce9fe7b",
+  secret: "bfea0c53da5613e9ef5b577353b9f874",
+  deviceId: "E13D0506342B",
+  apiUrl: "https://api.switch-bot.com/v1.1"
+};
+
+// 🤖 SwitchBot API署名生成関数
+function generateSwitchBotSignature() {
+  const t = Date.now();
+  const nonce = crypto.randomBytes(16).toString('base64');
+  const data = SWITCHBOT_CONFIG.token + t + nonce;
+  const signTerm = crypto.createHmac('sha256', SWITCHBOT_CONFIG.secret)
+    .update(Buffer.from(data, 'utf-8'))
+    .digest();
+  const sign = signTerm.toString('base64');
+  
+  return { t, nonce, sign };
+}
+
+// 🤖 SwitchBotボット押下関数
+async function pressSwitchBot() {
+  try {
+    console.log("🤖 SwitchBotボット押下開始...");
+    
+    const { t, nonce, sign } = generateSwitchBotSignature();
+    
+    const response = await fetch(`${SWITCHBOT_CONFIG.apiUrl}/devices/${SWITCHBOT_CONFIG.deviceId}/commands`, {
+      method: 'POST',
+      headers: {
+        'Authorization': SWITCHBOT_CONFIG.token,
+        'sign': sign,
+        't': t.toString(),
+        'nonce': nonce,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        command: 'press',
+        parameter: 'default',
+        commandType: 'command'
+      })
+    });
+    
+    const result = await response.json();
+    console.log("🤖 SwitchBotレスポンス:", result);
+    
+    if (result.statusCode === 100) {
+      console.log("✅ SwitchBotボット押下成功");
+      return true;
+    } else {
+      console.error("❌ SwitchBotボット押下失敗:", result);
+      return false;
+    }
+  } catch (error) {
+    console.error("❌ SwitchBotエラー:", error);
+    return false;
+  }
+}
+
+// 🤖 SwitchBotボット連続押下関数（2秒間隔で2回押下）
+async function executeSwitchBotSequence() {
+  try {
+    console.log("🔴 SwitchBot物理ボット押下シーケンス開始");
+    
+    // 1回目の押下
+    console.log("🔴 SwitchBot物理ボット押下（1回目）");
+    await pressSwitchBot();
+    
+    // 2秒待機
+    console.log("⏰ 2秒待機...");
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // 2回目の押下
+    console.log("🔴 SwitchBot物理ボット押下（2回目）");
+    await pressSwitchBot();
+    
+    console.log("🔴 SwitchBot物理ボット押下シーケンス完了");
+  } catch (error) {
+    console.error("❌ SwitchBotシーケンスエラー:", error);
+  }
+}
 
 const canvas = document.getElementById("drawCanvas");
 const ctx = canvas.getContext("2d");
@@ -104,6 +188,61 @@ function createReceiverFairyDust(x, y) {
   }
 }
 
+// ハートエフェクト関数（受信側用）
+function createReceiverHeart(x, y) {
+  console.log(`💖 受信側にハートを生成開始: (${x}, ${y})`);
+  
+  // ハートを少数生成（1-3個）
+  const heartCount = Math.floor(Math.random() * 3) + 1;
+  console.log(`💖 生成するハートの数: ${heartCount}`);
+  
+  for (let i = 0; i < heartCount; i++) {
+    const heart = document.createElement('div');
+    heart.className = 'receiver-drawing-heart';
+    
+    // ペン先により近い範囲にランダム配置（18px範囲）
+    const offsetX = (Math.random() - 0.5) * 18;
+    const offsetY = (Math.random() - 0.5) * 18;
+    
+    const finalX = x + offsetX;
+    const finalY = y + offsetY;
+    
+    heart.style.left = finalX + 'px';
+    heart.style.top = finalY + 'px';
+    
+    // ランダムなピンク系の色
+    const colors = ['#ff1493', '#ff69b4', '#ff6347', '#ff1493', '#db7093', '#c71585'];
+    const heartColor = colors[Math.floor(Math.random() * colors.length)];
+    
+    heart.style.background = heartColor;
+    heart.style.boxShadow = `0 0 8px ${heartColor}, 0 0 16px ${heartColor}`;
+    
+    // ランダムな飛び散り方向とアニメーション遅延
+    const randomDirection = (Math.random() - 0.5) * 60; // -30度から30度
+    heart.style.setProperty('--float-direction', randomDirection + 'deg');
+    heart.style.animationDelay = (Math.random() * 0.3) + 's';
+    
+    // 疑似要素の色も更新
+    heart.style.setProperty('--heart-color', heartColor);
+    
+    // 位置を固定
+    heart.style.position = 'fixed';
+    heart.style.zIndex = '9998';
+    
+    document.body.appendChild(heart);
+    console.log(`💖 ハート${i+1}をDOMに追加:`, heart);
+    console.log(`💖 ハート${i+1}の位置: left=${finalX}px, top=${finalY}px`);
+    
+    // アニメーション終了後にハートを削除
+    setTimeout(() => {
+      if (heart.parentNode) {
+        heart.parentNode.removeChild(heart);
+        console.log('💖 受信側のハートを削除');
+      }
+    }, 1500);
+  }
+}
+
 // 星エフェクト関数（送信側と完全に同じ飛び散る効果）
 function createReceiverStar(x, y) {
   console.log(`⭐ 受信側に星を生成: (${x}, ${y})`);
@@ -154,6 +293,7 @@ function createReceiverStar(x, y) {
     }, 1000);
   }
 }
+
 
 // CSSアニメーションをスタイルシートに追加（送信側と完全に同じ）
 function addStarStyles() {
@@ -391,6 +531,7 @@ function createHeart() {
 let lKeyPressCount = 0;
 let lKeyPressTimer = null;
 let specialWindow = null;
+let doorAnimationInProgress = false; // 扉演出中フラグ
 
 // Electron透明ウィンドウ作成関数
 async function createTransparentWindow() {
@@ -475,6 +616,12 @@ function createSpecialHeart() {
 async function triggerSpecialEffect() {
   console.log('🎉 特別演出開始！30個の大きなハートを生成');
   
+  // renzoku.mp3を再生
+  const audio = new Audio('./renzoku.mp3');
+  audio.volume = 0.7;
+  audio.play().catch(e => console.log('renzoku.mp3再生エラー:', e));
+  console.log('🔊 特別演出でrenzoku.mp3再生開始');
+  
   // 送信側にも特別演出開始を通知
   if (socket && socket.readyState === WebSocket.OPEN) {
     const specialEffectMessage = JSON.stringify({
@@ -504,6 +651,11 @@ async function triggerSpecialEffect() {
 // キーボードイベントリスナー
 document.addEventListener('keydown', function(event) {
   if (event.key.toLowerCase() === 'l') {
+    // 扉演出中はL キーを無効化
+    if (doorAnimationInProgress) {
+      console.log('🚪 扉演出中のため、L キーイベントを無効化');
+      return;
+    }
     console.log('💖 lキーが押されました - ハートエフェクト開始');
     
     // lキー押下回数をカウント
@@ -523,6 +675,15 @@ document.addEventListener('keydown', function(event) {
     } else {
       // 通常のハートエフェクト
       createHeart();
+      
+      // 🎵 poyo.mp3を再生
+      const poyoAudio = new Audio('./poyo.mp3');
+      poyoAudio.volume = 0.8; // ボリュームを80%に設定
+      poyoAudio.play().then(() => {
+        console.log('🎵 poyo.mp3再生開始');
+      }).catch(e => {
+        console.log('🎵 poyo.mp3再生エラー:', e);
+      });
       
       // 書き手側にもハート表示指示を送信
       if (socket && socket.readyState === WebSocket.OPEN) {
@@ -570,6 +731,8 @@ let currentPaperSize = "A4"; // 🔸 現在の用紙サイズ（デフォルト�
 let currentVideoSize = 100; // 🔸 現在のビデオサイズ（デフォルト100%）
 let starEffectEnabled = true; // 星エフェクトの状態（標準でON）
 let fairyDustEffectEnabled = true; // 妖精の粉エフェクトの状態（標準でON）
+let heartEffectEnabled = false; // ハートエフェクトの状態（標準でOFF）
+
 
 // 🔸 Dev Tool設定
 let devCanvasScale = 0.35; // キャンバススケール（デフォルト0.35）
@@ -973,6 +1136,20 @@ function handleMessage(data) {
       createReceiverFairyDust(pageX, pageY);
     }
     
+    // ハートエフェクトが有効でスタート時にハートを表示
+    console.log(`💖 start時ハートチェック: heartEffectEnabled=${heartEffectEnabled}`);
+    if (heartEffectEnabled) {
+      // 180度回転を考慮した座標変換
+      const canvasRect = canvas.getBoundingClientRect();
+      // 180度回転後の座標を計算
+      const rotatedX = canvas.width - (areaLeft + scaledX);
+      const rotatedY = canvas.height - (areaTop + scaledY);
+      const pageX = canvasRect.left + rotatedX;
+      const pageY = canvasRect.top + rotatedY;
+      console.log(`💖 start時にハートエフェクト(180度回転): canvas(${scaledX}, ${scaledY}) -> rotated(${rotatedX}, ${rotatedY}) -> page(${pageX}, ${pageY})`);
+      createReceiverHeart(pageX, pageY);
+    }
+    
     ctx.restore();
   } else if (data.type === "draw") {
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
@@ -1054,6 +1231,20 @@ function handleMessage(data) {
       createReceiverFairyDust(pageX, pageY);
     }
     
+    // ハートエフェクトが有効で受信側にハートを表示（4回に1回の頻度）
+    console.log(`💖 draw時ハートチェック: heartEffectEnabled=${heartEffectEnabled}`);
+    if (heartEffectEnabled && Math.random() < 0.25) {
+      // 180度回転を考慮した座標変換
+      const canvasRect = canvas.getBoundingClientRect();
+      // 180度回転後の座標を計算
+      const rotatedX = canvas.width - (areaLeft + scaledX);
+      const rotatedY = canvas.height - (areaTop + scaledY);
+      const pageX = canvasRect.left + rotatedX;
+      const pageY = canvasRect.top + rotatedY;
+      console.log(`💖 draw時にハートエフェクト(180度回転): canvas(${scaledX}, ${scaledY}) -> rotated(${rotatedX}, ${rotatedY}) -> page(${pageX}, ${pageY})`);
+      createReceiverHeart(pageX, pageY);
+    }
+    
     ctx.restore();
   } else if (data.type === "playVideo") {
     // 🔸 ビデオ再生処理
@@ -1082,9 +1273,10 @@ function handleMessage(data) {
     console.log(`✨ 妖精の粉エフェクト状態変更: ${fairyDustEffectEnabled ? 'ON' : 'OFF'}`);
     console.log(`✨ 受信した妖精の粉データ:`, data);
   } else if (data.type === "heartEffect") {
-    // ハートエフェクト指示を受信
-    console.log('💖 送信側からハートエフェクト指示を受信');
-    createHeart();
+    // ハートエフェクト状態変更通知を受信
+    heartEffectEnabled = data.enabled;
+    console.log(`💖 ハートエフェクト状態変更: ${heartEffectEnabled ? 'ON' : 'OFF'}`);
+    console.log(`💖 受信したハートエフェクトデータ:`, data);
   } else if (data.type === "downloadRotated") {
     // 🔸 180度回転ダウンロード要求を受信
     if (data.paperSize) {
@@ -1169,6 +1361,17 @@ function handleMessage(data) {
     
     console.log('✅ プリンターへの印刷命令送信完了！（更に180度回転）');
     console.log("✅ 更に180度回転画像をElectronに送信完了");
+    
+    // 🤖 SwitchBotボット押下（チェックボックスの状態を確認）
+    if (data.switchBotEnabled) {
+      console.log("🤖 SwitchBot有効：2秒後にボット押下実行");
+      // 2秒後にSwitchBotシーケンスを開始
+      setTimeout(() => {
+        executeSwitchBotSequence();
+      }, 2000);
+    } else {
+      console.log("🤖 SwitchBot無効：ボット押下をスキップ");
+    }
   } else if (data.type === "startRotationAnimation") {
     // 🔸 回転アニメーション開始
     console.log("🎬 回転アニメーション開始");
@@ -1182,6 +1385,10 @@ function handleMessage(data) {
     // 🔸 花火テスト指示を受信（無効化：送信ボタンでのみ花火実行）
     console.log("🎆 送信側から花火テスト指示を受信（無効化されています）");
     // createReceiverFireworks(); // 無効化
+  } else if (data.type === "switchBotTest") {
+    // 🔸 SwitchBotテスト指示を受信
+    console.log("🤖 送信側からSwitchBotテスト指示を受信");
+    executeSwitchBotSequence();
   }
 }
 
@@ -1323,9 +1530,10 @@ function prepareAndRunAnimation(waitTime = null, fireworksEnabled = true, confet
 
   animationImage = new Image();
   animationImage.src = imageDataUrl;
-  // 🔸 アニメーション画像のサイズも拡大したキャンバスに合わせる
-  animationImage.style.width = canvas.width + "px";
-  animationImage.style.height = canvas.height + "px";
+  // 🔸 アニメーション画像のサイズをキャンバスの表示サイズに合わせる
+  const canvasComputedStyle = window.getComputedStyle(canvas);
+  animationImage.style.width = canvasComputedStyle.width;
+  animationImage.style.height = canvasComputedStyle.height;
   animationImage.style.display = "block";
   
   // アニメーション画像をキャンバスと同じ位置に配置（その場に止まる）
@@ -2073,6 +2281,7 @@ function createReceiverExplosion(x, y) {
 // 🔸 扉開く演出関数
 function startDoorAnimation(imageSrc) {
   console.log('🚪 扉開く演出を開始');
+  doorAnimationInProgress = true; // 扉演出中フラグを立てる
   
   // 背景画像を事前に読み込み
   const img = new Image();
@@ -2097,71 +2306,48 @@ function startDoorAnimation(imageSrc) {
     
     console.log('🚪 背景画像を180度回転してキャンバスに描画');
     
-    // 2. ウィンドウ全体を覆う立体的な最上面レイヤーを作成
-    const grayOverlay = document.createElement('div');
-    grayOverlay.id = 'grayOverlay';
-    grayOverlay.style.cssText = `
+    // 2. 左右の扉を即座に作成（中央に切れ目がある状態）
+    // 左の扉（中央から左に開く）- 重厚感のあるデザイン
+    const leftDoor = document.createElement('div');
+    leftDoor.id = 'leftDoor';
+    leftDoor.style.cssText = `
       position: fixed;
       top: 0;
       left: 0;
-      width: 100vw;
+      width: 50vw;
       height: 100vh;
-      background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 25%, #e8e8e8 50%, #f5f5f5 75%, #ffffff 100%);
-      box-shadow: inset 0 0 50px rgba(0,0,0,0.2), inset 0 0 100px rgba(0,0,0,0.1), inset 0 0 80px rgba(255,255,255,0.4);
-      z-index: 10000;
-      pointer-events: none;
+      background: linear-gradient(45deg, #ffffff, #f0f0f0, #e5e5e5, #f0f0f0, #ffffff);
+      z-index: 10002;
+      transform-origin: left center;
+      transition: transform 1s ease-out;
+      border-right: 3px solid #d0d0d0;
+      box-shadow: inset -10px 0 30px rgba(0,0,0,0.2), 0 0 20px rgba(0,0,0,0.3), inset 0 0 50px rgba(255,255,255,0.3);
     `;
-    document.body.appendChild(grayOverlay);
+    document.body.appendChild(leftDoor);
     
-    console.log('🚪 グレーオーバーレイを作成（ウィンドウ全体）');
+    // 右の扉（中央から右に開く）- 重厚感のあるデザイン
+    const rightDoor = document.createElement('div');
+    rightDoor.id = 'rightDoor';
+    rightDoor.style.cssText = `
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 50vw;
+      height: 100vh;
+      background: linear-gradient(-45deg, #ffffff, #f0f0f0, #e5e5e5, #f0f0f0, #ffffff);
+      z-index: 10002;
+      transform-origin: right center;
+      transition: transform 1s ease-out;
+      border-left: 3px solid #d0d0d0;
+      box-shadow: inset 10px 0 30px rgba(0,0,0,0.2), 0 0 20px rgba(0,0,0,0.3), inset 0 0 50px rgba(255,255,255,0.3);
+    `;
+    document.body.appendChild(rightDoor);
+    
+    console.log('🚪 中央に切れ目のある扉を作成');
     
     // 3. 1秒後に扉が開く
     setTimeout(() => {
-        // グレーオーバーレイを左右の扉に分割
-        grayOverlay.style.display = 'none'; // 元のオーバーレイを非表示
-        
-        // 左の扉（中央から左に開く）- 重厚感のあるデザイン
-        const leftDoor = document.createElement('div');
-        leftDoor.id = 'leftDoor';
-        leftDoor.style.cssText = `
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 50vw;
-          height: 100vh;
-          background: linear-gradient(45deg, #ffffff, #f0f0f0, #e5e5e5, #f0f0f0, #ffffff);
-          z-index: 10002;
-          transform-origin: left center;
-          transition: transform 1s ease-out;
-          border-right: 3px solid #d0d0d0;
-          box-shadow: inset -10px 0 30px rgba(0,0,0,0.2), 0 0 20px rgba(0,0,0,0.3), inset 0 0 50px rgba(255,255,255,0.3);
-        `;
-        document.body.appendChild(leftDoor);
-        
-        // 右の扉（中央から右に開く）- 重厚感のあるデザイン
-        const rightDoor = document.createElement('div');
-        rightDoor.id = 'rightDoor';
-        rightDoor.style.cssText = `
-          position: fixed;
-          top: 0;
-          right: 0;
-          width: 50vw;
-          height: 100vh;
-          background: linear-gradient(-45deg, #ffffff, #f0f0f0, #e5e5e5, #f0f0f0, #ffffff);
-          z-index: 10002;
-          transform-origin: right center;
-          transition: transform 1s ease-out;
-          border-left: 3px solid #d0d0d0;
-          box-shadow: inset 10px 0 30px rgba(0,0,0,0.2), 0 0 20px rgba(0,0,0,0.3), inset 0 0 50px rgba(255,255,255,0.3);
-        `;
-        document.body.appendChild(rightDoor);
-        
-        console.log('🚪 扉要素を作成');
-        
-        // 効果音を再生
-        const audio = new Audio('./sound1.mp3');
-        audio.volume = 0.6;
-        audio.play().catch(e => console.log('扉効果音再生エラー:', e));
+        // 効果音を再生 (sound1.mp3 removed due to file loading errors)
         
         // 0.1秒後に扉を開く（中央から外側に開く）
         setTimeout(() => {
@@ -2172,9 +2358,9 @@ function startDoorAnimation(imageSrc) {
         
         // 1秒後に全ての要素を削除
         setTimeout(() => {
-          if (grayOverlay.parentNode) grayOverlay.parentNode.removeChild(grayOverlay);
           if (leftDoor.parentNode) leftDoor.parentNode.removeChild(leftDoor);
           if (rightDoor.parentNode) rightDoor.parentNode.removeChild(rightDoor);
+          doorAnimationInProgress = false; // 扉演出中フラグを下げる
           console.log('🚪 扉演出完了');
         }, 1100);
         
@@ -2190,6 +2376,7 @@ function startDoorAnimation(imageSrc) {
 // 🔸 扉演出第1段階: 扉表示のみ（開く直前で停止）
 function startDoorAnimationPhase1(imageSrc) {
   console.log('🚪 扉演出第1段階: 開く直前で停止:', imageSrc);
+  doorAnimationInProgress = true; // 扉演出中フラグを立てる
   
   const img = new Image();
   img.src = imageSrc;
@@ -2201,69 +2388,7 @@ function startDoorAnimationPhase1(imageSrc) {
     
     console.log('🚪 背景画像を保存（キャンバスには描画せず）');
     
-    // 1. ウィンドウ全体を覆う立体的な最上面レイヤーを即座に作成
-    const grayOverlay = document.createElement('div');
-    grayOverlay.id = 'grayOverlay';
-    grayOverlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 25%, #e8e8e8 50%, #f5f5f5 75%, #ffffff 100%);
-      box-shadow: inset 0 0 50px rgba(0,0,0,0.2), inset 0 0 100px rgba(0,0,0,0.1), inset 0 0 80px rgba(255,255,255,0.4);
-      z-index: 10000;
-      pointer-events: none;
-    `;
-    document.body.appendChild(grayOverlay);
-    
-    console.log('🚪 グレーオーバーレイを作成（第1段階完了 - 開く直前で停止）');
-  };
-  
-  img.onerror = () => {
-    console.error('❌ 扉用背景画像の読み込みに失敗:', imageSrc);
-  };
-}
-
-// 🔸 扉演出第2段階: 扉開放（LED表示 + 背景描画 + 扉開放）
-function startDoorAnimationPhase2(imageSrc) {
-  console.log('🚪 扉演出第2段階: LED表示 + 扉開放:', imageSrc);
-  
-  // 既存の要素を取得
-  const grayOverlay = document.getElementById('grayOverlay');
-  
-  if (!grayOverlay) {
-    console.error('❌ 扉要素が見つかりません。第1段階が実行されていない可能性があります。');
-    return;
-  }
-  
-  // 1. 背景画像を180度回転してキャンバスに描画
-  if (backgroundImage) {
-    ctx.save();
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate(Math.PI);
-    ctx.drawImage(backgroundImage, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
-    ctx.restore();
-    redrawCanvas();
-    console.log('🚪 背景画像を180度回転してキャンバスに描画');
-  }
-  
-  // 2. open.wavを再生
-  const audio = new Audio('./open.wav');
-  audio.volume = 0.6;
-  audio.play().catch(e => console.log('open.wav再生エラー:', e));
-  console.log('🔊 open.wav再生開始');
-  
-  // 3. 青色LEDを表示（削除）
-  // createBlueLEDLightingWithFadeOut();
-  
-  // 4. 2.5秒後に開く演出開始
-  setTimeout(() => {
-    console.log('🚪 開く演出開始（2.5秒後）');
-    
-    // グレーオーバーレイを左右の扉に分割
-    grayOverlay.style.display = 'none'; // 元のオーバーレイを非表示
-    
+    // 1. 左右の扉を即座に作成（中央に切れ目がある状態）
     // 左の扉（中央から左に開く）- 重厚感のあるデザイン
     const leftDoor = document.createElement('div');
     leftDoor.id = 'leftDoor';
@@ -2300,7 +2425,56 @@ function startDoorAnimationPhase2(imageSrc) {
     `;
     document.body.appendChild(rightDoor);
     
-    console.log('🚪 扉要素を作成');
+    // グレーオーバーレイIDを設定（互換性のため）
+    leftDoor.setAttribute('data-door-phase', '1');
+    rightDoor.setAttribute('data-door-phase', '1');
+    
+    console.log('🚪 中央に切れ目のある扉を作成（第1段階完了 - 開く直前で停止）');
+  };
+  
+  img.onerror = () => {
+    console.error('❌ 扉用背景画像の読み込みに失敗:', imageSrc);
+  };
+}
+
+// 🔸 扉演出第2段階: 扉開放（LED表示 + 背景描画 + 扉開放）
+function startDoorAnimationPhase2(imageSrc) {
+  console.log('🚪 扉演出第2段階: LED表示 + 扉開放:', imageSrc);
+  
+  // 既存の扉要素を取得
+  const leftDoor = document.getElementById('leftDoor');
+  const rightDoor = document.getElementById('rightDoor');
+  
+  if (!leftDoor || !rightDoor) {
+    console.error('❌ 扉要素が見つかりません。第1段階が実行されていない可能性があります。');
+    return;
+  }
+  
+  // 1. 背景画像を180度回転してキャンバスに描画
+  if (backgroundImage) {
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(Math.PI);
+    ctx.drawImage(backgroundImage, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+    ctx.restore();
+    redrawCanvas();
+    console.log('🚪 背景画像を180度回転してキャンバスに描画');
+  }
+  
+  // 2. open.wavを再生
+  const audio = new Audio('./open.wav');
+  audio.volume = 0.6;
+  audio.play().catch(e => console.log('open.wav再生エラー:', e));
+  console.log('🔊 open.wav再生開始');
+  
+  // 3. 青色LEDを表示（削除）
+  // createBlueLEDLightingWithFadeOut();
+  
+  // 4. 2.5秒後に開く演出開始
+  setTimeout(() => {
+    console.log('🚪 開く演出開始（2.5秒後）');
+    
+    console.log('🚪 既存の扉要素を使用');
     
     // 0.1秒後に扉を開く（中央から外側に開く）
     setTimeout(() => {
@@ -2311,9 +2485,9 @@ function startDoorAnimationPhase2(imageSrc) {
     
     // 4秒後に全ての要素を削除 + open2.mp3再生 + 心臓鼓動演出
     setTimeout(() => {
-      if (grayOverlay.parentNode) grayOverlay.parentNode.removeChild(grayOverlay);
       if (leftDoor.parentNode) leftDoor.parentNode.removeChild(leftDoor);
       if (rightDoor.parentNode) rightDoor.parentNode.removeChild(rightDoor);
+      doorAnimationInProgress = false; // 扉演出中フラグを下げる
       console.log('🚪 扉演出完了');
       
       // 扉が開き切ったらopen2.mp3を再生
@@ -2379,17 +2553,22 @@ function createHeartbeatEffect() {
   // 心臓鼓動用の背景画像要素を作成
   const heartbeatBg = document.createElement('div');
   heartbeatBg.id = 'heartbeat-background';
-  // キャンバスの位置情報を取得
+  
+  // キャンバスの最新の位置情報を取得（DevTool変更に対応）
   const canvasRect = canvas.getBoundingClientRect();
   const canvasTop = canvasRect.top + window.scrollY;
   const canvasLeft = canvasRect.left + window.scrollX;
+  const canvasWidth = canvas.offsetWidth;  // 表示される実際の幅
+  const canvasHeight = canvas.offsetHeight; // 表示される実際の高さ
+  
+  console.log(`💓 キャンバス位置情報: top=${canvasTop}, left=${canvasLeft}, width=${canvasWidth}, height=${canvasHeight}`);
   
   heartbeatBg.style.cssText = `
     position: absolute;
     top: ${canvasTop}px;
     left: ${canvasLeft}px;
-    width: ${canvas.width}px;
-    height: ${canvas.height}px;
+    width: ${canvasWidth}px;
+    height: ${canvasHeight}px;
     transform: rotate(180deg);
     transform-origin: center center;
     background-image: url('${backgroundImage.src}');
@@ -3130,6 +3309,7 @@ function toggleFullscreen() {
     console.log('❌ フルスクリーン機能はElectron環境でのみ利用可能');
   }
 }
+
 
 // 🔸 フルスクリーン状態変更の受信
 if (typeof ipcRenderer !== 'undefined') {
