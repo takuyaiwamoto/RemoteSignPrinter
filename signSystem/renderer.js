@@ -3299,7 +3299,12 @@ function generatePrintImageData() {
     downloadCtx.fillRect(0, 0, downloadCanvas.width, downloadCanvas.height);
   }
   
-  // 筆跡を描画（両モード共通）
+  // 筆跡を描画（両モード共通）- 受信側画面表示と同じ180度回転を適用
+  downloadCtx.save();
+  downloadCtx.translate(downloadCanvas.width / 2, downloadCanvas.height / 2);
+  downloadCtx.rotate(Math.PI); // 180度回転
+  downloadCtx.translate(-downloadCanvas.width / 2, -downloadCanvas.height / 2);
+  
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       downloadCtx.beginPath();
@@ -3326,24 +3331,13 @@ function generatePrintImageData() {
     }
   });
   
-  // 🔸 印刷用画像を180度回転して送信側の元の向きに戻す
-  console.log('🔄 印刷用画像を180度回転して送信側の向きに戻す');
-  const rotatedCanvas = document.createElement('canvas');
-  const rotatedCtx = rotatedCanvas.getContext('2d');
-  rotatedCanvas.width = downloadCanvas.width;
-  rotatedCanvas.height = downloadCanvas.height;
+  downloadCtx.restore();
   
-  // 受信側画面表示を180度回転して送信側の元の向きに戻す
-  rotatedCtx.save();
-  rotatedCtx.translate(rotatedCanvas.width, rotatedCanvas.height);
-  rotatedCtx.rotate(Math.PI);
-  rotatedCtx.drawImage(downloadCanvas, 0, 0);
-  rotatedCtx.restore();
+  // 🔸 印刷用画像を受信側画面表示と同じ向きで生成
+  console.log('🔄 印刷用画像を受信側画面表示と同じ向きで生成完了');
   
-  console.log('🔄 印刷用画像の180度回転処理完了（送信側の向きに復元）');
-  
-  // 画像データを返す
-  return rotatedCanvas.toDataURL("image/png");
+  // 画像データを返す（既に180度回転済み）
+  return downloadCanvas.toDataURL("image/png");
 }
 
 // 🔸 180度回転ダウンロード機能
