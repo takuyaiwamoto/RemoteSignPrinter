@@ -3283,16 +3283,16 @@ function generatePrintImageData() {
         }
       }
       
-      // 背景画像を180度回転して送信側の元の向きに戻す
-      downloadCtx.translate(drawingAreaSize.width / 2, drawingAreaSize.height / 2);
-      downloadCtx.rotate(Math.PI);
-      downloadCtx.translate(-drawingAreaSize.width / 2, -drawingAreaSize.height / 2);
-      
-      // 中央配置
+      // 中央配置の計算
       const bgX = (drawingAreaSize.width - bgWidth) / 2;
       const bgY = (drawingAreaSize.height - bgHeight) / 2;
       
-      downloadCtx.drawImage(backgroundImage, bgX, bgY, bgWidth, bgHeight);
+      // 背景画像を180度回転して送信側の元の向きに戻す
+      downloadCtx.translate(bgX + bgWidth / 2, bgY + bgHeight / 2);
+      downloadCtx.rotate(Math.PI);
+      downloadCtx.translate(-bgWidth / 2, -bgHeight / 2);
+      
+      downloadCtx.drawImage(backgroundImage, 0, 0, bgWidth, bgHeight);
       downloadCtx.restore();
       
       console.log(`🖨️ 背景画像を描画: ${bgWidth}x${bgHeight} at (${bgX}, ${bgY})`);
