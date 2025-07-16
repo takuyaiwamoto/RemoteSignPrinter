@@ -525,6 +525,12 @@
     <button id="posterBtn" onclick="setPaperSize('poster')">ポストカード</button>
   </div>
   
+  <div class="button-group">
+    <label>印刷モード:</label>
+    <button id="drawOnlyBtn" class="selected" onclick="setPrintMode('drawOnly')">描画モード</button>
+    <button id="fullModeBtn" onclick="setPrintMode('fullMode')">フルモード</button>
+  </div>
+  
   <hr style="margin: 15px 0;">
   
   <div class="button-group">
@@ -547,10 +553,11 @@ let drawing = false;
 let socket = new WebSocket("wss://realtime-sign-server-1.onrender.com");
 let backgroundImage = null;
 let currentPaperSize = "A4"; // 現在の用紙サイズ
+let currentPrintMode = "drawOnly"; // 現在の印刷モード（デフォルト：描画モード）
 let currentVideoSize = 100; // 現在のビデオサイズ（デフォルト100%）
 let canvasScale = 1.0; // キャンバススケール
 let animationStartWaitTime = 3.3; // アニメーション開始待機時間
-let rotationWaitTime = 8.1; // 回転後待機時間
+let rotationWaitTime = 3.0; // 回転後待機時間
 let currentPenThickness = 8; // 現在のペンの太さ（標準は太い）
 let currentPenColor = 'black'; // 現在のペンの色
 let neonColorIndex = 0; // ネオン用の色インデックス
@@ -707,7 +714,7 @@ function createSpecialHeart() {
       heart.style.position = 'fixed';
       
       document.body.appendChild(heart);
-      console.log(`🎉 送信側に特別ハート${i+1}追加完了`);
+      // console.log(`🎉 送信側に特別ハート${i+1}追加完了`);
       
       // アニメーション終了後に削除
       setTimeout(() => {
@@ -717,7 +724,7 @@ function createSpecialHeart() {
         if (style.parentNode) {
           style.parentNode.removeChild(style);
         }
-        console.log(`🎉 特別ハート${i+1}削除完了`);
+        // console.log(`🎉 特別ハート${i+1}削除完了`);
       }, 1000);
     }, i * 30); // 30ms間隔で順次生成
   }
@@ -826,6 +833,29 @@ function setPaperSize(size) {
   socket.send(JSON.stringify({ 
     type: "paperSize", 
     size: size 
+  }));
+}
+
+// 🖨️ 印刷モード設定関数
+function setPrintMode(mode) {
+  currentPrintMode = mode;
+  
+  // ボタンの選択状態を更新
+  document.getElementById("drawOnlyBtn").classList.remove("selected");
+  document.getElementById("fullModeBtn").classList.remove("selected");
+  
+  if (mode === "drawOnly") {
+    document.getElementById("drawOnlyBtn").classList.add("selected");
+    console.log("🖨️ 印刷モードを描画モード（描いたものだけ）に設定");
+  } else if (mode === "fullMode") {
+    document.getElementById("fullModeBtn").classList.add("selected");
+    console.log("🖨️ 印刷モードをフルモード（背景と描画したもの）に設定");
+  }
+  
+  // 受信側に印刷モード情報を送信
+  socket.send(JSON.stringify({ 
+    type: "printMode", 
+    mode: mode 
   }));
 }
 
@@ -1529,7 +1559,7 @@ function createFireworks() {
       const launchX = Math.random() * (window.innerWidth - 100) + 50; // 端から50px離す
       const targetY = Math.random() * (window.innerHeight * 0.5) + 80; // 上部50%の範囲に拡大
       
-      console.log(`🎆 花火${i+1}発射: X=${launchX}, Y=${targetY}`);
+      // console.log(`🎆 花火${i+1}発射: X=${launchX}, Y=${targetY}`);
       
       // 花火の軌道となる要素を作成（より派手に）
       const firework = document.createElement('div');
@@ -1561,19 +1591,19 @@ function createFireworks() {
       `;
       
       document.body.appendChild(firework);
-      console.log(`🎆 花火${i+1}要素を追加`);
+      // console.log(`🎆 花火${i+1}要素を追加`);
       
       // 打ち上げアニメーション（即座に開始）
       const launchDuration = 1000 + Math.random() * 500; // 1000-1500ms
       setTimeout(() => {
         firework.style.transition = `bottom ${launchDuration}ms ease-out`;
         firework.style.bottom = (window.innerHeight - targetY) + 'px';
-        console.log(`🎆 花火${i+1}打ち上げ開始`);
+        // console.log(`🎆 花火${i+1}打ち上げ開始`);
       }, 50);
       
       // 花火爆発
       setTimeout(() => {
-        console.log(`🎆 花火${i+1}爆発開始`);
+        // console.log(`🎆 花火${i+1}爆発開始`);
         firework.style.display = 'none';
         createExplosion(launchX, targetY);
       }, launchDuration + 100);
@@ -1581,7 +1611,7 @@ function createFireworks() {
       // 花火要素を削除
       setTimeout(() => {
         if (firework.parentNode) firework.parentNode.removeChild(firework);
-        console.log(`🎆 花火${i+1}要素削除`);
+        // console.log(`🎆 花火${i+1}要素削除`);
       }, launchDuration + 200);
       
     }, i * 350); // 350msずつ時間差で発射（6.5秒継続: 18発 × 350ms = 6.3秒）
@@ -1590,7 +1620,7 @@ function createFireworks() {
 
 // 花火爆発エフェクト（超派手に改良）
 function createExplosion(x, y) {
-  console.log(`💥 爆発エフェクト開始: X=${x}, Y=${y}`);
+  // console.log(`💥 爆発エフェクト開始: X=${x}, Y=${y}`);
   const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff8000', '#8000ff', '#ffd700', '#ff69b4', '#32cd32', '#ff4500', '#8a2be2', '#00ced1', '#ff6347', '#9370db'];
   const particles = 24; // 爆発する粒子数を大幅増加
   
@@ -2462,6 +2492,7 @@ function actualPrintProcess() {
         imageData: imageDataUrl,
         printType: 'double_rotated',
         paperSize: currentPaperSize,
+        printMode: currentPrintMode,
         switchBotEnabled: document.getElementById('switchBotEffect').checked
       }));
       console.log('✅ 更に180度回転画像の印刷処理を開始');

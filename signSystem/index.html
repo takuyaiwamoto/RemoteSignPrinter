@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://realtime-sign-server-1.onrender.com ws://localhost:* wss://localhost:*; img-src 'self' data: blob:; media-src 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://realtime-sign-server-1.onrender.com ws://localhost:* wss://localhost:* https://api.switch-bot.com; img-src 'self' data: blob:; media-src 'self';">
   <title>受信側1.2</title>
   <style>
     body {
@@ -218,6 +218,51 @@
     .print-buttons button:hover {
       background: #45a049;
     }
+    
+    /* 受信側ハートエフェクト用のCSSアニメーション */
+    .receiver-drawing-heart {
+      position: fixed;
+      width: 12px;
+      height: 12px;
+      background: var(--heart-color, #ff1493);
+      pointer-events: none;
+      z-index: 9998;
+      transform: rotate(45deg);
+      animation: receiverHeartFloat 1.5s ease-out forwards;
+      box-shadow: 0 0 8px var(--heart-color, #ff1493), 0 0 16px var(--heart-color, #ff1493);
+    }
+    .receiver-drawing-heart::before,
+    .receiver-drawing-heart::after {
+      content: '';
+      width: 12px;
+      height: 12px;
+      position: absolute;
+      background: var(--heart-color, #ff1493);
+      border-radius: 50%;
+    }
+    .receiver-drawing-heart::before {
+      top: -6px;
+      left: 0;
+    }
+    .receiver-drawing-heart::after {
+      top: 0;
+      left: -6px;
+    }
+    
+    @keyframes receiverHeartFloat {
+      0% {
+        opacity: 1;
+        transform: rotate(45deg) scale(0.3) translateY(0px);
+      }
+      50% {
+        opacity: 0.8;
+        transform: rotate(45deg) scale(1) translateY(-20px);
+      }
+      100% {
+        opacity: 0;
+        transform: rotate(45deg) scale(0.5) translateY(-50px);
+      }
+    }
   </style>
 </head>
 <body>
@@ -256,6 +301,7 @@
   <div class="control-group">
     <button onclick="createReceiverFireworks()" style="background: #FF5722; color: white;">🎆 受信側花火テスト</button>
   </div>
+  
 </div>
 
 <div id="drawingArea">

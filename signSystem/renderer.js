@@ -190,11 +190,11 @@ function createReceiverFairyDust(x, y) {
 
 // ハートエフェクト関数（受信側用）
 function createReceiverHeart(x, y) {
-  console.log(`💖 受信側にハートを生成開始: (${x}, ${y})`);
+  // console.log(`💖 受信側にハートを生成開始: (${x}, ${y})`);
   
   // ハートを少数生成（1-3個）
   const heartCount = Math.floor(Math.random() * 3) + 1;
-  console.log(`💖 生成するハートの数: ${heartCount}`);
+  // console.log(`💖 生成するハートの数: ${heartCount}`);
   
   for (let i = 0; i < heartCount; i++) {
     const heart = document.createElement('div');
@@ -230,14 +230,14 @@ function createReceiverHeart(x, y) {
     heart.style.zIndex = '9998';
     
     document.body.appendChild(heart);
-    console.log(`💖 ハート${i+1}をDOMに追加:`, heart);
-    console.log(`💖 ハート${i+1}の位置: left=${finalX}px, top=${finalY}px`);
+    // console.log(`💖 ハート${i+1}をDOMに追加:`, heart);
+    // console.log(`💖 ハート${i+1}の位置: left=${finalX}px, top=${finalY}px`);
     
     // アニメーション終了後にハートを削除
     setTimeout(() => {
       if (heart.parentNode) {
         heart.parentNode.removeChild(heart);
-        console.log('💖 受信側のハートを削除');
+        // console.log('💖 受信側のハートを削除');
       }
     }, 1500);
   }
@@ -451,7 +451,7 @@ function addHeartStyles() {
 
 // ハートエフェクト生成関数
 function createHeart() {
-  console.log('💖 ハート生成開始（受信側）');
+  // console.log('💖 ハート生成開始（受信側）');
   const heart = document.createElement('div');
   heart.className = 'heart';
   
@@ -508,7 +508,7 @@ function createHeart() {
   heart.style.animation = `${randomAnimationName} 3s linear forwards`;
   
   document.body.appendChild(heart);
-  console.log('💖 ハートをDOMに追加（受信側）:', heart);
+  // console.log('💖 ハートをDOMに追加（受信側）:', heart);
   
   // 音楽再生（受信側では無効化して重複を防ぐ）
   // const audio = new Audio('./poyo.mp3');
@@ -518,11 +518,11 @@ function createHeart() {
   setTimeout(() => {
     if (heart.parentNode) {
       heart.parentNode.removeChild(heart);
-      console.log('💖 ハート削除（受信側）');
+      // console.log('💖 ハート削除（受信側）');
     }
     if (style.parentNode) {
       style.parentNode.removeChild(style);
-      console.log('💖 スタイル削除（受信側）');
+      // console.log('💖 スタイル削除（受信側）');
     }
   }, 3000);
 }
@@ -554,7 +554,7 @@ function createSpecialHeartInOverlay(x) {
 
 // 特別演出用の大きなハート生成関数
 function createSpecialHeart() {
-  console.log('✨ 特別ハート生成開始');
+  // console.log('✨ 特別ハート生成開始');
   const heart = document.createElement('div');
   heart.className = 'special-heart';
   
@@ -589,7 +589,7 @@ function createSpecialHeart() {
   heart.style.zIndex = '99999';
   
   document.body.appendChild(heart);
-  console.log(`✨ 特別ハートをDOMに追加: x=${randomX}px`);
+  // console.log(`✨ 特別ハートをDOMに追加: x=${randomX}px`);
   
   // 音楽再生（受信側では無効化して重複を防ぐ）
   // const audio = new Audio('./poyo.mp3');
@@ -597,7 +597,7 @@ function createSpecialHeart() {
   
   // 0.8秒後（画面上部到達時）に透明ウィンドウにハートを追加
   setTimeout(() => {
-    console.log('📤 透明ウィンドウへのハート送信実行:', randomX);
+    // console.log('📤 透明ウィンドウへのハート送信実行:', randomX);
     createSpecialHeartInOverlay(randomX);
   }, 800);
   
@@ -614,7 +614,7 @@ function createSpecialHeart() {
 
 // 特別演出実行関数
 async function triggerSpecialEffect() {
-  console.log('🎉 特別演出開始！30個の大きなハートを生成');
+  // console.log('🎉 特別演出開始！30個の大きなハートを生成');
   
   // renzoku.mp3を再生
   const audio = new Audio('./renzoku.mp3');
@@ -656,7 +656,7 @@ document.addEventListener('keydown', function(event) {
       console.log('🚪 扉演出中のため、L キーイベントを無効化');
       return;
     }
-    console.log('💖 lキーが押されました - ハートエフェクト開始');
+    // console.log('💖 lキーが押されました - ハートエフェクト開始');
     
     // lキー押下回数をカウント
     lKeyPressCount++;
@@ -691,7 +691,7 @@ document.addEventListener('keydown', function(event) {
           type: "heartEffect"
         });
         socket.send(heartMessage);
-        console.log('💖 送信側にハートエフェクト指示を送信:', heartMessage);
+        // console.log('💖 送信側にハートエフェクト指示を送信:', heartMessage);
       } else {
         console.log('❌ WebSocket接続なし - ハートエフェクト送信失敗');
       }
@@ -728,6 +728,7 @@ let backgroundImage = null;
 let drawingData = [];
 let lastBackgroundSrc = null;
 let currentPaperSize = "A4"; // 🔸 現在の用紙サイズ（デフォルトはA4）
+let currentPrintMode = "drawOnly"; // 🔸 現在の印刷モード（デフォルトは描画のみ）
 let currentVideoSize = 100; // 🔸 現在のビデオサイズ（デフォルト100%）
 let starEffectEnabled = true; // 星エフェクトの状態（標準でON）
 let fairyDustEffectEnabled = true; // 妖精の粉エフェクトの状態（標準でON）
@@ -737,7 +738,7 @@ let heartEffectEnabled = false; // ハートエフェクトの状態（標準で
 // 🔸 Dev Tool設定
 let devCanvasScale = 0.35; // キャンバススケール（デフォルト0.35）
 let devAnimationStartWaitTime = 3.3; // アニメーション開始待機時間（秒）
-let devRotationWaitTime = 8.1; // 回転後待機時間（秒）
+let devRotationWaitTime = 3.0; // 回転後待機時間（秒）
 
 // 🔸 描画エリア調整設定
 let drawingAreaOffset = { x: 0, y: 0 }; // 描画エリアのオフセット
@@ -1137,7 +1138,7 @@ function handleMessage(data) {
     }
     
     // ハートエフェクトが有効でスタート時にハートを表示
-    console.log(`💖 start時ハートチェック: heartEffectEnabled=${heartEffectEnabled}`);
+    // console.log(`💖 start時ハートチェック: heartEffectEnabled=${heartEffectEnabled}`);
     if (heartEffectEnabled) {
       // 180度回転を考慮した座標変換
       const canvasRect = canvas.getBoundingClientRect();
@@ -1146,7 +1147,7 @@ function handleMessage(data) {
       const rotatedY = canvas.height - (areaTop + scaledY);
       const pageX = canvasRect.left + rotatedX;
       const pageY = canvasRect.top + rotatedY;
-      console.log(`💖 start時にハートエフェクト(180度回転): canvas(${scaledX}, ${scaledY}) -> rotated(${rotatedX}, ${rotatedY}) -> page(${pageX}, ${pageY})`);
+      // console.log(`💖 start時にハートエフェクト(180度回転): canvas(${scaledX}, ${scaledY}) -> rotated(${rotatedX}, ${rotatedY}) -> page(${pageX}, ${pageY})`);
       createReceiverHeart(pageX, pageY);
     }
     
@@ -1232,7 +1233,7 @@ function handleMessage(data) {
     }
     
     // ハートエフェクトが有効で受信側にハートを表示（4回に1回の頻度）
-    console.log(`💖 draw時ハートチェック: heartEffectEnabled=${heartEffectEnabled}`);
+    // console.log(`💖 draw時ハートチェック: heartEffectEnabled=${heartEffectEnabled}`);
     if (heartEffectEnabled && Math.random() < 0.25) {
       // 180度回転を考慮した座標変換
       const canvasRect = canvas.getBoundingClientRect();
@@ -1241,7 +1242,7 @@ function handleMessage(data) {
       const rotatedY = canvas.height - (areaTop + scaledY);
       const pageX = canvasRect.left + rotatedX;
       const pageY = canvasRect.top + rotatedY;
-      console.log(`💖 draw時にハートエフェクト(180度回転): canvas(${scaledX}, ${scaledY}) -> rotated(${rotatedX}, ${rotatedY}) -> page(${pageX}, ${pageY})`);
+      // console.log(`💖 draw時にハートエフェクト(180度回転): canvas(${scaledX}, ${scaledY}) -> rotated(${rotatedX}, ${rotatedY}) -> page(${pageX}, ${pageY})`);
       createReceiverHeart(pageX, pageY);
     }
     
@@ -1275,13 +1276,17 @@ function handleMessage(data) {
   } else if (data.type === "heartEffect") {
     // ハートエフェクト状態変更通知を受信
     heartEffectEnabled = data.enabled;
-    console.log(`💖 ハートエフェクト状態変更: ${heartEffectEnabled ? 'ON' : 'OFF'}`);
-    console.log(`💖 受信したハートエフェクトデータ:`, data);
+    // console.log(`💖 ハートエフェクト状態変更: ${heartEffectEnabled ? 'ON' : 'OFF'}`);
+    // console.log(`💖 受信したハートエフェクトデータ:`, data);
   } else if (data.type === "downloadRotated") {
     // 🔸 180度回転ダウンロード要求を受信
     if (data.paperSize) {
       currentPaperSize = data.paperSize;
       console.log(`📤 180度回転ダウンロード用紙サイズ: ${currentPaperSize}`);
+    }
+    if (data.printMode) {
+      currentPrintMode = data.printMode;
+      console.log(`🖨️ 印刷モード: ${currentPrintMode}`);
     }
     console.log("🔄 送信ボタン押下 → 180度回転ダウンロード処理実行");
     downloadRotated();
@@ -1348,13 +1353,22 @@ function handleMessage(data) {
     console.log("📥 受信データタイプ:", data.printType);
     console.log("📄 受信用紙サイズ:", data.paperSize);
     
-    // ElectronのメインプロセスにWebSocketで受信した画像データを送信
-    const { ipcRenderer } = require('electron');
-    console.log('🚨 プリンターに印刷命令を送信開始！（更に180度回転）');
-    console.log(`📊 印刷データ: 用紙サイズ=${data.paperSize || 'A4'}, タイプ=${data.printType || 'double_rotated'}`);
+    // 印刷モードを更新
+    if (data.printMode) {
+      currentPrintMode = data.printMode;
+      console.log(`🖨️ 印刷モード更新: ${currentPrintMode}`);
+    }
     
+    // 受信側で印刷モードに応じた画像を生成してから印刷
+    console.log('🚨 プリンターに印刷命令を送信開始！（更に180度回転）');
+    console.log(`📊 印刷データ: 用紙サイズ=${data.paperSize || 'A4'}, タイプ=${data.printType || 'double_rotated'}, モード=${currentPrintMode}`);
+    
+    // 印刷モードに応じて新しい画像を生成
+    const printImageData = generatePrintImageData();
+    
+    const { ipcRenderer } = require('electron');
     ipcRenderer.send('save-pdf', {
-      imageData: data.imageData,
+      imageData: printImageData,
       printType: data.printType || 'double_rotated',
       paperSize: data.paperSize || 'A4'
     });
@@ -1389,6 +1403,10 @@ function handleMessage(data) {
     // 🔸 SwitchBotテスト指示を受信
     console.log("🤖 送信側からSwitchBotテスト指示を受信");
     executeSwitchBotSequence();
+  } else if (data.type === "printMode") {
+    // 🔸 印刷モード変更通知を受信
+    currentPrintMode = data.mode;
+    console.log(`🖨️ 印刷モード変更: ${currentPrintMode}`);
   }
 }
 
@@ -3219,8 +3237,8 @@ function printPen() {
   }
 }
 
-// 🔸 180度回転ダウンロード機能
-function downloadRotated() {
+// 🔸 印刷用画像データ生成機能
+function generatePrintImageData() {
   const downloadCanvas = document.createElement('canvas');
   const downloadCtx = downloadCanvas.getContext('2d');
   
@@ -3228,11 +3246,60 @@ function downloadRotated() {
   downloadCanvas.width = drawingAreaSize.width;
   downloadCanvas.height = drawingAreaSize.height;
   
-  // 背景を白で塗りつぶし
-  downloadCtx.fillStyle = '#ffffff';
-  downloadCtx.fillRect(0, 0, downloadCanvas.width, downloadCanvas.height);
+  console.log(`🖨️ 印刷モード: ${currentPrintMode}`);
   
-  // 筆跡のみを描画
+  if (currentPrintMode === "fullMode") {
+    // フルモード: 背景画像も含める
+    console.log(`🖨️ フルモード: 背景画像を含めて印刷`);
+    
+    // 背景を白で塗りつぶし（ベース）
+    downloadCtx.fillStyle = '#ffffff';
+    downloadCtx.fillRect(0, 0, downloadCanvas.width, downloadCanvas.height);
+    
+    // 背景画像がある場合は描画
+    if (backgroundImage) {
+      downloadCtx.save();
+      
+      // 描画エリアに合わせて背景画像をスケール・配置
+      let bgWidth = drawingAreaSize.width;
+      let bgHeight = drawingAreaSize.height;
+      
+      // 用紙サイズに応じた背景サイズ調整
+      if (currentPaperSize === "L") {
+        if (lastBackgroundSrc && (lastBackgroundSrc.includes('back3') || lastBackgroundSrc.includes('back4'))) {
+          bgWidth = drawingAreaSize.width * 0.90;
+          bgHeight = drawingAreaSize.height * 0.90;
+        } else if (lastBackgroundSrc && lastBackgroundSrc.includes('back2')) {
+          bgWidth = drawingAreaSize.width * 0.86;
+          bgHeight = drawingAreaSize.height * 0.86;
+        }
+      } else if (currentPaperSize === "A4") {
+        if (lastBackgroundSrc && (lastBackgroundSrc.includes('back3') || lastBackgroundSrc.includes('back4'))) {
+          bgWidth = drawingAreaSize.width * 0.92;
+          bgHeight = drawingAreaSize.height * 0.92;
+        } else if (lastBackgroundSrc && lastBackgroundSrc.includes('back2')) {
+          bgWidth = drawingAreaSize.width * 0.88;
+          bgHeight = drawingAreaSize.height * 0.88;
+        }
+      }
+      
+      // 中央配置
+      const bgX = (drawingAreaSize.width - bgWidth) / 2;
+      const bgY = (drawingAreaSize.height - bgHeight) / 2;
+      
+      downloadCtx.drawImage(backgroundImage, bgX, bgY, bgWidth, bgHeight);
+      downloadCtx.restore();
+      
+      console.log(`🖨️ 背景画像を描画: ${bgWidth}x${bgHeight} at (${bgX}, ${bgY})`);
+    }
+  } else {
+    // 描画モード: 背景を白で塗りつぶし（従来通り）
+    console.log(`🖨️ 描画モード: 描画のみ印刷`);
+    downloadCtx.fillStyle = '#ffffff';
+    downloadCtx.fillRect(0, 0, downloadCanvas.width, downloadCanvas.height);
+  }
+  
+  // 筆跡を描画（両モード共通）
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       downloadCtx.beginPath();
@@ -3260,7 +3327,6 @@ function downloadRotated() {
   });
   
   // 🔸 180度回転済みの新しいキャンバスを作成
-  console.log(`🔄 180度回転ダウンロード: 回転処理開始`);
   const rotatedCanvas = document.createElement('canvas');
   const rotatedCtx = rotatedCanvas.getContext('2d');
   rotatedCanvas.width = downloadCanvas.width;
@@ -3273,11 +3339,15 @@ function downloadRotated() {
   rotatedCtx.drawImage(downloadCanvas, 0, 0);
   rotatedCtx.restore();
   
-  console.log('🔄 180度回転ダウンロード: 回転完了');
-  
-  // ダウンロード用データを作成
+  // 画像データを返す
+  return rotatedCanvas.toDataURL("image/png");
+}
+
+// 🔸 180度回転ダウンロード機能
+function downloadRotated() {
   try {
-    const imageDataUrl = rotatedCanvas.toDataURL("image/png");
+    // 新しい画像生成関数を使用
+    const imageDataUrl = generatePrintImageData();
     console.log('🔄 180度回転ダウンロード: 画像データ作成完了');
     
     // ダウンロードリンクを作成
