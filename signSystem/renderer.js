@@ -3327,6 +3327,7 @@ function generatePrintImageData() {
   });
   
   // 🔸 180度回転済みの新しいキャンバスを作成
+  console.log('🔄 印刷用画像を180度回転処理開始');
   const rotatedCanvas = document.createElement('canvas');
   const rotatedCtx = rotatedCanvas.getContext('2d');
   rotatedCanvas.width = downloadCanvas.width;
@@ -3338,6 +3339,8 @@ function generatePrintImageData() {
   rotatedCtx.rotate(Math.PI);
   rotatedCtx.drawImage(downloadCanvas, 0, 0);
   rotatedCtx.restore();
+  
+  console.log('🔄 印刷用画像の180度回転処理完了');
   
   // 画像データを返す
   return rotatedCanvas.toDataURL("image/png");
