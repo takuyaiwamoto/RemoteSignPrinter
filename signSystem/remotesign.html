@@ -4,32 +4,198 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://realtime-sign-server-1.onrender.com ws://localhost:* wss://localhost:*; img-src 'self' data: blob:; media-src 'self';">
   <title>送信側1.2</title>
   <style>
-    canvas {
+    /* クラシックスタイル（デフォルト） */
+    body.classic canvas {
       border: 1px solid black;
       display: block;
       margin-bottom: 10px;
     }
-    button {
+    body.classic button {
       margin-right: 5px;
       margin-bottom: 5px;
     }
-    .button-group {
+    body.classic .button-group {
       margin-bottom: 10px;
     }
-    .button-group label {
+    body.classic .button-group label {
       font-weight: bold;
       margin-right: 10px;
     }
-    #countdown {
+    
+    /* モダンスタイル */
+    body.modern {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    
+    body.modern .main-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+      backdrop-filter: blur(10px);
+    }
+    
+    body.modern canvas {
+      border: none;
+      border-radius: 15px;
+      display: block;
+      margin: 0 auto 20px auto;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      background: white;
+    }
+    
+    body.modern button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 10px 20px;
+      margin: 5px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    body.modern button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+    }
+    
+    body.modern button:active {
+      transform: translateY(0);
+    }
+    
+    body.modern .button-group {
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 15px;
+      padding: 15px;
+      margin-bottom: 12px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    body.modern .button-group label {
+      font-weight: 700;
+      margin-right: 15px;
+      color: #2d3748;
+      font-size: 16px;
+    }
+    
+    body.modern h1 {
+      text-align: center;
+      color: #2d3748;
+      font-size: 2.5rem;
+      margin-bottom: 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 800;
+    }
+    body.modern #countdown {
+      font-size: 32px;
+      background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-top: 20px;
+      text-align: center;
+      font-weight: 800;
+    }
+    
+    body.classic #countdown {
       font-size: 24px;
       color: red;
       margin-top: 10px;
     }
-    .selected {
+    
+    body.modern .selected {
+      background: linear-gradient(135deg, #48bb78, #38a169) !important;
+      color: white;
+      box-shadow: 0 6px 20px rgba(72, 187, 120, 0.5) !important;
+    }
+    
+    body.classic .selected {
       background-color: #4CAF50;
       color: white;
     }
-    .color-btn {
+    
+    /* テーマ切り替えボタン */
+    #themeToggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 50px;
+      padding: 12px 20px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      transition: all 0.3s ease;
+    }
+    
+    #themeToggle:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+    
+    /* モダンな開発ツールパネル */
+    body.modern #devToolsPanel {
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 20px;
+      padding: 25px;
+      margin-top: 20px;
+      border: 2px solid rgba(102, 126, 234, 0.2);
+      backdrop-filter: blur(10px);
+    }
+    
+    body.modern #devToolsPanel h3 {
+      color: #2d3748;
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    body.modern input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      margin-right: 10px;
+      accent-color: #667eea;
+    }
+    body.modern .color-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: 3px solid rgba(255, 255, 255, 0.8);
+      margin: 0 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    body.modern .color-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    }
+    
+    body.modern .color-btn.selected {
+      border: 4px solid #2d3748;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+      transform: scale(1.1);
+    }
+    
+    body.classic .color-btn {
       width: 40px;
       height: 40px;
       border-radius: 50%;
@@ -37,7 +203,8 @@
       margin: 0 5px;
       cursor: pointer;
     }
-    .color-btn.selected {
+    
+    body.classic .color-btn.selected {
       border: 3px solid #333;
       box-shadow: 0 0 5px rgba(0,0,0,0.5);
     }
@@ -167,6 +334,51 @@
       left: -12.5px;
     }
     
+    /* 描画エフェクト用の小さなハート */
+    .drawing-heart {
+      position: fixed;
+      width: 12px;
+      height: 12px;
+      background: var(--heart-color, #ff1493);
+      pointer-events: none;
+      z-index: 10000;
+      transform: rotate(45deg);
+      animation: heartFloat 1.5s ease-out forwards;
+      box-shadow: 0 0 8px var(--heart-color, #ff1493), 0 0 16px var(--heart-color, #ff1493);
+    }
+    .drawing-heart::before,
+    .drawing-heart::after {
+      content: '';
+      width: 12px;
+      height: 12px;
+      position: absolute;
+      background: var(--heart-color, #ff1493);
+      border-radius: 50%;
+    }
+    .drawing-heart::before {
+      top: -6px;
+      left: 0;
+    }
+    .drawing-heart::after {
+      top: 0;
+      left: -6px;
+    }
+    
+    @keyframes heartFloat {
+      0% {
+        opacity: 1;
+        transform: rotate(45deg) scale(0.3) translateY(0px);
+      }
+      50% {
+        opacity: 0.8;
+        transform: rotate(45deg) scale(1) translateY(-20px);
+      }
+      100% {
+        opacity: 0;
+        transform: rotate(45deg) scale(0.5) translateY(-50px);
+      }
+    }
+    
     /* 特別演出用の大きなハート */
     .special-heart {
       position: fixed;
@@ -198,7 +410,10 @@
     }
   </style>
 </head>
-<body>
+<body class="modern">
+<button id="themeToggle" onclick="toggleTheme()">📝 クラシック</button>
+
+<div class="main-container">
 <canvas id="drawCanvas" width="859" height="607"></canvas>
 
 <div class="button-group">
@@ -289,6 +504,10 @@
     <label for="starEffect">星</label>
     <input type="checkbox" id="fairyDustEffect" onchange="toggleFairyDustEffect()" checked>
     <label for="fairyDustEffect">妖精の粉</label>
+    <input type="checkbox" id="heartEffect" onchange="toggleHeartEffect()">
+    <label for="heartEffect">💖 ハート</label>
+    <input type="checkbox" id="penSoundEffect" onchange="togglePenSound()">
+    <label for="penSoundEffect">🎵 ペン音</label>
   </div>
   
   <div class="button-group">
@@ -304,6 +523,18 @@
     <button id="a4Btn" class="selected" onclick="setPaperSize('A4')">A4</button>
     <button id="lBtn" onclick="setPaperSize('L')">L判</button>
     <button id="posterBtn" onclick="setPaperSize('poster')">ポストカード</button>
+  </div>
+  
+  <hr style="margin: 15px 0;">
+  
+  <div class="button-group">
+    <label>SwitchBot:</label>
+    <input type="checkbox" id="switchBotEffect">
+    <label for="switchBotEffect">🤖 バブル</label>
+  </div>
+  
+  <div class="button-group">
+    <button onclick="testSwitchBot()" style="background-color: #FF6B35; color: white;">🤖 Botテスト</button>
   </div>
 </div>
 
@@ -325,10 +556,21 @@ let currentPenColor = 'black'; // 現在のペンの色
 let neonColorIndex = 0; // ネオン用の色インデックス
 let drawDistance = 0; // 描画距離の追跡（ネオン用）
 let lastPosition = null; // 前回の位置を記録
+let secondLastPosition = null; // さらに前の位置（曲線描画用）
+let currentPath = []; // 現在のストロークのポイント配列
+let smoothingFactor = 0.3; // 曲線の滑らかさ（0-1の範囲）
 let starEffectEnabled = true; // 星エフェクトの有効/無効（標準でON）
 let fairyDustEffectEnabled = true; // 妖精の粉エフェクトの有効/無効（標準でON）
+let heartEffectEnabled = false; // ハートエフェクトの有効/無効（標準でOFF）
+let penSoundEnabled = false; // ペン音の有効/無効（標準でOFF）
 let specialBackgroundState = 'ready'; // 'ready', 'door_shown', 'door_opened'
 let specialBackgroundToggle = false; // 特殊背景の画像を切り替えるフラグ
+
+// 🎵 ペン音制御
+let drawingAudio = null; // 描画中の音楽オブジェクト
+let isDrawingActive = false; // 描画中フラグ
+let drawingInactiveTimer = null; // 描画停止タイマー
+const DRAWING_PAUSE_DELAY = 500; // 描画停止から一時停止までの遅延（ミリ秒）
 
 // 背景別キャンバスサイズ設定（1.02倍サイズ = 0.6*1.7）
 const backgroundSizes = {
@@ -843,6 +1085,11 @@ function startCountdown() {
 }
 
 function clearCanvas() {
+  // 🎵 描画クリア時にペン音が有効なら音楽を停止して最初に戻す
+  if (penSoundEnabled) {
+    stopDrawingMusic();
+  }
+  
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (backgroundImage) {
     ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
@@ -999,6 +1246,144 @@ function toggleFairyDustEffect() {
   }
 }
 
+// ハートエフェクトのON/OFF切り替え
+function toggleHeartEffect() {
+  heartEffectEnabled = document.getElementById('heartEffect').checked;
+  console.log(`💖 ハートエフェクト: ${heartEffectEnabled ? 'ON' : 'OFF'}`);
+  
+  // 受信側にハートエフェクト状態を送信
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ 
+      type: "heartEffect", 
+      enabled: heartEffectEnabled 
+    }));
+  }
+}
+
+// 🎵 ペン音制御関数
+function togglePenSound() {
+  penSoundEnabled = document.getElementById('penSoundEffect').checked;
+  console.log(`🎵 ペン音設定: ${penSoundEnabled ? 'ON' : 'OFF'}`);
+  
+  // ペン音がOFFになった場合は音楽を停止
+  if (!penSoundEnabled) {
+    stopDrawingMusic();
+  }
+}
+
+function initDrawingAudio() {
+  if (!drawingAudio) {
+    drawingAudio = new Audio('./draw.mp3');
+    drawingAudio.loop = true; // ループ再生
+    drawingAudio.volume = 0.7; // ボリュームを70%に設定
+    console.log('🎵 描画音楽(draw.mp3)を初期化');
+  }
+}
+
+function startDrawingMusic() {
+  if (!penSoundEnabled) return; // ペン音が無効の場合は何もしない
+  
+  initDrawingAudio();
+  
+  if (drawingAudio.paused) {
+    drawingAudio.play().then(() => {
+      console.log('🎵 描画音楽を開始/再開');
+    }).catch(e => {
+      console.log('🎵 描画音楽再生エラー:', e);
+    });
+  }
+  
+  isDrawingActive = true;
+  
+  // 既存のタイマーをクリア
+  if (drawingInactiveTimer) {
+    clearTimeout(drawingInactiveTimer);
+    drawingInactiveTimer = null;
+  }
+}
+
+function pauseDrawingMusic() {
+  if (drawingAudio && !drawingAudio.paused) {
+    drawingAudio.pause();
+    console.log('🎵 描画音楽を一時停止');
+  }
+  isDrawingActive = false;
+}
+
+function stopDrawingMusic() {
+  if (drawingAudio) {
+    drawingAudio.pause();
+    drawingAudio.currentTime = 0; // 最初に戻す
+    console.log('🎵 描画音楽を停止して最初に戻す');
+  }
+  isDrawingActive = false;
+  
+  // タイマーをクリア
+  if (drawingInactiveTimer) {
+    clearTimeout(drawingInactiveTimer);
+    drawingInactiveTimer = null;
+  }
+}
+
+function handleDrawingActivity() {
+  if (!penSoundEnabled) return; // ペン音が無効の場合は何もしない
+  
+  startDrawingMusic();
+  
+  // 既存のタイマーをクリア
+  if (drawingInactiveTimer) {
+    clearTimeout(drawingInactiveTimer);
+  }
+  
+  // 新しいタイマーを設定（描画停止を検知）
+  drawingInactiveTimer = setTimeout(() => {
+    pauseDrawingMusic();
+    console.log('🎵 描画が停止したため音楽を一時停止');
+  }, DRAWING_PAUSE_DELAY);
+}
+
+// 描画用ハートを生成する関数
+function createDrawingHeart(x, y) {
+  // ハートを少数生成（1-3個）
+  const heartCount = Math.floor(Math.random() * 3) + 1;
+  
+  for (let i = 0; i < heartCount; i++) {
+    const heart = document.createElement('div');
+    heart.className = 'drawing-heart';
+    
+    // ペン先により近い範囲にランダム配置（18px範囲）
+    const offsetX = (Math.random() - 0.5) * 18;
+    const offsetY = (Math.random() - 0.5) * 18;
+    
+    heart.style.left = (x + offsetX) + 'px';
+    heart.style.top = (y + offsetY) + 'px';
+    
+    // ランダムなピンク系の色
+    const colors = ['#ff1493', '#ff69b4', '#ff6347', '#ff1493', '#db7093', '#c71585'];
+    const heartColor = colors[Math.floor(Math.random() * colors.length)];
+    
+    heart.style.background = heartColor;
+    heart.style.boxShadow = `0 0 8px ${heartColor}, 0 0 16px ${heartColor}`;
+    
+    // ランダムな飛び散り方向とアニメーション遅延
+    const randomDirection = (Math.random() - 0.5) * 60; // -30度から30度
+    heart.style.setProperty('--float-direction', randomDirection + 'deg');
+    heart.style.animationDelay = (Math.random() * 0.3) + 's';
+    
+    // 疑似要素の色も更新
+    heart.style.setProperty('--heart-color', heartColor);
+    
+    document.body.appendChild(heart);
+    
+    // アニメーション終了後にハートを削除
+    setTimeout(() => {
+      if (heart.parentNode) {
+        heart.parentNode.removeChild(heart);
+      }
+    }, 1500);
+  }
+}
+
 // 妖精の粉を生成する関数
 function createFairyDust(x, y) {
   // 妖精の粉を極少数生成（1-2個）
@@ -1008,9 +1393,9 @@ function createFairyDust(x, y) {
     const dust = document.createElement('div');
     dust.className = 'fairy-dust';
     
-    // 広範囲にランダム配置（80px範囲）
-    const offsetX = (Math.random() - 0.5) * 80;
-    const offsetY = (Math.random() - 0.5) * 80;
+    // ペン先により近い範囲にランダム配置（20px範囲）
+    const offsetX = (Math.random() - 0.5) * 20;
+    const offsetY = (Math.random() - 0.5) * 20;
     
     dust.style.left = (x + offsetX) + 'px';
     dust.style.top = (y + offsetY) + 'px';
@@ -1043,9 +1428,9 @@ function createStar(x, y) {
     const star = document.createElement('div');
     star.className = 'star';
     
-    // より広範囲にランダム配置（50px範囲）
-    const offsetX = (Math.random() - 0.5) * 50;
-    const offsetY = (Math.random() - 0.5) * 50;
+    // ペン先により近い範囲にランダム配置（15px範囲）
+    const offsetX = (Math.random() - 0.5) * 15;
+    const offsetY = (Math.random() - 0.5) * 15;
     
     star.style.left = (x + offsetX) + 'px';
     star.style.top = (y + offsetY) + 'px';
@@ -1339,10 +1724,107 @@ function createConfetti() {
   }
 }
 
+// 🎨 滑らかな描画関数（二次ベジェ曲線を使用）
+function drawSmoothLine(x, y) {
+  if (!lastPosition) {
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    lastPosition = { x, y };
+    return;
+  }
+  
+  // 前の位置からの距離を計算
+  const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
+  
+  // 距離が大きい場合はより細かく補間
+  if (distance > 2) {
+    const steps = Math.max(Math.ceil(distance / 1.5), 3); // より細かい分割
+    
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      // より滑らかなイージング関数を使用
+      const easedT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      
+      const interpX = lastPosition.x + (x - lastPosition.x) * easedT;
+      const interpY = lastPosition.y + (y - lastPosition.y) * easedT;
+      
+      // ベジェ曲線を使用した滑らかな描画
+      if (secondLastPosition) {
+        const cp1x = lastPosition.x + (secondLastPosition.x - lastPosition.x) * 0.1;
+        const cp1y = lastPosition.y + (secondLastPosition.y - lastPosition.y) * 0.1;
+        const cp2x = interpX - (x - lastPosition.x) * 0.1;
+        const cp2y = interpY - (y - lastPosition.y) * 0.1;
+        
+        ctx.beginPath();
+        ctx.moveTo(lastPosition.x, lastPosition.y);
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, interpX, interpY);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+      } else {
+        // 2点目の場合
+        ctx.beginPath();
+        ctx.moveTo(lastPosition.x, lastPosition.y);
+        ctx.lineTo(interpX, interpY);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+      }
+      
+      // 次の補間のために位置を更新
+      secondLastPosition = lastPosition;
+      lastPosition = { x: interpX, y: interpY };
+    }
+  } else {
+    // 距離が小さい場合は単純な線
+    if (secondLastPosition) {
+      const cp1x = lastPosition.x + (secondLastPosition.x - lastPosition.x) * 0.1;
+      const cp1y = lastPosition.y + (secondLastPosition.y - lastPosition.y) * 0.1;
+      const cp2x = x - (x - lastPosition.x) * 0.1;
+      const cp2y = y - (y - lastPosition.y) * 0.1;
+      
+      ctx.beginPath();
+      ctx.moveTo(lastPosition.x, lastPosition.y);
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(lastPosition.x, lastPosition.y);
+      ctx.lineTo(x, y);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    }
+    
+    secondLastPosition = lastPosition;
+    lastPosition = { x, y };
+  }
+}
+
+// 🎨 高品質線の補間関数
+function interpolatePoints(startX, startY, endX, endY, steps) {
+  const points = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    // イージング関数を適用してより自然な動き
+    const easedT = t * t * (3 - 2 * t); // smoothstep関数
+    points.push({
+      x: startX + (endX - startX) * easedT,
+      y: startY + (endY - startY) * easedT
+    });
+  }
+  return points;
+}
+
 canvas.addEventListener("mousedown", (e) => {
   drawing = true;
   const x = e.offsetX;
   const y = e.offsetY;
+  
+  // 🎵 描画開始時に音楽制御
+  handleDrawingActivity();
   
   // ネオンモードの初期設定
   if (currentPenColor === 'neon') {
@@ -1355,12 +1837,16 @@ canvas.addEventListener("mousedown", (e) => {
   ctx.beginPath();
   ctx.moveTo(x, y);
   
-  // 線の端と結合部を滑らかに
+  // 線の品質を向上させる設定
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   
   drawDistance = 0; // 新しいストロークの開始時に距離をリセット
   lastPosition = { x, y }; // 初期位置を記録
+  secondLastPosition = null; // 滑らか描画用の位置をリセット
+  currentPath = [{ x, y }]; // 新しいパスを開始
   
   // 描画コマンドを記録
   const startCmd = {
@@ -1405,6 +1891,9 @@ canvas.addEventListener("mousemove", (e) => {
   const x = e.offsetX;
   const y = e.offsetY;
   
+  // 🎵 描画継続時に音楽制御
+  handleDrawingActivity();
+  
   let actualColor;
   
   // 補間処理：前の位置から現在の位置までの距離を計算
@@ -1412,8 +1901,8 @@ canvas.addEventListener("mousemove", (e) => {
     const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
     
     // 距離が大きい場合は中間点を補間
-    if (distance > 5) {
-      const steps = Math.ceil(distance / 3);
+    if (distance > 3) {
+      const steps = Math.ceil(distance / 1.5);
       for (let i = 1; i <= steps; i++) {
         const t = i / steps;
         const interpX = lastPosition.x + (x - lastPosition.x) * t;
@@ -1435,8 +1924,7 @@ canvas.addEventListener("mousemove", (e) => {
           ctx.shadowColor = neonColor;
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
-          ctx.lineTo(interpX, interpY);
-          ctx.stroke();
+          drawSmoothLine(interpX, interpY);
         } else {
           actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : (currentPenColor === 'green' ? '#008000' : (currentPenColor === 'pink' ? '#ff69b4' : currentPenColor)));
           ctx.lineWidth = currentPenThickness;
@@ -1444,8 +1932,7 @@ canvas.addEventListener("mousemove", (e) => {
           ctx.shadowBlur = 0;
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
-          ctx.lineTo(interpX, interpY);
-          ctx.stroke();
+          drawSmoothLine(interpX, interpY);
         }
       }
     } else {
@@ -1465,8 +1952,7 @@ canvas.addEventListener("mousemove", (e) => {
         ctx.shadowColor = neonColor;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.lineTo(x, y);
-        ctx.stroke();
+        drawSmoothLine(x, y);
       } else {
         actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : (currentPenColor === 'green' ? '#008000' : (currentPenColor === 'pink' ? '#ff69b4' : currentPenColor)));
         ctx.lineWidth = currentPenThickness;
@@ -1474,8 +1960,7 @@ canvas.addEventListener("mousemove", (e) => {
         ctx.shadowBlur = 0;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.lineTo(x, y);
-        ctx.stroke();
+        drawSmoothLine(x, y);
       }
     }
   }
@@ -1507,12 +1992,20 @@ canvas.addEventListener("mousemove", (e) => {
   
   // 星エフェクトが有効な場合は星を生成（2回に1回の頻度）
   if (starEffectEnabled && Math.random() < 0.5) {
-    createStar(x, y);
+    const rect = canvas.getBoundingClientRect();
+    createStar(x + rect.left, y + rect.top);
   }
   
   // 妖精の粉エフェクトが有効な場合は妖精の粉を生成（3回に1回の頻度）
   if (fairyDustEffectEnabled && Math.random() < 0.33) {
-    createFairyDust(x, y);
+    const rect = canvas.getBoundingClientRect();
+    createFairyDust(x + rect.left, y + rect.top);
+  }
+  
+  // ハートエフェクトが有効な場合はハートを生成（4回に1回の頻度）
+  if (heartEffectEnabled && Math.random() < 0.25) {
+    const rect = canvas.getBoundingClientRect();
+    createDrawingHeart(x + rect.left, y + rect.top);
   }
 });
 
@@ -1525,6 +2018,9 @@ canvas.addEventListener("touchstart", (e) => {
   const x = touch.clientX - rect.left;
   const y = touch.clientY - rect.top;
   
+  // 🎵 描画開始時に音楽制御
+  handleDrawingActivity();
+  
   // ネオンモードの初期設定
   if (currentPenColor === 'neon') {
     ctx.lineWidth = currentPenThickness;
@@ -1536,12 +2032,16 @@ canvas.addEventListener("touchstart", (e) => {
   ctx.beginPath();
   ctx.moveTo(x, y);
   
-  // 線の端と結合部を滑らかに
+  // 線の品質を向上させる設定
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   
   drawDistance = 0; // 新しいストロークの開始時に距離をリセット
   lastPosition = { x, y }; // 初期位置を記録
+  secondLastPosition = null; // 滑らか描画用の位置をリセット
+  currentPath = [{ x, y }]; // 新しいパスを開始
   
   // 描画コマンドを記録
   const startCmd = {
@@ -1589,6 +2089,9 @@ canvas.addEventListener("touchmove", (e) => {
   const x = touch.clientX - rect.left;
   const y = touch.clientY - rect.top;
   
+  // 🎵 描画継続時に音楽制御
+  handleDrawingActivity();
+  
   let actualColor;
   
   if (currentPenColor === 'neon') {
@@ -1613,15 +2116,13 @@ canvas.addEventListener("touchmove", (e) => {
     ctx.strokeStyle = neonColor;
     ctx.shadowBlur = 5; // シャドウを小さくして汚れを軽減
     ctx.shadowColor = neonColor;
-    ctx.lineTo(x, y);
-    ctx.stroke();
+    drawSmoothLine(x, y);
   } else {
     actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : (currentPenColor === 'green' ? '#008000' : (currentPenColor === 'pink' ? '#ff69b4' : currentPenColor)));
     ctx.lineWidth = currentPenThickness;
     ctx.strokeStyle = actualColor;
     ctx.shadowBlur = 0;
-    ctx.lineTo(x, y);
-    ctx.stroke();
+    drawSmoothLine(x, y);
   }
   
   // 描画コマンドを記録
@@ -1651,12 +2152,20 @@ canvas.addEventListener("touchmove", (e) => {
   
   // 星エフェクトが有効な場合は星を生成（2回に1回の頻度）
   if (starEffectEnabled && Math.random() < 0.5) {
-    createStar(x, y);
+    const rect = canvas.getBoundingClientRect();
+    createStar(x + rect.left, y + rect.top);
   }
   
   // 妖精の粉エフェクトが有効な場合は妖精の粉を生成（3回に1回の頻度）
   if (fairyDustEffectEnabled && Math.random() < 0.33) {
-    createFairyDust(x, y);
+    const rect = canvas.getBoundingClientRect();
+    createFairyDust(x + rect.left, y + rect.top);
+  }
+  
+  // ハートエフェクトが有効な場合はハートを生成（4回に1回の頻度）
+  if (heartEffectEnabled && Math.random() < 0.25) {
+    const rect = canvas.getBoundingClientRect();
+    createDrawingHeart(x + rect.left, y + rect.top);
   }
 });
 
@@ -1807,6 +2316,11 @@ function saveRotatedImage() {
 
 // 現在の状態から更に180度回転させて保存する関数
 function saveDoubleRotatedImage() {
+  // 🎵 描画完了時にペン音が有効なら音楽を停止して最初に戻す
+  if (penSoundEnabled) {
+    stopDrawingMusic();
+  }
+  
   console.log(`🔄 送信ボタン: 印刷処理開始→${animationStartWaitTime}秒後にアニメーション開始`);
   
   // 🔸 送信ボタンの視覚的フィードバック
@@ -1947,7 +2461,8 @@ function actualPrintProcess() {
         type: "printRotatedImage",
         imageData: imageDataUrl,
         printType: 'double_rotated',
-        paperSize: currentPaperSize
+        paperSize: currentPaperSize,
+        switchBotEnabled: document.getElementById('switchBotEffect').checked
       }));
       console.log('✅ 更に180度回転画像の印刷処理を開始');
     } else {
@@ -1977,6 +2492,43 @@ function actualPrintProcess() {
   }
 }
 
+// 🤖 SwitchBotテスト関数（送信側からメッセージを送信）
+function testSwitchBot() {
+  console.log("🤖 送信側からSwitchBotテスト実行");
+  
+  // 受信側にSwitchBotテストメッセージを送信
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: "switchBotTest"
+    }));
+    console.log("🤖 受信側にSwitchBotテストメッセージを送信");
+  } else {
+    console.error("❌ WebSocket接続が閉じています");
+    alert("WebSocket接続が閉じています");
+  }
+}
+
+// 🎨 テーマ切り替え関数
+function toggleTheme() {
+  const body = document.body;
+  const themeToggle = document.getElementById('themeToggle');
+  
+  if (body.classList.contains('modern')) {
+    // モダン → クラシック
+    body.classList.remove('modern');
+    body.classList.add('classic');
+    themeToggle.textContent = '🎨 モダン';
+    console.log('📝 クラシックテーマに切り替え');
+  } else {
+    // クラシック → モダン
+    body.classList.remove('classic');
+    body.classList.add('modern');
+    themeToggle.textContent = '📝 クラシック';
+    console.log('🎨 モダンテーマに切り替え');
+  }
+}
+
 </script>
+</div>
 </body>
 </html>
