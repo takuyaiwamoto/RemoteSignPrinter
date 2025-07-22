@@ -734,6 +734,9 @@ let starEffectEnabled = true; // 星エフェクトの状態（標準でON）
 let fairyDustEffectEnabled = true; // 妖精の粉エフェクトの状態（標準でON）
 let heartEffectEnabled = false; // ハートエフェクトの状態（標準でOFF）
 
+// 🔸 背景変形パラメータ
+let backgroundScale = 1.0; // 背景のスケール
+let backgroundOffsetY = 0; // 背景の垂直オフセット
 
 // 🔸 Dev Tool設定
 let devCanvasScale = 0.35; // キャンバススケール（デフォルト0.35）
@@ -862,43 +865,43 @@ function redrawCanvas(withBackground = true) {
     ctx.translate(canvas.width / 2, canvas.height / 2); // 中心に移動
     ctx.rotate(Math.PI); // 180度回転
     
-    // 🔸 背景画像のサイズを調整
-    let drawWidth = canvas.width;
-    let drawHeight = canvas.height;
+    // 🔸 背景画像のサイズを調整（変形パラメータを適用）
+    let drawWidth = canvas.width * backgroundScale;
+    let drawHeight = canvas.height * backgroundScale;
     
     if (currentPaperSize === "poster" && lastBackgroundSrc && (lastBackgroundSrc.includes('back3') || lastBackgroundSrc.includes('back4'))) {
       // 背景1,3のポストカードは背景2より少し小さく（0.9倍）
-      drawWidth = canvas.width * 0.9;
-      drawHeight = canvas.height * 0.9;
+      drawWidth = canvas.width * 0.9 * backgroundScale;
+      drawHeight = canvas.height * 0.9 * backgroundScale;
     } else if (currentPaperSize === "L") {
       // L判モードでの背景サイズ調整
       if (lastBackgroundSrc && (lastBackgroundSrc.includes('back3') || lastBackgroundSrc.includes('back4'))) {
         // 背景1,3のL判はベースより10%小さく
-        drawWidth = canvas.width * 0.90;
-        drawHeight = canvas.height * 0.90;
+        drawWidth = canvas.width * 0.90 * backgroundScale;
+        drawHeight = canvas.height * 0.90 * backgroundScale;
         console.log("🔍 背景1,3のL判サイズ調整: 0.90倍");
       } else if (lastBackgroundSrc && lastBackgroundSrc.includes('back2')) {
         // 背景2のL判はベースより14%小さく
-        drawWidth = canvas.width * 0.86;
-        drawHeight = canvas.height * 0.86;
+        drawWidth = canvas.width * 0.86 * backgroundScale;
+        drawHeight = canvas.height * 0.86 * backgroundScale;
         console.log("🔍 背景2のL判サイズ調整: 0.86倍");
       }
     } else if (currentPaperSize === "A4") {
       // A4モードでの背景サイズ調整
       if (lastBackgroundSrc && (lastBackgroundSrc.includes('back3') || lastBackgroundSrc.includes('back4'))) {
         // 背景1,3のA4はベースより8%小さく
-        drawWidth = canvas.width * 0.92;
-        drawHeight = canvas.height * 0.92;
+        drawWidth = canvas.width * 0.92 * backgroundScale;
+        drawHeight = canvas.height * 0.92 * backgroundScale;
         console.log("🔍 背景1,3のA4サイズ調整: 0.92倍");
       } else if (lastBackgroundSrc && lastBackgroundSrc.includes('back2')) {
         // 背景2のA4はベースより12%小さく
-        drawWidth = canvas.width * 0.88;
-        drawHeight = canvas.height * 0.88;
+        drawWidth = canvas.width * 0.88 * backgroundScale;
+        drawHeight = canvas.height * 0.88 * backgroundScale;
         console.log("🔍 背景2のA4サイズ調整: 0.88倍");
       }
     }
     
-    ctx.drawImage(backgroundImage, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+    ctx.drawImage(backgroundImage, -drawWidth / 2, -drawHeight / 2 - backgroundOffsetY, drawWidth, drawHeight);
     ctx.restore();
   }
   
@@ -1407,6 +1410,12 @@ function handleMessage(data) {
     // 🔸 印刷モード変更通知を受信
     currentPrintMode = data.mode;
     console.log(`🖨️ 印刷モード変更: ${currentPrintMode}`);
+  } else if (data.type === "backgroundTransform") {
+    // 🔸 背景変形パラメータを受信
+    backgroundScale = data.scale || 1.0;
+    backgroundOffsetY = data.offsetY || 0;
+    console.log(`🖼️ 背景変形: スケール=${backgroundScale.toFixed(1)}, オフセットY=${backgroundOffsetY}`);
+    redrawCanvas();
   }
 }
 

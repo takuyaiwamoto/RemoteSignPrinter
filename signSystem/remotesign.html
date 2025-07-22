@@ -423,15 +423,10 @@
 
 <div class="button-group">
   <label>背景:</label>
-  <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
-    <button onclick="setBackground('./back5.png')" style="margin: 0;">上</button>
-    <div style="display: flex; gap: 5px;">
-      <button onclick="setBackground('./back3.png')">左</button>
-      <button onclick="setBackground('./back2.png')">中央</button>
-      <button onclick="setBackground('./back4.png')">右</button>
-    </div>
-    <button onclick="setBackground(null)" style="margin: 0;">下</button>
-  </div>
+  <button onclick="setBackground('./back3.png')">背景1</button>
+  <button onclick="setBackground('./back2.png')">背景2</button>
+  <button onclick="setBackground('./back4.png')">背景3</button>
+  <button onclick="setBackground(null)">白</button>
   <button onclick="setSpecialBackgroundToggle()" style="background: linear-gradient(45deg, #ff1493, #00ffff); color: white;">特殊背景</button>
 </div>
 
@@ -2564,7 +2559,11 @@ function toggleTheme() {
   }
 }
 
-// キーボードイベントリスナーを追加（矢印キーで背景変更）
+// 背景画像の変形パラメータ
+let backgroundScale = 1.0; // スケール（大きさ）
+let backgroundOffsetY = 0; // 垂直オフセット
+
+// キーボードイベントリスナーを追加（矢印キーで操作）
 document.addEventListener('keydown', function(event) {
   // 入力フィールドにフォーカスがある場合は無視
   if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
@@ -2574,13 +2573,19 @@ document.addEventListener('keydown', function(event) {
   switch(event.key) {
     case 'ArrowUp':
       event.preventDefault();
-      setBackground('./back5.png');
-      console.log('⬆️ 矢印キー上 - 背景5に変更');
+      // 背景を上に移動・拡大
+      backgroundOffsetY = Math.max(backgroundOffsetY - 20, -100);
+      backgroundScale = Math.min(backgroundScale + 0.1, 2.0);
+      updateBackgroundTransform();
+      console.log(`⬆️ 矢印キー上 - オフセット: ${backgroundOffsetY}, スケール: ${backgroundScale.toFixed(1)}`);
       break;
     case 'ArrowDown':
       event.preventDefault();
-      setBackground(null);
-      console.log('⬇️ 矢印キー下 - 白背景に変更');
+      // 背景を下に移動・縮小
+      backgroundOffsetY = Math.min(backgroundOffsetY + 20, 100);
+      backgroundScale = Math.max(backgroundScale - 0.1, 0.5);
+      updateBackgroundTransform();
+      console.log(`⬇️ 矢印キー下 - オフセット: ${backgroundOffsetY}, スケール: ${backgroundScale.toFixed(1)}`);
       break;
     case 'ArrowLeft':
       event.preventDefault();
@@ -2594,6 +2599,46 @@ document.addEventListener('keydown', function(event) {
       break;
   }
 });
+
+// 背景画像の変形を適用する関数
+function updateBackgroundTransform() {
+  if (backgroundImage) {
+    // キャンバスを再描画
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 変形パラメータを適用して背景を描画
+    const scaledWidth = canvas.width * backgroundScale;
+    const scaledHeight = canvas.height * backgroundScale;
+    const offsetX = (canvas.width - scaledWidth) / 2;
+    const offsetY = (canvas.height - scaledHeight) / 2 + backgroundOffsetY;
+    
+    ctx.drawImage(backgroundImage, offsetX, offsetY, scaledWidth, scaledHeight);
+    
+    // 描画コマンドを再実行
+    if (drawingCommands && drawingCommands.length > 0) {
+      drawingCommands.forEach(cmd => {
+        if (cmd.type === 'start') {
+          ctx.beginPath();
+          ctx.moveTo(cmd.x, cmd.y);
+        } else if (cmd.type === 'draw') {
+          ctx.lineWidth = cmd.thickness || currentPenThickness;
+          ctx.strokeStyle = cmd.color || currentPenColor;
+          ctx.lineTo(cmd.x, cmd.y);
+          ctx.stroke();
+        }
+      });
+    }
+    
+    // 受信側にも変形パラメータを送信
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: "backgroundTransform",
+        scale: backgroundScale,
+        offsetY: backgroundOffsetY
+      }));
+    }
+  }
+}
 
 </script>
 </div>
