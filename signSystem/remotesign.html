@@ -423,10 +423,15 @@
 
 <div class="button-group">
   <label>背景:</label>
-  <button onclick="setBackground('./back3.png')">背景1</button>
-  <button onclick="setBackground('./back2.png')">背景2</button>
-  <button onclick="setBackground('./back4.png')">背景3</button>
-  <button onclick="setBackground(null)">白</button>
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+    <button onclick="setBackground('./back5.png')" style="margin: 0;">上</button>
+    <div style="display: flex; gap: 5px;">
+      <button onclick="setBackground('./back3.png')">左</button>
+      <button onclick="setBackground('./back2.png')">中央</button>
+      <button onclick="setBackground('./back4.png')">右</button>
+    </div>
+    <button onclick="setBackground(null)" style="margin: 0;">下</button>
+  </div>
   <button onclick="setSpecialBackgroundToggle()" style="background: linear-gradient(45deg, #ff1493, #00ffff); color: white;">特殊背景</button>
 </div>
 
@@ -2558,6 +2563,37 @@ function toggleTheme() {
     console.log('🎨 モダンテーマに切り替え');
   }
 }
+
+// キーボードイベントリスナーを追加（矢印キーで背景変更）
+document.addEventListener('keydown', function(event) {
+  // 入力フィールドにフォーカスがある場合は無視
+  if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+    return;
+  }
+  
+  switch(event.key) {
+    case 'ArrowUp':
+      event.preventDefault();
+      setBackground('./back5.png');
+      console.log('⬆️ 矢印キー上 - 背景5に変更');
+      break;
+    case 'ArrowDown':
+      event.preventDefault();
+      setBackground(null);
+      console.log('⬇️ 矢印キー下 - 白背景に変更');
+      break;
+    case 'ArrowLeft':
+      event.preventDefault();
+      setBackground('./back3.png');
+      console.log('⬅️ 矢印キー左 - 背景1に変更');
+      break;
+    case 'ArrowRight':
+      event.preventDefault();
+      setBackground('./back4.png');
+      console.log('➡️ 矢印キー右 - 背景3に変更');
+      break;
+  }
+});
 
 </script>
 </div>
