@@ -757,6 +757,10 @@ let dragStartAreaPos = { x: 0, y: 0 };
 let dragStartAreaSize = { width: 0, height: 0 };
 let resizeDirection = null;
 
+// 🎬 動画背景関連変数
+let videoBackgroundElement = null;
+let isVideoBackgroundActive = false;
+
 // 🔸 送信側と受信側のキャンバスサイズ情報
 let senderCanvasSize = { width: 842, height: 595 }; // 送信側のキャンバスサイズ
 let receiverCanvasSize = { width: 842, height: 595 }; // 受信側のキャンバスサイズ
