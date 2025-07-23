@@ -1107,6 +1107,8 @@ function setSpecialBackgroundToggle() {
     ctx.font = '24px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('動画背景準備中...', canvas.width/2, canvas.height/2);
+    ctx.font = '16px Arial';
+    ctx.fillText('（扉が閉じた状態で0.3倍サイズの動画を配置）', canvas.width/2, canvas.height/2 + 30);
     
   } else if (specialBackgroundState === 'door_shown') {
     // 第2段階: 扉を開いて動画再生開始
@@ -1132,6 +1134,8 @@ function setSpecialBackgroundToggle() {
     ctx.font = '20px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('動画再生中 - 描画可能', canvas.width/2, canvas.height/2);
+    ctx.font = '16px Arial';
+    ctx.fillText('（扉が開き0.3倍サイズの動画が再生中）', canvas.width/2, canvas.height/2 + 30);
     
     // 動画終了まで待機（back6.mp4の長さに合わせて調整）
     setTimeout(() => {

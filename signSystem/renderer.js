@@ -779,19 +779,23 @@ function prepareVideoBackground(videoSrc) {
     videoBackgroundElement.remove();
   }
   
-  // 新しい動画要素を作成
+  // 新しい動画要素を作成（0.3倍サイズ）
   videoBackgroundElement = document.createElement('video');
   videoBackgroundElement.src = videoSrc;
+  const videoWidth = canvas.width * 0.3;
+  const videoHeight = canvas.height * 0.3;
+  
   videoBackgroundElement.style.cssText = `
     position: fixed;
     top: 60px;
     left: 50%;
-    transform: translateX(-50%) rotate(180deg);
+    transform: translateX(-50%) rotate(180deg) scale(0.3);
     width: ${canvas.width}px;
     height: ${canvas.height}px;
-    z-index: 0;
+    z-index: 9;
     object-fit: cover;
     pointer-events: none;
+    transform-origin: center center;
   `;
   
   // 最初のフレームで停止
@@ -809,15 +813,25 @@ function prepareVideoBackground(videoSrc) {
   canvas.style.backgroundColor = 'transparent';
   isVideoBackgroundActive = true;
   
-  console.log('🎬 動画背景準備完了 - 最初のフレームで停止');
+  // 扉演出第1段階：扉表示（閉じた状態）
+  createDoorForVideo();
+  
+  console.log('🎬 動画背景準備完了 - 0.3倍サイズで表示');
 }
 
 function playVideoBackground() {
   if (videoBackgroundElement) {
     console.log('🎬 動画背景再生開始');
-    videoBackgroundElement.play().catch(e => {
-      console.error('❌ 動画再生エラー:', e);
-    });
+    
+    // 扉を開く演出
+    openDoorForVideo();
+    
+    // 扉が開き始めてから動画再生
+    setTimeout(() => {
+      videoBackgroundElement.play().catch(e => {
+        console.error('❌ 動画再生エラー:', e);
+      });
+    }, 1000); // 1秒後に再生開始
   }
 }
 
@@ -851,6 +865,72 @@ function clearVideoBackground() {
     
     // キャンバスの背景を元に戻す
     canvas.style.backgroundColor = '#f0f0f0';
+  }
+}
+
+// 🚪 動画用の扉作成（閉じた状態）
+function createDoorForVideo() {
+  console.log('🚪 動画用の扉を作成（閉じた状態）');
+  
+  // 左の扉（中央に閉じた状態）
+  const leftDoor = document.createElement('div');
+  leftDoor.id = 'videoDoorLeft';
+  leftDoor.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 50vw;
+    height: 100vh;
+    background: linear-gradient(45deg, #2c2c2c, #1a1a1a, #0f0f0f, #1a1a1a, #2c2c2c);
+    z-index: 10002;
+    transform-origin: left center;
+    transform: rotateY(0deg);
+    transition: transform 3s ease-in-out;
+    border-right: 2px solid #444;
+    box-shadow: inset -10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
+  `;
+  document.body.appendChild(leftDoor);
+  
+  // 右の扉（中央に閉じた状態）
+  const rightDoor = document.createElement('div');
+  rightDoor.id = 'videoDoorRight';
+  rightDoor.style.cssText = `
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 50vw;
+    height: 100vh;
+    background: linear-gradient(-45deg, #2c2c2c, #1a1a1a, #0f0f0f, #1a1a1a, #2c2c2c);
+    z-index: 10002;
+    transform-origin: right center;
+    transform: rotateY(0deg);
+    transition: transform 3s ease-in-out;
+    border-left: 2px solid #444;
+    box-shadow: inset 10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
+  `;
+  document.body.appendChild(rightDoor);
+  
+  console.log('🚪 動画用の扉作成完了');
+}
+
+// 🚪 動画用の扉を開く
+function openDoorForVideo() {
+  console.log('🚪 動画用の扉を開く');
+  
+  const leftDoor = document.getElementById('videoDoorLeft');
+  const rightDoor = document.getElementById('videoDoorRight');
+  
+  if (leftDoor && rightDoor) {
+    // 扉を開く（中央から外側に）
+    leftDoor.style.transform = 'rotateY(90deg)';
+    rightDoor.style.transform = 'rotateY(-90deg)';
+    
+    // 3秒後に扉を削除
+    setTimeout(() => {
+      if (leftDoor.parentNode) leftDoor.parentNode.removeChild(leftDoor);
+      if (rightDoor.parentNode) rightDoor.parentNode.removeChild(rightDoor);
+      console.log('🚪 動画用の扉を削除');
+    }, 3000);
   }
 }
 
