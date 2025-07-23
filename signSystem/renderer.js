@@ -807,16 +807,19 @@ function prepareVideoBackground(videoSrc) {
     console.log('🎬 動画メタデータ読み込み完了 - 最初のフレームに設定');
   });
   
+  // 動画を先に追加
   document.body.appendChild(videoBackgroundElement);
   
   // キャンバスを透明にする
   canvas.style.backgroundColor = 'transparent';
   isVideoBackgroundActive = true;
   
-  // 扉演出第1段階：扉表示（閉じた状態）
-  createDoorForVideo();
+  // 動画配置後に扉演出第1段階：扉表示（閉じた状態）
+  setTimeout(() => {
+    createDoorForVideo();
+  }, 100); // 動画配置後に扉を表示
   
-  console.log('🎬 動画背景準備完了 - 0.3倍サイズで表示');
+  console.log('🎬 動画背景準備完了 - 0.3倍サイズで表示、扉で覆う');
 }
 
 function playVideoBackground() {
@@ -872,7 +875,7 @@ function clearVideoBackground() {
 function createDoorForVideo() {
   console.log('🚪 動画用の扉を作成（閉じた状態）');
   
-  // 左の扉（中央に閉じた状態）
+  // 左の扉（白い立体的なデザイン）
   const leftDoor = document.createElement('div');
   leftDoor.id = 'videoDoorLeft';
   leftDoor.style.cssText = `
@@ -881,17 +884,21 @@ function createDoorForVideo() {
     left: 0;
     width: 50vw;
     height: 100vh;
-    background: linear-gradient(45deg, #2c2c2c, #1a1a1a, #0f0f0f, #1a1a1a, #2c2c2c);
+    background: linear-gradient(135deg, #ffffff 0%, #f8f8f8 25%, #f0f0f0 50%, #f8f8f8 75%, #ffffff 100%);
     z-index: 10002;
     transform-origin: left center;
     transform: rotateY(0deg);
     transition: transform 3s ease-in-out;
-    border-right: 2px solid #444;
-    box-shadow: inset -10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
+    border-right: 3px solid #e0e0e0;
+    box-shadow: 
+      inset -15px 0 25px rgba(0,0,0,0.1),
+      inset 0 0 30px rgba(255,255,255,0.5),
+      5px 0 20px rgba(0,0,0,0.15),
+      0 0 30px rgba(0,0,0,0.1);
   `;
   document.body.appendChild(leftDoor);
   
-  // 右の扉（中央に閉じた状態）
+  // 右の扉（白い立体的なデザイン）
   const rightDoor = document.createElement('div');
   rightDoor.id = 'videoDoorRight';
   rightDoor.style.cssText = `
@@ -900,17 +907,21 @@ function createDoorForVideo() {
     right: 0;
     width: 50vw;
     height: 100vh;
-    background: linear-gradient(-45deg, #2c2c2c, #1a1a1a, #0f0f0f, #1a1a1a, #2c2c2c);
+    background: linear-gradient(-135deg, #ffffff 0%, #f8f8f8 25%, #f0f0f0 50%, #f8f8f8 75%, #ffffff 100%);
     z-index: 10002;
     transform-origin: right center;
     transform: rotateY(0deg);
     transition: transform 3s ease-in-out;
-    border-left: 2px solid #444;
-    box-shadow: inset 10px 0 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.8);
+    border-left: 3px solid #e0e0e0;
+    box-shadow: 
+      inset 15px 0 25px rgba(0,0,0,0.1),
+      inset 0 0 30px rgba(255,255,255,0.5),
+      -5px 0 20px rgba(0,0,0,0.15),
+      0 0 30px rgba(0,0,0,0.1);
   `;
   document.body.appendChild(rightDoor);
   
-  console.log('🚪 動画用の扉作成完了');
+  console.log('🚪 動画用の白い立体的な扉作成完了');
 }
 
 // 🚪 動画用の扉を開く

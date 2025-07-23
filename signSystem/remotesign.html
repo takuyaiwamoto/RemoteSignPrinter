@@ -573,6 +573,10 @@ let penSoundEnabled = false; // ペン音の有効/無効（標準でOFF）
 let specialBackgroundState = 'ready'; // 'ready', 'door_shown', 'door_opened'
 let specialBackgroundToggle = false; // 特殊背景の画像を切り替えるフラグ
 
+// 🎬 送信側動画背景関連変数
+let senderVideoElement = null;
+let isSenderVideoActive = false;
+
 // 🎵 ペン音制御
 let drawingAudio = null; // 描画中の音楽オブジェクト
 let isDrawingActive = false; // 描画中フラグ
@@ -1089,6 +1093,9 @@ function setSpecialBackgroundToggle() {
     console.log('🚪 第1段階: 扉表示と動画準備');
     specialBackgroundState = 'door_shown';
     
+    // 送信側にも動画を配置
+    createSenderVideo();
+    
     // 受信側に動画背景開始を通知
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ 
@@ -1114,6 +1121,9 @@ function setSpecialBackgroundToggle() {
     // 第2段階: 扉を開いて動画再生開始
     console.log('🚪 第2段階: 扉開放と動画再生開始');
     specialBackgroundState = 'video_playing';
+    
+    // 送信側の動画も再生開始
+    playSenderVideo();
     
     // 受信側に動画再生開始を通知
     if (socket.readyState === WebSocket.OPEN) {
@@ -1141,6 +1151,9 @@ function setSpecialBackgroundToggle() {
     setTimeout(() => {
       console.log('🎬 動画再生完了 - 最終フレームで停止');
       specialBackgroundState = 'ready';
+      
+      // 送信側の動画も終了
+      stopSenderVideo();
       
       // 受信側に動画終了を通知
       if (socket.readyState === WebSocket.OPEN) {
@@ -2643,6 +2656,67 @@ function toggleTheme() {
 // 背景画像の変形パラメータ
 let backgroundScale = 1.0; // スケール（大きさ）
 let backgroundOffsetY = 0; // 垂直オフセット
+
+// 🎬 送信側動画関数群
+function createSenderVideo() {
+  console.log('🎬 送信側に動画を作成');
+  
+  // 既存の動画要素を削除
+  if (senderVideoElement) {
+    senderVideoElement.remove();
+  }
+  
+  // 新しい動画要素を作成（0.3倍サイズ）
+  senderVideoElement = document.createElement('video');
+  senderVideoElement.src = './back6.mp4';
+  
+  senderVideoElement.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-50%) scale(0.3);
+    width: ${canvas.width}px;
+    height: ${canvas.height}px;
+    z-index: 5;
+    object-fit: cover;
+    pointer-events: none;
+    transform-origin: center center;
+  `;
+  
+  // 最初のフレームで停止
+  senderVideoElement.muted = true;
+  
+  // メタデータ読み込み後に最初のフレームに移動
+  senderVideoElement.addEventListener('loadedmetadata', () => {
+    senderVideoElement.currentTime = 0;
+    console.log('🎬 送信側動画メタデータ読み込み完了');
+  });
+  
+  document.body.appendChild(senderVideoElement);
+  isSenderVideoActive = true;
+  
+  console.log('🎬 送信側動画作成完了 - 0.3倍サイズ');
+}
+
+function playSenderVideo() {
+  if (senderVideoElement) {
+    console.log('🎬 送信側動画再生開始');
+    senderVideoElement.play().catch(e => {
+      console.error('❌ 送信側動画再生エラー:', e);
+    });
+  }
+}
+
+function stopSenderVideo() {
+  if (senderVideoElement) {
+    console.log('🎬 送信側動画終了');
+    senderVideoElement.pause();
+    // 最終フレームに移動
+    if (senderVideoElement.duration) {
+      senderVideoElement.currentTime = senderVideoElement.duration - 0.1;
+    }
+  }
+}
 
 // スマホの傾きセンサーを追加
 let lastTiltX = 0;
