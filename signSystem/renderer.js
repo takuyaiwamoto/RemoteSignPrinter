@@ -722,7 +722,7 @@ canvas.style.position = "absolute";
 canvas.style.top = "60px";
 canvas.style.left = "50%";
 canvas.style.transform = "translateX(-50%)"; // 180度回転を削除
-canvas.style.zIndex = "1";
+canvas.style.zIndex = "10"; // 動画背景より上に設定
 
 let backgroundImage = null;
 let drawingData = [];
@@ -765,6 +765,90 @@ let socket = new WebSocket("wss://realtime-sign-server-1.onrender.com");
 socket.onopen = () => console.log("✅ WebSocket接続完了（Electron受信側）");
 socket.onerror = e => console.error("❌ WebSocketエラー", e);
 socket.onclose = () => console.warn("⚠️ WebSocket切断");
+
+// 🎬 動画背景関数群
+function prepareVideoBackground(videoSrc) {
+  console.log('🎬 動画背景準備:', videoSrc);
+  
+  // 既存の動画要素を削除
+  if (videoBackgroundElement) {
+    videoBackgroundElement.remove();
+  }
+  
+  // 新しい動画要素を作成
+  videoBackgroundElement = document.createElement('video');
+  videoBackgroundElement.src = videoSrc;
+  videoBackgroundElement.style.cssText = `
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%) rotate(180deg);
+    width: ${canvas.width}px;
+    height: ${canvas.height}px;
+    z-index: 0;
+    object-fit: cover;
+    pointer-events: none;
+  `;
+  
+  // 最初のフレームで停止
+  videoBackgroundElement.muted = true;
+  
+  // メタデータ読み込み後に最初のフレームに移動
+  videoBackgroundElement.addEventListener('loadedmetadata', () => {
+    videoBackgroundElement.currentTime = 0;
+    console.log('🎬 動画メタデータ読み込み完了 - 最初のフレームに設定');
+  });
+  
+  document.body.appendChild(videoBackgroundElement);
+  
+  // キャンバスを透明にする
+  canvas.style.backgroundColor = 'transparent';
+  isVideoBackgroundActive = true;
+  
+  console.log('🎬 動画背景準備完了 - 最初のフレームで停止');
+}
+
+function playVideoBackground() {
+  if (videoBackgroundElement) {
+    console.log('🎬 動画背景再生開始');
+    videoBackgroundElement.play().catch(e => {
+      console.error('❌ 動画再生エラー:', e);
+    });
+  }
+}
+
+function endVideoBackground() {
+  if (videoBackgroundElement) {
+    console.log('🎬 動画背景終了 - 最終フレームで停止');
+    
+    // 動画終了イベントをリスナーで監視
+    videoBackgroundElement.addEventListener('ended', () => {
+      console.log('🎬 動画再生終了 - 最終フレームで停止');
+      // 最終フレームに停止（最後から0.1秒手前）
+      videoBackgroundElement.currentTime = videoBackgroundElement.duration - 0.1;
+    });
+    
+    // すでに再生中の場合は自然に終わるのを待つ
+    if (!videoBackgroundElement.ended) {
+      console.log('🎬 動画再生中 - 自然終了を待機');
+    } else {
+      // すでに終了している場合は最終フレームに設定
+      videoBackgroundElement.currentTime = videoBackgroundElement.duration - 0.1;
+    }
+  }
+}
+
+function clearVideoBackground() {
+  if (videoBackgroundElement) {
+    console.log('🎬 動画背景をクリア');
+    videoBackgroundElement.remove();
+    videoBackgroundElement = null;
+    isVideoBackgroundActive = false;
+    
+    // キャンバスの背景を元に戻す
+    canvas.style.backgroundColor = '#f0f0f0';
+  }
+}
 
 let animationImage = null;
 
@@ -1293,6 +1377,18 @@ function handleMessage(data) {
     }
     console.log("🔄 送信ボタン押下 → 180度回転ダウンロード処理実行");
     downloadRotated();
+  } else if (data.type === "videoBackground") {
+    // 🎬 動画背景処理
+    if (data.action === "prepare") {
+      console.log('🎬 動画背景準備開始:', data.videoSrc);
+      prepareVideoBackground(data.videoSrc);
+    } else if (data.action === "play") {
+      console.log('🎬 動画背景再生開始');
+      playVideoBackground();
+    } else if (data.action === "end") {
+      console.log('🎬 動画背景終了');
+      endVideoBackground();
+    }
   } else if (data.type === "doorAnimation") {
     // 🔸 扉演出を開始
     const imageSrc = data.imageSrc || data.backgroundSrc;

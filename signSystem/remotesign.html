@@ -427,7 +427,7 @@
   <button onclick="setBackground('./back2.png')">背景2</button>
   <button onclick="setBackground('./back4.png')">背景3</button>
   <button onclick="setBackground(null)">白</button>
-  <button onclick="setSpecialBackgroundToggle()" style="background: linear-gradient(45deg, #ff1493, #00ffff); color: white;">特殊背景</button>
+  <button onclick="setSpecialBackgroundToggle()" style="background: linear-gradient(45deg, #ff1493, #00ffff); color: white;">🎬 動画背景</button>
 </div>
 
 
@@ -1036,7 +1036,7 @@ function setSpecialBackground(src) {
         console.log("✅ 特殊背景画像設定開始:", src);
         
         // 背景に応じたキャンバスサイズを設定
-        const backgroundKey = src.includes('back3') ? 'back3' : (src.includes('back4') ? 'back4' : (src.includes('back5') ? 'back5' : 'back2'));
+        const backgroundKey = src.includes('back3') ? 'back3' : (src.includes('back4') ? 'back4' : (src.includes('back5') ? 'back5' : (src.includes('back6') ? 'back4' : 'back2')));
         setCanvasSize(backgroundKey);
         
         // キャンバスをクリアして背景を描画
@@ -1080,18 +1080,74 @@ function setSpecialBackground(src) {
   }
 }
 
-// 🎪 特殊背景設定関数（back4.pngとback5.pngを交互に切り替え）
+// 🎪 特殊背景設定関数（back6.mp4動画を使用）
 function setSpecialBackgroundToggle() {
-  // 現在のフラグ状態をログ出力
-  console.log(`🎪 特殊背景ボタン押下 - 現在の状態: ${specialBackgroundState}`);
-  console.log(`🎪 現在のフラグ状態: ${specialBackgroundToggle}`);
+  console.log(`🎪 特殊背景ボタン押下（動画モード） - 現在の状態: ${specialBackgroundState}`);
   
-  // 背景画像を決定（トグルは背景適用時に行う）
-  const backgroundPath = specialBackgroundToggle ? './back5.png' : './back4.png';
-  console.log(`🎪 使用する背景: ${backgroundPath}`);
-  
-  // 既存の特殊背景関数を呼び出し
-  setSpecialBackground(backgroundPath);
+  if (specialBackgroundState === 'ready') {
+    // 第1段階: 扉を表示して動画を最初のフレームで停止
+    console.log('🚪 第1段階: 扉表示と動画準備');
+    specialBackgroundState = 'door_shown';
+    
+    // 受信側に動画背景開始を通知
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ 
+        type: "videoBackground", 
+        action: "prepare",
+        videoSrc: "./back6.mp4"
+      }));
+      console.log('🎬 受信側に動画背景準備を送信');
+    }
+    
+    // 送信側でも視覚的フィードバック
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'white';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('動画背景準備中...', canvas.width/2, canvas.height/2);
+    
+  } else if (specialBackgroundState === 'door_shown') {
+    // 第2段階: 扉を開いて動画再生開始
+    console.log('🚪 第2段階: 扉開放と動画再生開始');
+    specialBackgroundState = 'video_playing';
+    
+    // 受信側に動画再生開始を通知
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ 
+        type: "videoBackground", 
+        action: "play",
+        videoSrc: "./back6.mp4"
+      }));
+      console.log('🎬 受信側に動画再生開始を送信');
+    }
+    
+    // 送信側の表示を更新
+    ctx.restore();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(100, 100, 100, 0.3)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'white';
+    ctx.font = '20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('動画再生中 - 描画可能', canvas.width/2, canvas.height/2);
+    
+    // 動画終了まで待機（back6.mp4の長さに合わせて調整）
+    setTimeout(() => {
+      console.log('🎬 動画再生完了 - 最終フレームで停止');
+      specialBackgroundState = 'ready';
+      
+      // 受信側に動画終了を通知
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ 
+          type: "videoBackground", 
+          action: "end"
+        }));
+        console.log('🎬 受信側に動画終了を送信');
+      }
+    }, 15000); // 15秒後（back6.mp4の長さに合わせて調整）
+  }
 }
 
 function startCountdown() {
