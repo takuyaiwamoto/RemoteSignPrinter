@@ -459,8 +459,8 @@
   
   <div class="button-group">
     <label>キャンバスサイズ調整:</label>
-    <input type="range" id="canvasScale" min="0.1" max="3.0" step="0.05" value="1.0" oninput="updateCanvasScale(this.value)">
-    <span id="canvasScaleValue">1.0x</span>
+    <input type="range" id="canvasScale" min="0.1" max="3.0" step="0.05" value="0.35" oninput="updateCanvasScale(this.value)">
+    <span id="canvasScaleValue">0.35x</span>
   </div>
   
   <div class="button-group">
@@ -471,8 +471,8 @@
   
   <div class="button-group">
     <label>回転後待機時間（秒）:</label>
-    <input type="range" id="rotationWait" min="1" max="10" step="0.5" value="3.0" oninput="updateRotationWait(this.value)">
-    <span id="rotationWaitValue">3.0秒</span>
+    <input type="range" id="rotationWait" min="1" max="10" step="0.5" value="7.5" oninput="updateRotationWait(this.value)">
+    <span id="rotationWaitValue">7.5秒</span>
   </div>
   
   <div class="button-group">
@@ -555,9 +555,9 @@ let backgroundImage = null;
 let currentPaperSize = "A4"; // 現在の用紙サイズ
 let currentPrintMode = "drawOnly"; // 現在の印刷モード（デフォルト：描画モード）
 let currentVideoSize = 100; // 現在のビデオサイズ（デフォルト100%）
-let canvasScale = 1.0; // キャンバススケール
+let canvasScale = 0.35; // キャンバススケール
 let animationStartWaitTime = 3.3; // アニメーション開始待機時間
-let rotationWaitTime = 3.0; // 回転後待機時間
+let rotationWaitTime = 7.5; // 回転後待機時間
 let currentPenThickness = 8; // 現在のペンの太さ（標準は太い）
 let currentPenColor = 'black'; // 現在のペンの色
 let neonColorIndex = 0; // ネオン用の色インデックス
@@ -916,7 +916,28 @@ function setBackground(src) {
       setCanvasSize(backgroundKey);
       
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+      
+      // アスペクト比を保持して描画
+      const imageAspect = img.naturalWidth / img.naturalHeight;
+      const canvasAspect = canvas.width / canvas.height;
+      
+      let drawWidth, drawHeight, offsetX, offsetY;
+      
+      if (imageAspect > canvasAspect) {
+        // 画像が横長の場合、幅をキャンバス幅に合わせる
+        drawWidth = canvas.width;
+        drawHeight = drawWidth / imageAspect;
+        offsetX = 0;
+        offsetY = (canvas.height - drawHeight) / 2;
+      } else {
+        // 画像が縦長の場合、高さをキャンバス高さに合わせる
+        drawHeight = canvas.height;
+        drawWidth = drawHeight * imageAspect;
+        offsetX = (canvas.width - drawWidth) / 2;
+        offsetY = 0;
+      }
+      
+      ctx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
       
       // 受信側にサイズ情報付きで送信
       socket.send(JSON.stringify({ 
@@ -2563,7 +2584,102 @@ function toggleTheme() {
 let backgroundScale = 1.0; // スケール（大きさ）
 let backgroundOffsetY = 0; // 垂直オフセット
 
-// キーボードイベントリスナーを追加（矢印キーで操作）
+// スマホの傾きセンサーを追加
+let lastTiltX = 0;
+let lastTiltY = 0;
+
+// デバイスの向きが変更された時のイベントリスナー
+async function requestOrientationPermission() {
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // iOS 13以降の場合、許可を求める
+    try {
+      const permission = await DeviceOrientationEvent.requestPermission();
+      if (permission !== 'granted') {
+        console.log('❌ デバイス傾きセンサーの許可が拒否されました');
+        return false;
+      }
+    } catch (error) {
+      console.log('❌ デバイス傾きセンサーの許可要求エラー:', error);
+      return false;
+    }
+  }
+  return true;
+}
+
+if (window.DeviceOrientationEvent) {
+  // 傾きセンサー使用ボタンを追加（iOS用）
+  const orientationButton = document.createElement('button');
+  orientationButton.textContent = '📱 傾きセンサー有効化';
+  orientationButton.style.cssText = 'position: fixed; top: 10px; left: 10px; z-index: 1000; background: #ff9500; color: white; border: none; padding: 10px; border-radius: 5px;';
+  orientationButton.onclick = async () => {
+    const permitted = await requestOrientationPermission();
+    if (permitted) {
+      orientationButton.style.display = 'none';
+      startOrientationListener();
+    }
+  };
+  document.body.appendChild(orientationButton);
+  
+  // デスクトップや許可不要な環境では自動で開始
+  if (typeof DeviceOrientationEvent.requestPermission !== 'function') {
+    orientationButton.style.display = 'none';
+    startOrientationListener();
+  }
+}
+
+function startOrientationListener() {
+  window.addEventListener('deviceorientation', function(event) {
+    // デバイスの傾きを取得
+    const tiltX = event.beta;  // 前後の傾き (-180 to 180)
+    const tiltY = event.gamma; // 左右の傾き (-90 to 90)
+    
+    // null値チェック
+    if (tiltX === null || tiltY === null) return;
+    
+    // 傾きの変化量を計算
+    const deltaX = tiltX - lastTiltX;
+    const deltaY = tiltY - lastTiltY;
+    
+    // 閾値を超えた場合のみ処理
+    if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+      // 垂直方向の傾き（前後）でスケール調整
+      if (Math.abs(deltaX) > 2) {
+        if (deltaX > 0) {
+          // 前に傾ける → 拡大
+          backgroundScale = Math.min(backgroundScale + 0.05, 2.0);
+        } else {
+          // 後ろに傾ける → 縮小
+          backgroundScale = Math.max(backgroundScale - 0.05, 0.5);
+        }
+      }
+      
+      // 水平方向の傾き（左右）で垂直オフセット調整
+      if (Math.abs(deltaY) > 2) {
+        if (deltaY > 0) {
+          // 右に傾ける → 上に移動
+          backgroundOffsetY = Math.max(backgroundOffsetY - 5, -100);
+        } else {
+          // 左に傾ける → 下に移動
+          backgroundOffsetY = Math.min(backgroundOffsetY + 5, 100);
+        }
+      }
+      
+      updateBackgroundTransform();
+      console.log(`📱 傾きセンサー - X:${tiltX.toFixed(1)}, Y:${tiltY.toFixed(1)}, スケール:${backgroundScale.toFixed(2)}, オフセット:${backgroundOffsetY}`);
+      
+      lastTiltX = tiltX;
+      lastTiltY = tiltY;
+    }
+  });
+  
+  console.log('📱 デバイス傾きセンサーを有効化');
+}
+
+if (!window.DeviceOrientationEvent) {
+  console.log('❌ このデバイスは傾きセンサーに対応していません');
+}
+
+// キーボードイベントリスナーを追加（矢印キーで操作 - デスクトップ用）
 document.addEventListener('keydown', function(event) {
   // 入力フィールドにフォーカスがある場合は無視
   if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
@@ -2606,9 +2722,22 @@ function updateBackgroundTransform() {
     // キャンバスを再描画
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // 変形パラメータを適用して背景を描画
-    const scaledWidth = canvas.width * backgroundScale;
-    const scaledHeight = canvas.height * backgroundScale;
+    // 変形パラメータを適用して背景を描画（アスペクト比保持）
+    const imageAspect = backgroundImage.naturalWidth / backgroundImage.naturalHeight;
+    const canvasAspect = canvas.width / canvas.height;
+    
+    let scaledWidth, scaledHeight;
+    
+    if (imageAspect > canvasAspect) {
+      // 画像が横長の場合、幅をキャンバス幅に合わせる
+      scaledWidth = canvas.width * backgroundScale;
+      scaledHeight = scaledWidth / imageAspect;
+    } else {
+      // 画像が縦長の場合、高さをキャンバス高さに合わせる
+      scaledHeight = canvas.height * backgroundScale;
+      scaledWidth = scaledHeight * imageAspect;
+    }
+    
     const offsetX = (canvas.width - scaledWidth) / 2;
     const offsetY = (canvas.height - scaledHeight) / 2 + backgroundOffsetY;
     

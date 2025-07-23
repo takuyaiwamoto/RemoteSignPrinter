@@ -741,7 +741,7 @@ let backgroundOffsetY = 0; // 背景の垂直オフセット
 // 🔸 Dev Tool設定
 let devCanvasScale = 0.35; // キャンバススケール（デフォルト0.35）
 let devAnimationStartWaitTime = 3.3; // アニメーション開始待機時間（秒）
-let devRotationWaitTime = 3.0; // 回転後待機時間（秒）
+let devRotationWaitTime = 7.5; // 回転後待機時間（秒）
 
 // 🔸 描画エリア調整設定
 let drawingAreaOffset = { x: 0, y: 0 }; // 描画エリアのオフセット
