@@ -611,6 +611,14 @@ socket.onopen = () => {
   };
   console.log("📤 Writer ID要求送信:", requestMsg);
   socket.send(JSON.stringify(requestMsg));
+  
+  // 3秒後にWriter IDが設定されているかチェック
+  setTimeout(() => {
+    if (!myWriterId) {
+      console.warn("⚠️ Writer IDが3秒経っても割り当てられていません");
+      alert("Writer IDが割り当てられていません。右上の「ID確認」ボタンで状況を確認してください。");
+    }
+  }, 3000);
 };
 
 socket.onmessage = (event) => {
@@ -2223,6 +2231,13 @@ canvas.addEventListener("mousedown", (e) => {
   };
   drawingCommands.push(startCmd);
   
+  // Writer IDが未設定の場合は送信しない
+  if (!myWriterId) {
+    console.warn("⚠️ Writer ID未設定のため描画データを送信しません");
+    alert("Writer IDが設定されていません。右上の「ID確認」ボタンで確認してください。");
+    return;
+  }
+  
   const startMsg = { 
     type: "start", 
     writerId: myWriterId, // Writer ID を追加
@@ -2348,6 +2363,11 @@ canvas.addEventListener("mousemove", (e) => {
   // 現在の位置を記録
   lastPosition = { x, y };
   
+  // Writer IDが未設定の場合は送信しない
+  if (!myWriterId) {
+    return;
+  }
+  
   const drawMsg = { 
     type: "draw", 
     writerId: myWriterId, // Writer ID を追加
@@ -2431,6 +2451,13 @@ canvas.addEventListener("touchstart", (e) => {
     color: currentPenColor === 'neon' ? getNeonColor() : (currentPenColor === 'black' ? '#000' : currentPenColor)
   };
   drawingCommands.push(startCmd);
+  
+  // Writer IDが未設定の場合は送信しない
+  if (!myWriterId) {
+    console.warn("⚠️ Writer ID未設定のため描画データを送信しません");
+    alert("Writer IDが設定されていません。右上の「ID確認」ボタンで確認してください。");
+    return;
+  }
   
   const touchStartMsg = { 
     type: "start", 
@@ -2520,6 +2547,11 @@ canvas.addEventListener("touchmove", (e) => {
   
   // 現在の位置を記録
   lastPosition = { x, y };
+  
+  // Writer IDが未設定の場合は送信しない
+  if (!myWriterId) {
+    return;
+  }
   
   const touchDrawMsg = { 
     type: "draw", 
