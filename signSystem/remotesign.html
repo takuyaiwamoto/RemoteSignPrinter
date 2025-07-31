@@ -415,7 +415,7 @@
 <button id="themeToggle" onclick="toggleTheme()">📝 クラシック</button>
 
 <div class="main-container">
-<canvas id="drawCanvas" width="859" height="607" style="position: relative; z-index: 100; background: transparent; transform: rotate(180deg); transform-origin: center center;"></canvas>
+<canvas id="drawCanvas" width="859" height="607" style="position: relative; z-index: 100; background: transparent;"></canvas>
 
 <div class="button-group">
   <button onclick="clearCanvas()">Clear</button>
@@ -606,16 +606,46 @@ socket.onopen = () => {
   console.log("✅ WebSocket接続完了（送信側）");
   
   // writer ID を要求
-  socket.send(JSON.stringify({
+  const requestMsg = {
     type: "requestWriterId"
-  }));
+  };
+  console.log("📤 Writer ID要求送信:", requestMsg);
+  socket.send(JSON.stringify(requestMsg));
 };
 
 socket.onmessage = (event) => {
-  const data = JSON.parse(event.data);
+  try {
+    let data;
+    
+    // Blobの場合は文字列として読み取る
+    if (event.data instanceof Blob) {
+      const reader = new FileReader();
+      reader.onload = function() {
+        try {
+          data = JSON.parse(reader.result);
+          processMessage(data);
+        } catch (error) {
+          console.error('❌ Blobデータの解析エラー:', error);
+        }
+      };
+      reader.readAsText(event.data);
+      return;
+    } else {
+      // 文字列の場合
+      data = JSON.parse(event.data);
+      processMessage(data);
+    }
+  } catch (error) {
+    console.error('❌ メッセージ処理エラー:', error);
+  }
+};
+
+function processMessage(data) {
+  console.log(`📨 メッセージ受信: type=${data.type}, writerId=${data.writerId || 'なし'}`);
   
   if (data.type === "assignWriterId") {
     // writer ID の割り当てを受信
+    console.log("📨 Writer ID割り当てメッセージ受信:", data);
     myWriterId = data.writerId;
     console.log(`📝 Writer ID 割り当て: ${myWriterId}`);
     document.title = `送信側 - ${myWriterId}`;
@@ -626,15 +656,32 @@ socket.onmessage = (event) => {
     
   } else if (data.type === "start" || data.type === "draw") {
     // 他の執筆者からの描画データを受信
+    console.log(`🖊️ 描画データ受信: writerId=${data.writerId}, myWriterId=${myWriterId}, 他の書き手？${data.writerId !== myWriterId}`);
     if (data.writerId && data.writerId !== myWriterId) {
+      console.log("✅ 他の書き手の描画として処理");
       handleOtherWriterDrawing(data);
+    } else {
+      console.log("❌ 自分の描画のため無視");
     }
   } else if (data.type === "clear") {
     // 全体クリア
     otherWritersData = {};
     redrawCanvasWithOthers();
+  } else if (data.type === "heartEffect") {
+    // ハートエフェクト指示受信
+    createHeart();
+  } else if (data.type === "specialHeartEffect") {
+    // 特別ハートエフェクト指示受信
+    createSpecialHeart();
+  } else if (data.type === "autoSelectBackground") {
+    console.log('🖼️ 受信側から背景自動選択指示を受信:', data.background);
+    // 背景4を自動選択
+    if (data.background === "back6") {
+      setBackground('./back6.png');
+      console.log('🖼️ 背景4（back6.png）を自動選択');
+    }
   }
-};
+}
 
 // Writer ID ステータス表示div を作成
 function createWriterStatusDiv() {
@@ -651,6 +698,28 @@ function createWriterStatusDiv() {
     font-size: 12px;
     z-index: 1000;
   `;
+  
+  // デバッグ用テストボタンを追加
+  const testBtn = document.createElement('button');
+  testBtn.textContent = 'ID確認';
+  testBtn.style.cssText = `
+    margin-left: 8px;
+    font-size: 10px;
+    padding: 3px 8px;
+    background: #333;
+    color: white;
+    border: 1px solid #666;
+    border-radius: 3px;
+    cursor: pointer;
+  `;
+  testBtn.onclick = () => {
+    console.log(`🔍 現在のWriter ID: ${myWriterId}`);
+    console.log(`🔍 WebSocket状態: ${socket ? socket.readyState : 'socket未初期化'}`);
+    console.log(`🔍 他の書き手データ:`, otherWritersData);
+    alert(`Writer ID: ${myWriterId || '未割り当て'}\nWebSocket: ${socket ? socket.readyState : '未初期化'}\n他の書き手: ${Object.keys(otherWritersData).length}人`);
+  };
+  statusDiv.appendChild(testBtn);
+  
   document.body.appendChild(statusDiv);
   return statusDiv;
 }
@@ -859,8 +928,8 @@ function createSpecialHeart() {
   }
 }
 
-// 受信側からのメッセージ処理
-socket.onmessage = function(event) {
+// 受信側からのメッセージ処理（上のsocket.onmessageに統合済み）
+// socket.onmessage = function(event) {
   try {
     // Blobの場合は文字列として読み取る
     if (event.data instanceof Blob) {
@@ -1092,13 +1161,8 @@ function setBackground(src) {
         console.log(`📐 背景2をキャンバス全体に表示: ${drawWidth}x${drawHeight}`);
       }
       
-      // 書き手側では背景1〜4を正常な向きで表示するため、キャンバスが180度回転している分を補正
-      ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate(Math.PI); // 180度回転
-      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+      // 書き手側では背景画像を回転なしで表示
       ctx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
-      ctx.restore();
       
       // 背景ソースを記録
       lastBackgroundSrc = src;
@@ -2181,6 +2245,8 @@ canvas.addEventListener("mousedown", (e) => {
   const x = e.offsetX;
   const y = e.offsetY;
   
+  console.log(`🖱️ マウス開始座標: offsetX=${x}, offsetY=${y}`);
+  
   // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
   // ネオンモードの初期設定
@@ -2228,8 +2294,10 @@ canvas.addEventListener("mousedown", (e) => {
   };
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify(startMsg));
+    console.log("📤 送信 start:", startMsg);
+  } else {
+    console.error("❌ WebSocket接続なし - start送信失敗");
   }
-  console.log("📤 送信 start:", startMsg);
   
   // 星エフェクトが有効な場合は星を生成
   if (starEffectEnabled) {
@@ -2352,7 +2420,7 @@ canvas.addEventListener("mousemove", (e) => {
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify(drawMsg));
   }
-  // console.log("📤 送信 draw:", drawMsg); // パフォーマンスのためコメントアウト
+  // console.log("📤 送信 draw:", drawMsg, `myWriterId=${myWriterId}`); // パフォーマンスのためコメントアウト
   
   // 星エフェクトが有効な場合は星を生成（2回に1回の頻度）
   if (starEffectEnabled && Math.random() < 0.5) {
@@ -2379,8 +2447,14 @@ canvas.addEventListener("touchstart", (e) => {
   drawing = true;
   const touch = e.touches[0];
   const rect = canvas.getBoundingClientRect();
-  const x = touch.clientX - rect.left;
-  const y = touch.clientY - rect.top;
+  
+  // スケール調整を考慮した座標計算
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (touch.clientX - rect.left) * scaleX;
+  const y = (touch.clientY - rect.top) * scaleY;
+  
+  console.log(`📱 タッチ開始座標: clientX=${touch.clientX}, clientY=${touch.clientY}, rect=${rect.left},${rect.top}, scale=${scaleX},${scaleY}, final=${x},${y}`);
   
   // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
@@ -2450,8 +2524,12 @@ canvas.addEventListener("touchmove", (e) => {
   if (!drawing) return;
   const touch = e.touches[0];
   const rect = canvas.getBoundingClientRect();
-  const x = touch.clientX - rect.left;
-  const y = touch.clientY - rect.top;
+  
+  // スケール調整を考慮した座標計算
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (touch.clientX - rect.left) * scaleX;
+  const y = (touch.clientY - rect.top) * scaleY;
   
   // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
@@ -2754,15 +2832,10 @@ function saveDoubleRotatedImage() {
     // キャンバスを完全にクリア
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // 背景画像があれば180度回転で再描画
+    // 背景画像があれば再描画（回転なし）
     if (backgroundImage) {
-      ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate(Math.PI); // 180度回転
-      ctx.translate(-canvas.width / 2, -canvas.height / 2);
       ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
-      ctx.restore();
-      console.log('🖼️ 背景画像を180度回転で再描画');
+      console.log('🖼️ 背景画像を再描画');
     }
     
     // 描画コマンドをクリア
@@ -3295,6 +3368,9 @@ window.addEventListener('DOMContentLoaded', () => {
   
   // キャンバススケール0.7を適用
   updateCanvasScale(0.7);
+  
+  // Writer IDステータス表示を作成
+  createWriterStatusDiv();
   
   // 背景2を自動設定
   setTimeout(() => {

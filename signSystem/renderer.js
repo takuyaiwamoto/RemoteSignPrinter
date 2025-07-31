@@ -1790,6 +1790,7 @@ function handleMessage(data) {
   
   // Writer ID要求の処理
   if (data.type === "requestWriterId") {
+    console.log("📨 Writer ID要求を受信");
     // 利用可能なwriter IDを割り当て
     let assignedId = null;
     for (let i = 1; i <= 3; i++) {
@@ -1806,11 +1807,15 @@ function handleMessage(data) {
       console.log(`📝 Writer ID割り当て: ${assignedId} (接続中: ${Array.from(connectedWriters).join(', ')})`);
       
       // 仮実装：全ての書き手にID割り当て通知を送信
+      const assignMsg = {
+        type: "assignWriterId",
+        writerId: assignedId
+      };
+      console.log("📤 Writer ID割り当て送信:", assignMsg);
       if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({
-          type: "assignWriterId",
-          writerId: assignedId
-        }));
+        socket.send(JSON.stringify(assignMsg));
+      } else {
+        console.error("❌ WebSocket接続なし - Writer ID割り当て送信失敗");
       }
     } else {
       console.warn("⚠️ 利用可能なwriter IDがありません（最大3人）");
@@ -2068,18 +2073,17 @@ function handleMessage(data) {
     let scaledX = (data.x / senderCanvasSize.width) * drawingAreaSize.width;
     let scaledY = (data.y / senderCanvasSize.height) * drawingAreaSize.height;
     
-    console.log('🎯 START描画デバッグ:');
-    //console.log('送信側座標:', data.x, data.y);
-    //console.log('スケール後座標:', scaledX.toFixed(1), scaledY.toFixed(1));
+    console.log(`🎯 START描画デバッグ: 送信側(${data.x}, ${data.y}) → スケール後(${scaledX.toFixed(1)}, ${scaledY.toFixed(1)})`);
     console.log('  描画エリアサイズ:', drawingAreaSize.width, 'x', drawingAreaSize.height);
-    //console.log('描画エリア中心:', areaCenterX.toFixed(1), areaCenterY.toFixed(1));
     console.log('  描画エリア左上:', areaLeft.toFixed(1), areaTop.toFixed(1));
     
     // 180度回転座標変換を適用
+    const beforeRotationX = scaledX;
+    const beforeRotationY = scaledY;
     scaledX = drawingAreaSize.width - scaledX;
     scaledY = drawingAreaSize.height - scaledY;
     
-    //console.log('180度回転座標変換適用済み:', scaledX.toFixed(1), scaledY.toFixed(1));
+    console.log(`  180度回転変換: (${beforeRotationX.toFixed(1)}, ${beforeRotationY.toFixed(1)}) → (${scaledX.toFixed(1)}, ${scaledY.toFixed(1)})`);
     
     const finalX = areaLeft + scaledX;
     const finalY = areaTop + scaledY;
