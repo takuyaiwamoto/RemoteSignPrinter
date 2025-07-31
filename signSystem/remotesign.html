@@ -824,13 +824,8 @@ function redrawCanvasWithOthers() {
         ctx.moveTo(cmd.x, cmd.y);
       } else if (cmd.type === "draw") {
         ctx.lineWidth = cmd.thickness || 4;
-        // 執筆者ごとに色を変える
-        const writerColors = {
-          writer1: '#ff4444',
-          writer2: '#44ff44', 
-          writer3: '#4444ff'
-        };
-        ctx.strokeStyle = writerColors[writerId] || cmd.color || 'black';
+        // そのIDが設定した実際の色を使用
+        ctx.strokeStyle = cmd.color || 'black';
         ctx.lineTo(cmd.x, cmd.y);
         ctx.stroke();
       }
