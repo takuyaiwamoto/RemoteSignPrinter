@@ -557,6 +557,7 @@ let drawing = false;
 let socket = new WebSocket("wss://realtime-sign-server-1.onrender.com");
 let myWriterId = null; // 自分のwriter ID
 let otherWritersData = {}; // 他の執筆者のデータ
+let mySessionId = null; // セッション固有ID
 let backgroundImage = null;
 let currentPaperSize = "A4"; // 現在の用紙サイズ
 let currentPrintMode = "drawOnly"; // 現在の印刷モード（デフォルト：描画モード）
@@ -642,13 +643,19 @@ function processMessage(data) {
   if (data.type === "assignWriterId") {
     // writer ID の割り当てを受信
     console.log("📨 Writer ID割り当てメッセージ受信:", data);
-    myWriterId = data.writerId;
-    console.log(`📝 Writer ID 割り当て: ${myWriterId}`);
-    document.title = `送信側 - ${myWriterId}`;
     
-    // Writer ID表示を更新
-    const statusDiv = document.getElementById('writerStatus') || createWriterStatusDiv();
-    statusDiv.textContent = `Writer ID: ${myWriterId}`;
+    // セッションIDが一致する場合のみ受け入れる
+    if (data.sessionId && data.sessionId === mySessionId) {
+      myWriterId = data.writerId;
+      console.log(`📝 Writer ID 割り当て: ${myWriterId} (SessionID: ${mySessionId})`);
+      document.title = `送信側 - ${myWriterId}`;
+      
+      // Writer ID表示を更新
+      const statusDiv = document.getElementById('writerStatus') || createWriterStatusDiv();
+      statusDiv.childNodes[0].textContent = `Writer ID: ${myWriterId}`;
+    } else {
+      console.log("❌ セッションID不一致のため無視:", data.sessionId, "vs", mySessionId);
+    }
     
   } else if (data.type === "start" || data.type === "draw") {
     // 他の執筆者からの描画データを受信
@@ -679,11 +686,23 @@ function processMessage(data) {
   }
 }
 
+// セッションID生成関数
+function generateSessionId() {
+  return 'session_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+}
+
 // Writer ID要求関数
 function requestWriterId() {
   if (socket && socket.readyState === WebSocket.OPEN) {
+    // セッションIDが未設定の場合は生成
+    if (!mySessionId) {
+      mySessionId = generateSessionId();
+      console.log("🆔 セッションID生成:", mySessionId);
+    }
+    
     const requestMsg = {
-      type: "requestWriterId"
+      type: "requestWriterId",
+      sessionId: mySessionId
     };
     console.log("🔄 Writer ID再要求送信:", requestMsg);
     socket.send(JSON.stringify(requestMsg));

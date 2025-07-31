@@ -865,6 +865,7 @@ let receiverCanvasSize = { width: 1202, height: 849 }; // 受信側のキャン�
 
 let socket = new WebSocket("wss://realtime-sign-server-1.onrender.com");
 let connectedWriters = new Set(); // 接続中の書き手管理
+let writerSessions = new Map(); // WriterID -> SessionID のマッピング
 
 socket.onopen = () => console.log("✅ 受信側WebSocket接続完了");
 socket.onerror = e => console.error("❌ 受信側WebSocketエラー", e);
@@ -1790,7 +1791,38 @@ function handleMessage(data) {
   
   // Writer ID要求の処理
   if (data.type === "requestWriterId") {
-    console.log("📨 Writer ID要求を受信");
+    console.log("📨 Writer ID要求を受信:", data.sessionId);
+    
+    // セッションIDが提供されていない場合は旧方式
+    if (!data.sessionId) {
+      console.warn("⚠️ セッションIDが提供されていません - 旧方式を使用");
+      return;
+    }
+    
+    // 既存セッションの確認と重複チェック
+    let existingWriterId = null;
+    for (let [writerId, sessionId] of writerSessions.entries()) {
+      if (sessionId === data.sessionId) {
+        existingWriterId = writerId;
+        console.log(`🔄 既存セッション発見: ${writerId} -> ${sessionId}`);
+        break;
+      }
+    }
+    
+    // 既存セッションがある場合はそれを再利用
+    if (existingWriterId) {
+      const assignMsg = {
+        type: "assignWriterId",
+        writerId: existingWriterId,
+        sessionId: data.sessionId
+      };
+      console.log("📤 既存Writer ID再送信:", assignMsg);
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(assignMsg));
+      }
+      return;
+    }
+    
     // 利用可能なwriter IDを割り当て
     let assignedId = null;
     for (let i = 1; i <= 3; i++) {
@@ -1803,13 +1835,16 @@ function handleMessage(data) {
     }
     
     if (assignedId) {
-      // 書き手にwriter IDを送信（実際のWebSocketサーバーでは双方向通信が必要）
-      console.log(`📝 Writer ID割り当て: ${assignedId} (接続中: ${Array.from(connectedWriters).join(', ')})`);
+      // セッションマッピングを記録
+      writerSessions.set(assignedId, data.sessionId);
       
-      // 仮実装：全ての書き手にID割り当て通知を送信
+      console.log(`📝 Writer ID割り当て: ${assignedId} セッション: ${data.sessionId} (接続中: ${Array.from(connectedWriters).join(', ')})`);
+      console.log("📋 現在のセッション:", Array.from(writerSessions.entries()));
+      
       const assignMsg = {
         type: "assignWriterId",
-        writerId: assignedId
+        writerId: assignedId,
+        sessionId: data.sessionId // セッションIDを含める
       };
       console.log("📤 Writer ID割り当て送信:", assignMsg);
       if (socket && socket.readyState === WebSocket.OPEN) {
@@ -1819,6 +1854,7 @@ function handleMessage(data) {
       }
     } else {
       console.warn("⚠️ 利用可能なwriter IDがありません（最大3人）");
+      console.log("📋 現在のセッション:", Array.from(writerSessions.entries()));
     }
     return;
   }
