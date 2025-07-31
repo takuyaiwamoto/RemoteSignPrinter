@@ -1693,16 +1693,16 @@ function redrawCanvas(withBackground = true) {
   ctx.rotate(Math.PI); // 180度回転
   ctx.translate(-areaCenterX, -areaCenterY); // 元の位置に戻す
   
+  // 各writerIDごとの最後のwriterIDを追跡して、異なるwriterID間でパスが繋がらないようにする
+  let lastWriterId = null;
+  
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       ctx.beginPath();
-      // 🔸 描画エリア調整を適用した座標変換（180度回転適用）
+      lastWriterId = cmd.writerId; // 現在のwriterIDを記録
+      // 🔸 描画エリア調整を適用した座標変換（Canvasレベルで180度回転するため座標変換は不要）
       let scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
       let scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
-      
-      // 180度回転座標変換（書き手側と同じ表示にする）
-      scaledX = drawingAreaSize.width - scaledX;
-      scaledY = drawingAreaSize.height - scaledY;
       
       if (cmd === drawingData.find(d => d.type === 'start')) { // 最初のstartコマンドでのみログ出力
         //console.log(`  ////描画エリア中心: (${areaCenterX}, ${areaCenterY})`);
@@ -1716,13 +1716,20 @@ function redrawCanvas(withBackground = true) {
       
       ctx.moveTo(areaLeft + scaledX, areaTop + scaledY);
     } else if (cmd.type === "draw") {
-      // 🔸 描画エリア調整を適用した座標変換（180度回転適用）
+      // writerIDが変わった場合は新しいパスを開始
+      if (cmd.writerId !== lastWriterId) {
+        ctx.beginPath();
+        lastWriterId = cmd.writerId;
+        // 新しいパスの場合、moveToから開始（Canvasレベルで180度回転するため座標変換は不要）
+        let scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+        let scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+        ctx.moveTo(areaLeft + scaledX, areaTop + scaledY);
+        return; // この点はmoveToのみで、strokeは行わない
+      }
+      
+      // 🔸 描画エリア調整を適用した座標変換（Canvasレベルで180度回転するため座標変換は不要）
       let scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
       let scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
-      
-      // 180度回転座標変換（書き手側と同じ表示にする）
-      scaledX = drawingAreaSize.width - scaledX;
-      scaledY = drawingAreaSize.height - scaledY;
       
       // ネオンの場合はセグメントごとに新しいパスを作成（送信側と同じ方式）
       if (cmd.color === 'neon' && cmd.neonIndex !== null) {
