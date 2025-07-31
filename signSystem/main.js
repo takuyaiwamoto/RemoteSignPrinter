@@ -105,6 +105,48 @@ app.on("window-all-closed", () => {
 });
 
 // 印刷処理
+// 🔸 画像保存のIPCハンドラー
+ipcMain.on("save-image", (event, data) => {
+  try {
+    console.log("💾 画像保存要求を受信");
+    console.log("💾 ファイル名:", data.filename);
+    console.log("💾 画像データサイズ:", data.imageData ? data.imageData.length : 'なし');
+    
+    if (!data.imageData) {
+      console.error("❌ 画像データがありません");
+      return;
+    }
+    
+    const base64Data = data.imageData.replace(/^data:image\/png;base64,/, "");
+    const pngBuffer = Buffer.from(base64Data, "base64");
+    console.log("💾 バッファサイズ:", pngBuffer.length);
+    
+    // Downloadsフォルダに保存
+    const os = require('os');
+    const downloadsPath = path.join(os.homedir(), 'Downloads');
+    const filePath = path.join(downloadsPath, data.filename);
+    
+    console.log("💾 保存先パス:", filePath);
+    console.log("💾 Downloadsフォルダ存在確認:", fs.existsSync(downloadsPath));
+    
+    // フォルダが存在しない場合は作成
+    if (!fs.existsSync(downloadsPath)) {
+      fs.mkdirSync(downloadsPath, { recursive: true });
+      console.log("💾 Downloadsフォルダを作成しました");
+    }
+    
+    fs.writeFileSync(filePath, pngBuffer);
+    console.log("💾 画像保存完了:", filePath);
+    console.log("💾 保存ファイル確認:", fs.existsSync(filePath));
+    
+    // 保存完了をレンダラープロセスに通知
+    event.reply("save-image-complete", { filePath });
+  } catch (error) {
+    console.error("❌ 画像保存でエラー発生:", error);
+    event.reply("save-image-error", { error: error.message });
+  }
+});
+
 ipcMain.on("save-pdf", (event, data) => {
   console.log("📥 画像データ受信");
   console.log("📥 受信データタイプ:", data.printType || "不明");
@@ -213,9 +255,9 @@ ipcMain.on("save-pdf", (event, data) => {
       console.log(`🔍 用紙サイズ判定: paperSize="${paperSize}" (型: ${typeof paperSize})`);
       
       if (paperSize === 'L') {
-        // L判用紙トレイを指定 (トレイ1がL版) + 180度回転
-        printCommand = `lpr -P "${printerName}" -o PageSize=4x6 -o InputSlot=tray-1 -o orientation-requested=6 "${savePath}"`;
-        console.log(`🖨️ L判印刷コマンド実行（180度回転）: ${printCommand}`);
+        // L判用紙トレイを指定 (トレイ1がL版) ※renderer.jsで既に180度回転済み
+        printCommand = `lpr -P "${printerName}" -o PageSize=4x6 -o InputSlot=tray-1 "${savePath}"`;
+        console.log(`🖨️ L判印刷コマンド実行（renderer.jsで180度回転済み）: ${printCommand}`);
         
         // プリンタのメディアサイズ確認用コマンド実行
         exec(`lpoptions -p "${printerName}" -l | grep -i media`, (error, stdout, stderr) => {
@@ -244,8 +286,8 @@ ipcMain.on("save-pdf", (event, data) => {
           
           // L判の場合は別のコマンドを試行
           if (paperSize === 'L') {
-            const fallbackCommand = `lpr -P "${printerName}" -o PageSize=4x6 -o orientation-requested=6 "${savePath}"`;
-            console.log(`🔄 L判フォールバック印刷（180度回転）: ${fallbackCommand}`);
+            const fallbackCommand = `lpr -P "${printerName}" -o PageSize=4x6 "${savePath}"`;
+            console.log(`🔄 L判フォールバック印刷（renderer.jsで180度回転済み）: ${fallbackCommand}`);
             
             exec(fallbackCommand, (fbError, fbStdout, fbStderr) => {
               if (fbError) {

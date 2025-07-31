@@ -32,6 +32,7 @@
     }
     
     body.modern .main-container {
+      position: relative;
       max-width: 1200px;
       margin: 0 auto;
       background: rgba(255, 255, 255, 0.95);
@@ -414,7 +415,7 @@
 <button id="themeToggle" onclick="toggleTheme()">📝 クラシック</button>
 
 <div class="main-container">
-<canvas id="drawCanvas" width="859" height="607"></canvas>
+<canvas id="drawCanvas" width="859" height="607" style="position: relative; z-index: 100; background: transparent; transform: rotate(180deg); transform-origin: center center;"></canvas>
 
 <div class="button-group">
   <button onclick="clearCanvas()">Clear</button>
@@ -426,6 +427,7 @@
   <button onclick="setBackground('./back3.png')">背景1</button>
   <button onclick="setBackground('./back2.png')">背景2</button>
   <button onclick="setBackground('./back4.png')">背景3</button>
+  <button onclick="setBackground('./back6.png')">背景4</button>
   <button onclick="setBackground(null)">白</button>
   <button onclick="setSpecialBackgroundToggle()" style="background: linear-gradient(45deg, #ff1493, #00ffff); color: white;">🎬 動画背景</button>
 </div>
@@ -459,8 +461,8 @@
   
   <div class="button-group">
     <label>キャンバスサイズ調整:</label>
-    <input type="range" id="canvasScale" min="0.1" max="3.0" step="0.05" value="0.35" oninput="updateCanvasScale(this.value)">
-    <span id="canvasScaleValue">0.35x</span>
+    <input type="range" id="canvasScale" min="0.1" max="3.0" step="0.05" value="0.7" oninput="updateCanvasScale(this.value)">
+    <span id="canvasScaleValue">0.7x</span>
   </div>
   
   <div class="button-group">
@@ -516,6 +518,8 @@
     <label for="fireworksEffect">🎆 花火</label>
     <input type="checkbox" id="confettiEffect" checked>
     <label for="confettiEffect">🎊 紙吹雪</label>
+    <input type="checkbox" id="backgroundDebug" onchange="toggleBackgroundDebug()">
+    <label for="backgroundDebug">🔍 背景デバッグ</label>
   </div>
   
   <div class="button-group">
@@ -551,11 +555,13 @@ const canvas = document.getElementById("drawCanvas");
 const ctx = canvas.getContext("2d");
 let drawing = false;
 let socket = new WebSocket("wss://realtime-sign-server-1.onrender.com");
+let myWriterId = null; // 自分のwriter ID
+let otherWritersData = {}; // 他の執筆者のデータ
 let backgroundImage = null;
 let currentPaperSize = "A4"; // 現在の用紙サイズ
 let currentPrintMode = "drawOnly"; // 現在の印刷モード（デフォルト：描画モード）
 let currentVideoSize = 100; // 現在のビデオサイズ（デフォルト100%）
-let canvasScale = 0.35; // キャンバススケール
+let canvasScale = 0.7; // キャンバススケール
 let animationStartWaitTime = 3.3; // アニメーション開始待機時間
 let rotationWaitTime = 7.5; // 回転後待機時間
 let currentPenThickness = 8; // 現在のペンの太さ（標準は太い）
@@ -583,21 +589,142 @@ let isDrawingActive = false; // 描画中フラグ
 let drawingInactiveTimer = null; // 描画停止タイマー
 const DRAWING_PAUSE_DELAY = 500; // 描画停止から一時停止までの遅延（ミリ秒）
 
+// 🔍 背景デバッグ表示制御
+let backgroundDebugEnabled = false;
+let lastBackgroundSrc = null;
+
 // 背景別キャンバスサイズ設定（1.02倍サイズ = 0.6*1.7）
 const backgroundSizes = {
   'back3': { width: 859, height: 607 },    // 背景1 (842*0.6*1.7, 595*0.6*1.7)
-  'back2': { width: 607, height: 859 },    // 背景2（縦向き） (595*0.6*1.7, 842*0.6*1.7)
+  'back2': { width: 455, height: 644 },    // 背景2（縦向き）25%縮小 (607*0.75, 859*0.75)
   'back4': { width: 859, height: 607 },    // 背景3 (842*0.6*1.7, 595*0.6*1.7)
-  'back5': { width: 859, height: 607 },    // 背景4 (842*0.6*1.7, 595*0.6*1.7)
+  'back5': { width: 859, height: 607 },    // 背景5 (842*0.6*1.7, 595*0.6*1.7)
+  'back6': { width: 859, height: 607 },    // 背景4（横長） (842*0.6*1.7, 595*0.6*1.7)
   'white': { width: 859, height: 607 }     // 白背景 (842*0.6*1.7, 595*0.6*1.7)
 };
-socket.onopen = () => console.log("✅ WebSocket接続完了（送信側）");
+socket.onopen = () => {
+  console.log("✅ WebSocket接続完了（送信側）");
+  
+  // writer ID を要求
+  socket.send(JSON.stringify({
+    type: "requestWriterId"
+  }));
+};
+
+socket.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  
+  if (data.type === "assignWriterId") {
+    // writer ID の割り当てを受信
+    myWriterId = data.writerId;
+    console.log(`📝 Writer ID 割り当て: ${myWriterId}`);
+    document.title = `送信側 - ${myWriterId}`;
+    
+    // Writer ID表示を更新
+    const statusDiv = document.getElementById('writerStatus') || createWriterStatusDiv();
+    statusDiv.textContent = `Writer ID: ${myWriterId}`;
+    
+  } else if (data.type === "start" || data.type === "draw") {
+    // 他の執筆者からの描画データを受信
+    if (data.writerId && data.writerId !== myWriterId) {
+      handleOtherWriterDrawing(data);
+    }
+  } else if (data.type === "clear") {
+    // 全体クリア
+    otherWritersData = {};
+    redrawCanvasWithOthers();
+  }
+};
+
+// Writer ID ステータス表示div を作成
+function createWriterStatusDiv() {
+  const statusDiv = document.createElement('div');
+  statusDiv.id = 'writerStatus';
+  statusDiv.style.cssText = `
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 1000;
+  `;
+  document.body.appendChild(statusDiv);
+  return statusDiv;
+}
+
+// 他の執筆者の描画データを処理
+function handleOtherWriterDrawing(data) {
+  const writerId = data.writerId;
+  
+  if (!otherWritersData[writerId]) {
+    otherWritersData[writerId] = [];
+  }
+  
+  otherWritersData[writerId].push(data);
+  
+  // リアルタイムで他執筆者の描画を表示
+  redrawCanvasWithOthers();
+}
+
+// 自分と他執筆者の描画を統合して再描画
+function redrawCanvasWithOthers() {
+  // 背景をクリア
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // 背景画像があれば描画
+  if (backgroundImage) {
+    ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+  }
+  
+  // 自分の描画コマンドを再実行
+  drawingCommands.forEach(cmd => {
+    if (cmd.type === "start") {
+      ctx.beginPath();
+      ctx.moveTo(cmd.x, cmd.y);
+    } else if (cmd.type === "draw") {
+      ctx.lineWidth = cmd.thickness || currentPenThickness;
+      ctx.strokeStyle = cmd.color || currentPenColor;
+      ctx.lineTo(cmd.x, cmd.y);
+      ctx.stroke();
+    }
+  });
+  
+  // 他執筆者の描画データを描画（半透明で表示）
+  Object.keys(otherWritersData).forEach(writerId => {
+    ctx.save();
+    ctx.globalAlpha = 0.7; // 他執筆者は少し透明に
+    
+    otherWritersData[writerId].forEach(cmd => {
+      if (cmd.type === "start") {
+        ctx.beginPath();
+        ctx.moveTo(cmd.x, cmd.y);
+      } else if (cmd.type === "draw") {
+        ctx.lineWidth = cmd.thickness || 4;
+        // 執筆者ごとに色を変える
+        const writerColors = {
+          writer1: '#ff4444',
+          writer2: '#44ff44', 
+          writer3: '#4444ff'
+        };
+        ctx.strokeStyle = writerColors[writerId] || cmd.color || 'black';
+        ctx.lineTo(cmd.x, cmd.y);
+        ctx.stroke();
+      }
+    });
+    
+    ctx.restore();
+  });
+}
+
 socket.onerror = (error) => console.error("❌ WebSocketエラー（送信側）:", error);
 socket.onclose = (event) => console.log("⚠️ WebSocket切断（送信側）:", event.code, event.reason);
 
 // ハートエフェクト生成関数
 function createHeart() {
-  console.log('💖 ハート生成開始（送信側）');
+  // ハート生成開始
   const heart = document.createElement('div');
   heart.className = 'heart';
   
@@ -609,7 +736,7 @@ function createHeart() {
     randomMoves.push(randomX);
   }
   
-  console.log(`💖 ランダム移動値: [${randomMoves.join(', ')}]`);
+  // ランダム移動値計算
   
   // ランダムなキーフレームを動的に生成
   const style = document.createElement('style');
@@ -648,7 +775,7 @@ function createHeart() {
     }
   `;
   document.head.appendChild(style);
-  console.log(`💖 スタイル追加: ${randomAnimationName}`);
+  // スタイル追加
   
   // ランダムアニメーションを適用
   heart.style.animation = `${randomAnimationName} 3s linear forwards`;
@@ -658,28 +785,26 @@ function createHeart() {
   heart.style.zIndex = '99999';
   
   document.body.appendChild(heart);
-  console.log('💖 ハートをDOMに追加（送信側）:', heart);
+  // ハートをDOMに追加
   
-  // 音楽再生
-  const audio = new Audio('./poyo.mp3');
-  audio.play().catch(e => console.log('音楽再生エラー:', e));
+  // 音楽再生は受信側のみ（送信側では削除）
   
   // アニメーション終了後削除（スタイルも削除）
   setTimeout(() => {
     if (heart.parentNode) {
       heart.parentNode.removeChild(heart);
-      console.log('💖 ハート削除（送信側）');
+      // ハート削除
     }
     if (style.parentNode) {
       style.parentNode.removeChild(style);
-      console.log('💖 スタイル削除（送信側）');
+      // スタイル削除
     }
   }, 3000);
 }
 
 // 特別演出用の大きなハート生成関数
 function createSpecialHeart() {
-  console.log('🎉 特別演出開始！送信側に30個の大きなハートを生成');
+  // 特別ハート演出開始
   
   // 30個のハートを30ms間隔で生成
   for (let i = 0; i < 30; i++) {
@@ -694,7 +819,7 @@ function createSpecialHeart() {
       const windowCenterX = window.innerWidth / 2;
       const randomX = windowCenterX + (Math.random() - 0.5) * 600; // -300px to +300px
       
-      console.log(`🎉 特別ハート${i+1}配置位置:`, { windowCenterX, randomX, windowWidth: window.innerWidth });
+      // 特別ハート配置
       
       // 個別のキーフレームアニメーションを動的に生成
       const style = document.createElement('style');
@@ -747,11 +872,18 @@ socket.onmessage = function(event) {
           // console.log('📨 Blobから解析したメッセージ:', data);
           
           if (data.type === "heartEffect") {
-            console.log('💖 受信側からハートエフェクト指示を受信（Blob経由）');
+            // ハートエフェクト指示受信
             createHeart();
           } else if (data.type === "specialHeartEffect") {
-            console.log('🎉 受信側から特別ハートエフェクト指示を受信（Blob経由）');
+            // 特別ハートエフェクト指示受信
             createSpecialHeart();
+          } else if (data.type === "autoSelectBackground") {
+            console.log('🖼️ 受信側から背景自動選択指示を受信（Blob経由）:', data.background);
+            // 背景4を自動選択
+            if (data.background === "back6") {
+              setBackground('./back6.png');
+              console.log('✅ 背景4を自動選択しました（Blob経由）');
+            }
           }
         } catch (error) {
           console.log('⚠️ Blob解析エラー:', error.message);
@@ -765,11 +897,18 @@ socket.onmessage = function(event) {
     console.log('📨 送信側で受信したメッセージ:', data);
     
     if (data.type === "heartEffect") {
-      console.log('💖 受信側からハートエフェクト指示を受信');
+      // ハートエフェクト指示受信
       createHeart();
     } else if (data.type === "specialHeartEffect") {
-      console.log('🎉 受信側から特別ハートエフェクト指示を受信');
+      // 特別ハートエフェクト指示受信
       createSpecialHeart();
+    } else if (data.type === "autoSelectBackground") {
+      console.log('🖼️ 受信側から背景自動選択指示を受信:', data.background);
+      // 背景4を自動選択
+      if (data.background === "back6") {
+        setBackground('./back6.png');
+        console.log('✅ 背景4を自動選択しました');
+      }
     } else {
       console.log('⚠️ 不明なメッセージタイプ:', data.type);
     }
@@ -786,7 +925,7 @@ let senderLKeyTimer = null;
 document.addEventListener('keydown', function(event) {
   if (event.key.toLowerCase() === 'l') {
     senderLKeyCount++;
-    console.log('💖 送信側でlキーが押されました - カウント:', senderLKeyCount);
+    // 送信側lキー押下
     
     if (senderLKeyTimer) {
       clearTimeout(senderLKeyTimer);
@@ -809,7 +948,7 @@ document.addEventListener('keydown', function(event) {
 
 // テスト用：5秒後に自動でハートを表示
 setTimeout(() => {
-  console.log('🧪 テスト: 自動ハート表示（送信側）');
+  // テスト: 自動ハート表示
   createHeart();
 }, 5000);
 
@@ -850,10 +989,10 @@ function setPrintMode(mode) {
   
   if (mode === "drawOnly") {
     document.getElementById("drawOnlyBtn").classList.add("selected");
-    console.log("🖨️ 印刷モードを描画モード（描いたものだけ）に設定");
+    // 印刷モードを描画モードに設定
   } else if (mode === "fullMode") {
     document.getElementById("fullModeBtn").classList.add("selected");
-    console.log("🖨️ 印刷モードをフルモード（背景と描画したもの）に設定");
+    // 印刷モードをフルモードに設定
   }
   
   // 受信側に印刷モード情報を送信
@@ -893,6 +1032,8 @@ function resetCanvasToNormalSize() {
 }
 
 function setBackground(src) {
+  console.log('setBackground関数呼び出し:', src, 'WebSocket状態:', socket ? socket.readyState : 'socket未初期化');
+  
   if (src === null) {
     backgroundImage = null;
     
@@ -900,11 +1041,12 @@ function setBackground(src) {
     setCanvasSize('white');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // 受信側にサイズ情報付きで送信
+    // 受信側にサイズ情報付きで送信（devtoolのスケール値も含める）
     socket.send(JSON.stringify({ 
       type: "background", 
       src: "white",
-      canvasSize: backgroundSizes['white']
+      canvasSize: backgroundSizes['white'],
+      scale: canvasScale
     }));
   } else {
     const img = new Image();
@@ -916,7 +1058,7 @@ function setBackground(src) {
       backgroundImage = img;
       
       // 🔸 背景に応じたキャンバスサイズを設定
-      const backgroundKey = src.includes('back3') ? 'back3' : (src.includes('back4') ? 'back4' : (src.includes('back5') ? 'back5' : 'back2'));
+      const backgroundKey = src.includes('back3') ? 'back3' : (src.includes('back4') ? 'back4' : (src.includes('back5') ? 'back5' : (src.includes('back6') ? 'back6' : 'back2')));
       setCanvasSize(backgroundKey);
       
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -941,13 +1083,52 @@ function setBackground(src) {
         offsetY = 0;
       }
       
-      ctx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
+      // 🔸 背景2の場合はキャンバス全体に表示（キャンバスサイズが既に25%小さい）
+      if (src.includes('back2')) {
+        drawWidth = canvas.width;
+        drawHeight = canvas.height;
+        offsetX = 0;
+        offsetY = 0;
+        console.log(`📐 背景2をキャンバス全体に表示: ${drawWidth}x${drawHeight}`);
+      }
       
-      // 受信側にサイズ情報付きで送信
+      // 書き手側では背景1〜4を正常な向きで表示するため、キャンバスが180度回転している分を補正
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(Math.PI); // 180度回転
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+      ctx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
+      ctx.restore();
+      
+      // 背景ソースを記録
+      lastBackgroundSrc = src;
+      
+      // 🔍 背景画像の配置情報を詳細表示
+      console.log(`🖼️ 背景画像配置詳細 [${src}]:`);
+      console.log(`  キャンバスサイズ: ${canvas.width}x${canvas.height}`);
+      console.log(`  元画像サイズ: ${img.naturalWidth}x${img.naturalHeight}`);
+      console.log(`  描画サイズ: ${drawWidth.toFixed(1)}x${drawHeight.toFixed(1)}`);
+      console.log(`  描画位置: (${offsetX.toFixed(1)}, ${offsetY.toFixed(1)})`);
+      console.log(`  画像の占有率: ${((drawWidth * drawHeight) / (canvas.width * canvas.height) * 100).toFixed(1)}%`);
+      
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const bgCenterX = offsetX + drawWidth / 2;
+      const bgCenterY = offsetY + drawHeight / 2;
+      console.log(`  キャンバス中心: (${centerX}, ${centerY}) 緑点`);
+      console.log(`  背景画像中心: (${bgCenterX.toFixed(1)}, ${bgCenterY.toFixed(1)}) 青点`);
+      
+      // 🔍 デバッグ表示が有効な場合のみ視覚的な表示を追加
+      if (backgroundDebugEnabled) {
+        addBackgroundDebugVisuals(offsetX, offsetY, drawWidth, drawHeight);
+      }
+      
+      // 受信側にサイズ情報付きで送信（devtoolのスケール値も含める）
       socket.send(JSON.stringify({ 
         type: "background", 
         src: src,
-        canvasSize: backgroundSizes[backgroundKey]
+        canvasSize: backgroundSizes[backgroundKey],
+        scale: canvasScale
       }));
     };
     
@@ -1086,7 +1267,8 @@ function setSpecialBackground(src) {
 
 // 🎪 特殊背景設定関数（back6.mp4動画を使用）
 function setSpecialBackgroundToggle() {
-  console.log(`🎪 特殊背景ボタン押下（動画モード） - 現在の状態: ${specialBackgroundState}`);
+  console.log('動画背景ボタン押下 - WebSocket状態:', socket ? socket.readyState : 'socket未初期化');
+  console.log('特殊背景ボタン押下（動画モード） - 現在の状態:', specialBackgroundState);
   
   if (specialBackgroundState === 'ready') {
     // 第1段階: 扉を表示して動画を最初のフレームで停止
@@ -1106,16 +1288,10 @@ function setSpecialBackgroundToggle() {
       console.log('🎬 受信側に動画背景準備を送信');
     }
     
-    // 送信側でも視覚的フィードバック
-    ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = 'white';
-    ctx.font = '24px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('動画背景準備中...', canvas.width/2, canvas.height/2);
-    ctx.font = '16px Arial';
-    ctx.fillText('（扉が閉じた状態で0.3倍サイズの動画を配置）', canvas.width/2, canvas.height/2 + 30);
+    // 送信側キャンバスの背景を透明にして動画背景を見せる（描画は保持）
+    canvas.style.backgroundColor = 'transparent';
+    // ctx.clearRect(0, 0, canvas.width, canvas.height); // 描画を保持するためコメントアウト
+    console.log('🎬 送信側キャンバス透明化 - 動画背景準備完了（描画保持）');
     
   } else if (specialBackgroundState === 'door_shown') {
     // 第2段階: 扉を開いて動画再生開始
@@ -1135,17 +1311,12 @@ function setSpecialBackgroundToggle() {
       console.log('🎬 受信側に動画再生開始を送信');
     }
     
-    // 送信側の表示を更新
+    // 送信側の表示を更新（キャンバスを透明にして動画背景を見せる）
     ctx.restore();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = 'rgba(100, 100, 100, 0.3)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = 'white';
-    ctx.font = '20px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('動画再生中 - 描画可能', canvas.width/2, canvas.height/2);
-    ctx.font = '16px Arial';
-    ctx.fillText('（扉が開き0.3倍サイズの動画が再生中）', canvas.width/2, canvas.height/2 + 30);
+    // ctx.clearRect(0, 0, canvas.width, canvas.height); // 描画を保持するためコメントアウト
+    // 動画背景時はキャンバスを透明にする
+    canvas.style.backgroundColor = 'transparent';
+    console.log('🎬 送信側キャンバスを透明化 - 描画と動画が見える状態（描画保持）');
     
     // 動画終了まで待機（back6.mp4の長さに合わせて調整）
     setTimeout(() => {
@@ -1209,10 +1380,7 @@ function startCountdown() {
 }
 
 function clearCanvas() {
-  // 🎵 描画クリア時にペン音が有効なら音楽を停止して最初に戻す
-  if (penSoundEnabled) {
-    stopDrawingMusic();
-  }
+  // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (backgroundImage) {
@@ -1234,7 +1402,7 @@ function setPenThickness(thickness) {
   document.querySelectorAll('.thickness-btn').forEach(btn => btn.classList.remove('selected'));
   event.target.classList.add('selected');
   
-  console.log(`✏️ ペンの太さを${thickness}に設定`);
+  // ペンの太さ設定
   
   // 受信側に太さ情報を送信
   if (socket.readyState === WebSocket.OPEN) {
@@ -1255,7 +1423,7 @@ function setPenColor(color) {
   document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
   event.target.classList.add('selected');
   
-  console.log(`🎨 ペンの色を${color}に設定`);
+  // ペンの色設定
   
   // 受信側に色情報を送信
   if (socket.readyState === WebSocket.OPEN) {
@@ -1373,7 +1541,7 @@ function toggleFairyDustEffect() {
 // ハートエフェクトのON/OFF切り替え
 function toggleHeartEffect() {
   heartEffectEnabled = document.getElementById('heartEffect').checked;
-  console.log(`💖 ハートエフェクト: ${heartEffectEnabled ? 'ON' : 'OFF'}`);
+  // ハートエフェクト設定
   
   // 受信側にハートエフェクト状態を送信
   if (socket.readyState === WebSocket.OPEN) {
@@ -1384,15 +1552,81 @@ function toggleHeartEffect() {
   }
 }
 
-// 🎵 ペン音制御関数
+// 🎵 ペン音制御関数（送信側では無効化）
 function togglePenSound() {
-  penSoundEnabled = document.getElementById('penSoundEffect').checked;
-  console.log(`🎵 ペン音設定: ${penSoundEnabled ? 'ON' : 'OFF'}`);
+  penSoundEnabled = false; // 送信側では常に無効
+  // 音声は受信側のみで再生
+}
+
+function toggleBackgroundDebug() {
+  backgroundDebugEnabled = document.getElementById('backgroundDebug').checked;
+  console.log(`🔍 背景デバッグ表示: ${backgroundDebugEnabled ? 'ON' : 'OFF'}`);
   
-  // ペン音がOFFになった場合は音楽を停止
-  if (!penSoundEnabled) {
-    stopDrawingMusic();
+  // 現在の背景を再描画してデバッグ表示を更新
+  if (backgroundImage) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 背景画像を再描画
+    const imageAspect = backgroundImage.naturalWidth / backgroundImage.naturalHeight;
+    const canvasAspect = canvas.width / canvas.height;
+    
+    let drawWidth, drawHeight, offsetX, offsetY;
+    
+    if (imageAspect > canvasAspect) {
+      drawWidth = canvas.width;
+      drawHeight = drawWidth / imageAspect;
+      offsetX = 0;
+      offsetY = (canvas.height - drawHeight) / 2;
+    } else {
+      drawHeight = canvas.height;
+      drawWidth = drawHeight * imageAspect;
+      offsetX = (canvas.width - drawWidth) / 2;
+      offsetY = 0;
+    }
+    
+    // 背景2の特殊処理
+    if (lastBackgroundSrc && lastBackgroundSrc.includes('back2')) {
+      drawWidth = canvas.width;
+      drawHeight = canvas.height;
+      offsetX = 0;
+      offsetY = 0;
+    }
+    
+    ctx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
+    
+    // デバッグ表示が有効な場合のみ視覚的な表示を追加
+    if (backgroundDebugEnabled) {
+      addBackgroundDebugVisuals(offsetX, offsetY, drawWidth, drawHeight);
+    }
   }
+}
+
+function addBackgroundDebugVisuals(offsetX, offsetY, drawWidth, drawHeight) {
+  ctx.save();
+  
+  // 背景画像の境界線
+  ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 5]);
+  ctx.strokeRect(offsetX, offsetY, drawWidth, drawHeight);
+  
+  // キャンバス中心点（緑）
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+  ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, 5, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  // 背景画像中心点（青）
+  const bgCenterX = offsetX + drawWidth / 2;
+  const bgCenterY = offsetY + drawHeight / 2;
+  ctx.fillStyle = 'rgba(0, 0, 255, 0.8)';
+  ctx.beginPath();
+  ctx.arc(bgCenterX, bgCenterY, 5, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  ctx.restore();
 }
 
 function initDrawingAudio() {
@@ -1400,7 +1634,7 @@ function initDrawingAudio() {
     drawingAudio = new Audio('./draw.mp3');
     drawingAudio.loop = true; // ループ再生
     drawingAudio.volume = 0.7; // ボリュームを70%に設定
-    console.log('🎵 描画音楽(draw.mp3)を初期化');
+    // 描画音楽初期化
   }
 }
 
@@ -1411,9 +1645,9 @@ function startDrawingMusic() {
   
   if (drawingAudio.paused) {
     drawingAudio.play().then(() => {
-      console.log('🎵 描画音楽を開始/再開');
+      // 描画音楽開始
     }).catch(e => {
-      console.log('🎵 描画音楽再生エラー:', e);
+      // 描画音楽再生エラー
     });
   }
   
@@ -1429,7 +1663,7 @@ function startDrawingMusic() {
 function pauseDrawingMusic() {
   if (drawingAudio && !drawingAudio.paused) {
     drawingAudio.pause();
-    console.log('🎵 描画音楽を一時停止');
+    // 描画音楽一時停止
   }
   isDrawingActive = false;
 }
@@ -1438,7 +1672,7 @@ function stopDrawingMusic() {
   if (drawingAudio) {
     drawingAudio.pause();
     drawingAudio.currentTime = 0; // 最初に戻す
-    console.log('🎵 描画音楽を停止して最初に戻す');
+    // 描画音楽停止
   }
   isDrawingActive = false;
   
@@ -1947,8 +2181,7 @@ canvas.addEventListener("mousedown", (e) => {
   const x = e.offsetX;
   const y = e.offsetY;
   
-  // 🎵 描画開始時に音楽制御
-  handleDrawingActivity();
+  // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
   // ネオンモードの初期設定
   if (currentPenColor === 'neon') {
@@ -1984,14 +2217,18 @@ canvas.addEventListener("mousedown", (e) => {
   
   const startMsg = { 
     type: "start", 
+    writerId: myWriterId, // Writer ID を追加
     x, 
     y,
     thickness: currentPenThickness,
     color: currentPenColor,
     starEffect: starEffectEnabled,
-    fairyDustEffect: fairyDustEffectEnabled
+    fairyDustEffect: fairyDustEffectEnabled,
+    canvasSize: { width: canvas.width, height: canvas.height }
   };
-  socket.send(JSON.stringify(startMsg));
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify(startMsg));
+  }
   console.log("📤 送信 start:", startMsg);
   
   // 星エフェクトが有効な場合は星を生成
@@ -2015,8 +2252,7 @@ canvas.addEventListener("mousemove", (e) => {
   const x = e.offsetX;
   const y = e.offsetY;
   
-  // 🎵 描画継続時に音楽制御
-  handleDrawingActivity();
+  // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
   let actualColor;
   
@@ -2104,14 +2340,18 @@ canvas.addEventListener("mousemove", (e) => {
   
   const drawMsg = { 
     type: "draw", 
+    writerId: myWriterId, // Writer ID を追加
     x, 
     y,
     thickness: currentPenThickness,
     color: currentPenColor,
     neonIndex: currentPenColor === 'neon' ? neonColorIndex : null,
-    starEffect: starEffectEnabled
+    starEffect: starEffectEnabled,
+    canvasSize: { width: canvas.width, height: canvas.height }
   };
-  socket.send(JSON.stringify(drawMsg));
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify(drawMsg));
+  }
   // console.log("📤 送信 draw:", drawMsg); // パフォーマンスのためコメントアウト
   
   // 星エフェクトが有効な場合は星を生成（2回に1回の頻度）
@@ -2142,8 +2382,7 @@ canvas.addEventListener("touchstart", (e) => {
   const x = touch.clientX - rect.left;
   const y = touch.clientY - rect.top;
   
-  // 🎵 描画開始時に音楽制御
-  handleDrawingActivity();
+  // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
   // ネオンモードの初期設定
   if (currentPenColor === 'neon') {
@@ -2179,6 +2418,7 @@ canvas.addEventListener("touchstart", (e) => {
   
   const touchStartMsg = { 
     type: "start", 
+    writerId: myWriterId, // Writer ID を追加
     x, 
     y,
     thickness: currentPenThickness,
@@ -2213,8 +2453,7 @@ canvas.addEventListener("touchmove", (e) => {
   const x = touch.clientX - rect.left;
   const y = touch.clientY - rect.top;
   
-  // 🎵 描画継続時に音楽制御
-  handleDrawingActivity();
+  // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
   let actualColor;
   
@@ -2264,6 +2503,7 @@ canvas.addEventListener("touchmove", (e) => {
   
   const touchDrawMsg = { 
     type: "draw", 
+    writerId: myWriterId, // Writer ID を追加
     x, 
     y,
     thickness: currentPenThickness,
@@ -2440,10 +2680,7 @@ function saveRotatedImage() {
 
 // 現在の状態から更に180度回転させて保存する関数
 function saveDoubleRotatedImage() {
-  // 🎵 描画完了時にペン音が有効なら音楽を停止して最初に戻す
-  if (penSoundEnabled) {
-    stopDrawingMusic();
-  }
+  // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
   console.log(`🔄 送信ボタン: 印刷処理開始→${animationStartWaitTime}秒後にアニメーション開始`);
   
@@ -2517,10 +2754,15 @@ function saveDoubleRotatedImage() {
     // キャンバスを完全にクリア
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // 背景画像があれば再描画
+    // 背景画像があれば180度回転で再描画
     if (backgroundImage) {
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(Math.PI); // 180度回転
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
       ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
-      console.log('🖼️ 背景画像を再描画');
+      ctx.restore();
+      console.log('🖼️ 背景画像を180度回転で再描画');
     }
     
     // 描画コマンドをクリア
@@ -2666,22 +2908,91 @@ function createSenderVideo() {
     senderVideoElement.remove();
   }
   
-  // 新しい動画要素を作成（0.3倍サイズ）
+  // 新しい動画要素を作成（キャンバス位置に配置）
   senderVideoElement = document.createElement('video');
   senderVideoElement.src = './back6.mp4';
   
+  // 🔍 デバッグ情報: 現状把握
+  const canvasRect = canvas.getBoundingClientRect();
+  console.log('📊 書き手側デバッグ情報:');
+  console.log(`  canvasScale値: ${canvasScale}`);
+  console.log(`  キャンバス位置: (${canvasRect.left}, ${canvasRect.top})`);
+  console.log(`  キャンバスサイズ: ${canvasRect.width} x ${canvasRect.height}`);
+  console.log(`  ウィンドウサイズ: ${window.innerWidth} x ${window.innerHeight}`);
+  
+  // ステップ1: キャンバスの情報を確認
+  console.log('📏 ステップ1: キャンバス情報確認');
+  console.log(`  キャンバスサイズ: ${canvas.width} x ${canvas.height}`);
+  console.log(`  キャンバス画面位置: (${canvasRect.left}, ${canvasRect.top})`);
+  
+  // ステップ2: キャンバスの中心座標を計算
+  const canvasCenterX = canvas.width / 2;
+  const canvasCenterY = canvas.height / 2;
+  console.log('🎯 ステップ2: キャンバス中心座標計算');
+  console.log(`  キャンバス中心（相対座標）: (${canvasCenterX}, ${canvasCenterY})`);
+  
+  // ステップ3: 動画のアスペクト比（16:9）を保持しながらキャンバスに収まるサイズを計算
+  const videoAspectRatio = 16 / 9;
+  const canvasAspectRatio = canvas.width / canvas.height;
+  let videoWidth, videoHeight;
+  
+  if (canvasAspectRatio > videoAspectRatio) {
+    // キャンバスの方が横長 → 高さを基準にする
+    videoHeight = canvas.height;
+    videoWidth = videoHeight * videoAspectRatio;
+  } else {
+    // キャンバスの方が縦長 → 幅を基準にする
+    videoWidth = canvas.width;
+    videoHeight = videoWidth / videoAspectRatio;
+  }
+  
+  console.log('📐 ステップ3: 動画サイズ計算（16:9比率を保持）');
+  console.log(`  計算された動画サイズ: ${videoWidth.toFixed(1)} x ${videoHeight.toFixed(1)}`);
+  console.log(`  キャンバスに対する比率: ${(videoWidth/canvas.width*100).toFixed(1)}% x ${(videoHeight/canvas.height*100).toFixed(1)}%`);
+  
+  // ステップ4: 動画の画面絶対座標を計算（キャンバス中心に配置）
+  const canvasScreenCenterX = canvasRect.left + canvasCenterX;
+  const canvasScreenCenterY = canvasRect.top + canvasCenterY;
+  const videoScreenLeft = canvasScreenCenterX - (videoWidth / 2);
+  const videoScreenTop = canvasScreenCenterY - (videoHeight / 2);
+  
+  console.log('📍 ステップ4: 動画配置座標計算（画面絶対座標）');
+  console.log(`  キャンバス中心（画面座標）: (${canvasScreenCenterX.toFixed(1)}, ${canvasScreenCenterY.toFixed(1)})`);
+  console.log(`  動画左上座標（画面座標）: (${videoScreenLeft.toFixed(1)}, ${videoScreenTop.toFixed(1)})`);
+  
+  // ステップ5: 動画を画面絶対座標で配置（レイアウト影響を完全排除）
   senderVideoElement.style.cssText = `
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translateX(-50%) translateY(-50%) scale(0.3);
-    width: ${canvas.width}px;
-    height: ${canvas.height}px;
-    z-index: 5;
-    object-fit: cover;
-    pointer-events: none;
-    transform-origin: center center;
+    position: fixed !important;
+    top: ${videoScreenTop}px !important;
+    left: ${videoScreenLeft}px !important;
+    width: ${videoWidth}px !important;
+    height: ${videoHeight}px !important;
+    z-index: 50 !important;
+    object-fit: contain !important;
+    pointer-events: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    transform: none !important;
+    transform-origin: initial !important;
   `;
+  
+  // ステップ6: 理論上のずれ確認計算（画面座標）
+  const theoreticalVideoCenterX = videoScreenLeft + (videoWidth / 2);
+  const theoreticalVideoCenterY = videoScreenTop + (videoHeight / 2);
+  const theoreticalOffsetX = theoreticalVideoCenterX - canvasScreenCenterX;
+  const theoreticalOffsetY = theoreticalVideoCenterY - canvasScreenCenterY;
+  
+  console.log('✅ ステップ6: 理論上のずれ確認計算（画面座標）');
+  console.log(`  計算上の動画中心: (${theoreticalVideoCenterX.toFixed(1)}, ${theoreticalVideoCenterY.toFixed(1)})`);
+  console.log(`  キャンバス中心: (${canvasScreenCenterX.toFixed(1)}, ${canvasScreenCenterY.toFixed(1)})`);
+  console.log(`  理論上のずれ: X=${theoreticalOffsetX.toFixed(1)}px, Y=${theoreticalOffsetY.toFixed(1)}px`);
+  
+  if (Math.abs(theoreticalOffsetX) < 0.1 && Math.abs(theoreticalOffsetY) < 0.1) {
+    console.log('✅ 理論上は完璧！');
+  } else {
+    console.log('⚠️ 計算にエラーがあります');
+  }
   
   // 最初のフレームで停止
   senderVideoElement.muted = true;
@@ -2690,20 +3001,142 @@ function createSenderVideo() {
   senderVideoElement.addEventListener('loadedmetadata', () => {
     senderVideoElement.currentTime = 0;
     console.log('🎬 送信側動画メタデータ読み込み完了');
+    
+    // 実際の配置後の座標を確認
+    setTimeout(() => {
+      const videoRect = senderVideoElement.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+      
+      // 詳細なデバッグ情報
+      console.log('🔍 詳細デバッグ:');
+      console.log(`  動画要素の実際のstyle.top: ${senderVideoElement.style.top}`);
+      console.log(`  動画要素の実際のstyle.left: ${senderVideoElement.style.left}`);
+      console.log(`  動画要素のgetBoundingClientRect: left=${videoRect.left}, top=${videoRect.top}, width=${videoRect.width}, height=${videoRect.height}`);
+      
+      // 画面上の中央座標を計算
+      const videoCenterScreenX = videoRect.left + (videoRect.width / 2);
+      const videoCenterScreenY = videoRect.top + (videoRect.height / 2);
+      const canvasCenterScreenX = canvasRect.left + (canvasRect.width / 2);
+      const canvasCenterScreenY = canvasRect.top + (canvasRect.height / 2);
+      
+      // ずれを計算
+      const screenOffsetX = videoCenterScreenX - canvasCenterScreenX;
+      const screenOffsetY = videoCenterScreenY - canvasCenterScreenY;
+      
+      console.log('🎯 実際の画面座標での中央点確認:');
+      console.log(`  動画中央点（画面座標）: (${videoCenterScreenX.toFixed(1)}, ${videoCenterScreenY.toFixed(1)})`);
+      console.log(`  キャンバス中央点（画面座標）: (${canvasCenterScreenX.toFixed(1)}, ${canvasCenterScreenY.toFixed(1)})`);
+      console.log(`  実際のずれ: X=${screenOffsetX.toFixed(1)}px, Y=${screenOffsetY.toFixed(1)}px`);
+      
+      if (Math.abs(screenOffsetX) < 1 && Math.abs(screenOffsetY) < 1) {
+        console.log('✅ 完璧！ずれが解消されました');
+      } else {
+        console.log('⚠️ まだずれています - さらなる調整が必要');
+      }
+    }, 100);
   });
   
+  // bodyに直接追加してレイアウトの影響を回避
   document.body.appendChild(senderVideoElement);
   isSenderVideoActive = true;
   
-  console.log('🎬 送信側動画作成完了 - 0.3倍サイズ');
+  console.log('🎬 送信側動画作成完了 - キャンバス位置に配置');
 }
 
 function playSenderVideo() {
   if (senderVideoElement) {
-    console.log('🎬 送信側動画再生開始');
-    senderVideoElement.play().catch(e => {
-      console.error('❌ 送信側動画再生エラー:', e);
-    });
+    console.log('🎬 送信側扉開く演出開始');
+    
+    // 音声再生は送信側では削除（受信側のみで音楽再生）
+    
+    // 4秒後に動画再生開始
+    setTimeout(() => {
+      // 動画終了時の処理を追加
+      senderVideoElement.addEventListener('ended', () => {
+        console.log('🎬 送信側動画終了 - 背景4ボタンと同じ処理を実行');
+        
+        // 動画を非表示
+        senderVideoElement.style.display = 'none';
+        senderVideoElement.style.visibility = 'hidden';
+        
+        // 背景4ボタンを押したと同じ処理を実行
+        setBackground('./back6.png');
+        
+        console.log('🎬 送信側動画非表示完了、背景4設定完了');
+      });
+      
+      senderVideoElement.play().catch(e => {
+        console.error('❌ 送信側動画再生エラー:', e);
+      });
+      console.log('🎬 送信側動画再生開始（4秒後）');
+    }, 4000);
+  }
+}
+
+function stopSenderVideoAtLastFrame() {
+  if (senderVideoElement && senderVideoElement.tagName === 'VIDEO') {
+    try {
+      console.log('🎬 送信側動画を最後のシーンで停止');
+      
+      // 最終フレームに移動して停止
+      if (senderVideoElement.duration) {
+        senderVideoElement.currentTime = senderVideoElement.duration - 0.1;
+      }
+      senderVideoElement.pause();
+      
+      // 特殊背景状態をリセット
+      specialBackgroundState = 'ready';
+      
+      // キャンバス状態を確実にリセット
+      ctx.globalCompositeOperation = 'source-over';
+      
+      console.log('🎬 送信側動画最終フレームで停止完了');
+      
+    } catch (error) {
+      console.error('❌ 送信側動画停止エラー:', error);
+    }
+  }
+}
+
+function hideSenderVideo() {
+  if (senderVideoElement) {
+    try {
+      console.log('🎬 送信側動画を非表示にする');
+      
+      const mainContainer = document.querySelector('.main-container');
+      
+      // 動画要素を確実に削除（停止してから削除）
+      if (senderVideoElement && senderVideoElement.tagName === 'VIDEO') {
+        senderVideoElement.pause();
+        senderVideoElement.src = '';
+        senderVideoElement.remove();
+        console.log('🎬 送信側動画要素を削除');
+      }
+      
+      // 変数をクリア
+      senderVideoElement = null;
+      isSenderVideoActive = false;
+      
+      // 背景画像もクリア（動画キャプチャを背景にしない）
+      backgroundImage = null;
+      
+      // キャンバス背景を通常状態に戻す
+      canvas.style.backgroundColor = 'transparent';
+      
+      // キャンバスをクリア
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // 特殊背景状態をリセット
+      specialBackgroundState = 'ready';
+      
+      // キャンバス状態を確実にリセット
+      ctx.globalCompositeOperation = 'source-over';
+      
+      console.log('🎬 送信側動画非表示完了 - 通常モードに戻る');
+      
+    } catch (error) {
+      console.error('❌ 送信側動画非表示エラー:', error);
+    }
   }
 }
 
@@ -2718,100 +3151,53 @@ function stopSenderVideo() {
   }
 }
 
-// スマホの傾きセンサーを追加
-let lastTiltX = 0;
-let lastTiltY = 0;
-
-// デバイスの向きが変更された時のイベントリスナー
-async function requestOrientationPermission() {
-  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-    // iOS 13以降の場合、許可を求める
-    try {
-      const permission = await DeviceOrientationEvent.requestPermission();
-      if (permission !== 'granted') {
-        console.log('❌ デバイス傾きセンサーの許可が拒否されました');
-        return false;
-      }
-    } catch (error) {
-      console.log('❌ デバイス傾きセンサーの許可要求エラー:', error);
-      return false;
-    }
+// 送信側PNG背景表示関数
+function showSenderPngBackground() {
+  console.log('🖼️ 送信側PNG背景表示開始');
+  
+  // 動画を非表示にする
+  if (senderVideoElement) {
+    senderVideoElement.style.display = 'none';
+    console.log('🎬 送信側動画を非表示');
   }
-  return true;
-}
-
-if (window.DeviceOrientationEvent) {
-  // 傾きセンサー使用ボタンを追加（iOS用）
-  const orientationButton = document.createElement('button');
-  orientationButton.textContent = '📱 傾きセンサー有効化';
-  orientationButton.style.cssText = 'position: fixed; top: 10px; left: 10px; z-index: 1000; background: #ff9500; color: white; border: none; padding: 10px; border-radius: 5px;';
-  orientationButton.onclick = async () => {
-    const permitted = await requestOrientationPermission();
-    if (permitted) {
-      orientationButton.style.display = 'none';
-      startOrientationListener();
-    }
+  
+  // PNG画像要素を作成
+  const pngElement = document.createElement('img');
+  pngElement.id = 'senderPngBackground';
+  pngElement.src = './back6.png';
+  
+  // 動画と同じ位置・サイズでPNG画像を配置
+  if (senderVideoElement) {
+    const videoStyle = senderVideoElement.style;
+    pngElement.style.cssText = `
+      position: fixed !important;
+      top: ${videoStyle.top} !important;
+      left: ${videoStyle.left} !important;
+      width: ${videoStyle.width} !important;
+      height: ${videoStyle.height} !important;
+      z-index: 50 !important;
+      object-fit: contain !important;
+      pointer-events: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      transform: none !important;
+      transform-origin: initial !important;
+    `;
+  }
+  
+  // 画像読み込み完了後に表示
+  pngElement.onload = () => {
+    document.body.appendChild(pngElement);
+    console.log('🖼️ 送信側PNG背景表示完了');
   };
-  document.body.appendChild(orientationButton);
   
-  // デスクトップや許可不要な環境では自動で開始
-  if (typeof DeviceOrientationEvent.requestPermission !== 'function') {
-    orientationButton.style.display = 'none';
-    startOrientationListener();
-  }
+  pngElement.onerror = () => {
+    console.error('❌ PNG画像の読み込みに失敗しました');
+  };
 }
 
-function startOrientationListener() {
-  window.addEventListener('deviceorientation', function(event) {
-    // デバイスの傾きを取得
-    const tiltX = event.beta;  // 前後の傾き (-180 to 180)
-    const tiltY = event.gamma; // 左右の傾き (-90 to 90)
-    
-    // null値チェック
-    if (tiltX === null || tiltY === null) return;
-    
-    // 傾きの変化量を計算
-    const deltaX = tiltX - lastTiltX;
-    const deltaY = tiltY - lastTiltY;
-    
-    // 閾値を超えた場合のみ処理
-    if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
-      // 垂直方向の傾き（前後）でスケール調整
-      if (Math.abs(deltaX) > 2) {
-        if (deltaX > 0) {
-          // 前に傾ける → 拡大
-          backgroundScale = Math.min(backgroundScale + 0.05, 2.0);
-        } else {
-          // 後ろに傾ける → 縮小
-          backgroundScale = Math.max(backgroundScale - 0.05, 0.5);
-        }
-      }
-      
-      // 水平方向の傾き（左右）で垂直オフセット調整
-      if (Math.abs(deltaY) > 2) {
-        if (deltaY > 0) {
-          // 右に傾ける → 上に移動
-          backgroundOffsetY = Math.max(backgroundOffsetY - 5, -100);
-        } else {
-          // 左に傾ける → 下に移動
-          backgroundOffsetY = Math.min(backgroundOffsetY + 5, 100);
-        }
-      }
-      
-      updateBackgroundTransform();
-      console.log(`📱 傾きセンサー - X:${tiltX.toFixed(1)}, Y:${tiltY.toFixed(1)}, スケール:${backgroundScale.toFixed(2)}, オフセット:${backgroundOffsetY}`);
-      
-      lastTiltX = tiltX;
-      lastTiltY = tiltY;
-    }
-  });
-  
-  console.log('📱 デバイス傾きセンサーを有効化');
-}
-
-if (!window.DeviceOrientationEvent) {
-  console.log('❌ このデバイスは傾きセンサーに対応していません');
-}
+// 傾きセンサー機能は削除されました
 
 // キーボードイベントリスナーを追加（矢印キーで操作 - デスクトップ用）
 document.addEventListener('keydown', function(event) {
@@ -2902,6 +3288,27 @@ function updateBackgroundTransform() {
     }
   }
 }
+
+// 初期化処理：起動時に背景2を設定
+window.addEventListener('DOMContentLoaded', () => {
+  console.log('🚀 初期化処理開始');
+  
+  // キャンバススケール0.7を適用
+  updateCanvasScale(0.7);
+  
+  // 背景2を自動設定
+  setTimeout(() => {
+    console.log('🖼️ 起動時に背景2を自動設定');
+    setBackground('./back2.png');
+    
+    // 背景2ボタンを選択状態にする
+    const back2Btn = document.getElementById('back2Btn');
+    if (back2Btn) {
+      document.querySelectorAll('.bg-btn').forEach(btn => btn.classList.remove('selected'));
+      back2Btn.classList.add('selected');
+    }
+  }, 500); // WebSocket接続を待つため少し遅延
+});
 
 </script>
 </div>
