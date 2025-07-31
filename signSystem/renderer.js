@@ -2522,13 +2522,10 @@ function sendCanvasToMainProcess() {
   
   // 背景は透明のまま（描画データのみ）
   
-  // 送信ボタン印刷用に180度回転して描画
-  console.log('🖨️ 送信ボタン印刷用Canvas180度回転適用開始');
+  // 送信ボタン印刷用（回転なし）
+  console.log('🖨️ 送信ボタン印刷用Canvas設定開始');
   printCtx.save();
-  printCtx.translate(printCanvas.width / 2, printCanvas.height / 2);
-  printCtx.rotate(Math.PI); // 180度回転
-  printCtx.translate(-printCanvas.width / 2, -printCanvas.height / 2);
-  console.log('🖨️ 送信ボタン印刷用Canvas180度回転適用完了');
+  console.log('🖨️ 送信ボタン印刷用Canvas設定完了（回転なし）');
   
   // 全執筆者データを統合して印刷
   const consolidatedData = consolidateDrawingData();
@@ -2670,15 +2667,10 @@ function saveRotatedImageAs0Degree() {
     saveCtx.fillRect(0, 0, saveCanvas.width, saveCanvas.height);
     console.log('💾 白背景描画完了');
     
-    // 受信側キャンバスを180度回転してコピー（0度に戻す）
-    saveCtx.save();
-    saveCtx.translate(saveCanvas.width / 2, saveCanvas.height / 2);
-    saveCtx.rotate(Math.PI); // 180度回転
-    saveCtx.translate(-saveCanvas.width / 2, -saveCanvas.height / 2);
+    // 受信側キャンバスを直接コピー（回転なし）
     saveCtx.drawImage(canvas, 0, 0);
-    saveCtx.restore();
     
-    console.log('💾 180度回転適用完了（0度に戻す）');
+    console.log('💾 キャンバスコピー完了（回転なし）');
     
     // 画像データを作成
     const imageDataUrl = saveCanvas.toDataURL("image/png");
@@ -2732,15 +2724,12 @@ function saveDrawingDataAs0Degree() {
     saveCtx.fillRect(0, 0, saveCanvas.width, saveCanvas.height);
     console.log('💾 白背景描画完了');
     
-    // 描画データを180度回転して描画
-    console.log('💾 Canvas180度回転適用開始');
+    // 描画データを回転なしで描画
+    console.log('💾 Canvas設定開始');
     saveCtx.save();
-    saveCtx.translate(saveCanvas.width / 2, saveCanvas.height / 2);
-    saveCtx.rotate(Math.PI); // 180度回転
-    saveCtx.translate(-saveCanvas.width / 2, -saveCanvas.height / 2);
-    console.log('💾 Canvas180度回転適用完了');
+    console.log('💾 Canvas設定完了（回転なし）');
     
-    console.log('💾 統合描画データを180度回転して描画開始');
+    console.log('💾 統合描画データを描画開始（回転なし）');
     consolidatedData.forEach((cmd, index) => {
       if (cmd.type === "start") {
         saveCtx.beginPath();
@@ -4465,17 +4454,13 @@ function showPrintPreview() {
     previewCtx.drawImage(backgroundImage, 0, 0, previewCanvas.width, previewCanvas.height);
   }
   
-  // 筆跡を描画（180度回転せずにそのまま）
+  // 筆跡を描画（印刷用のため回転なし）
   drawingData.forEach(cmd => {
     if (cmd.type === "start") {
       previewCtx.beginPath();
-      // 送信側から受信側への座標変換（180度回転適用）
+      // 送信側から印刷用への座標変換（回転なし）
       let scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
       let scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
-      
-      // 180度回転座標変換
-      scaledX = drawingAreaSize.width - scaledX;
-      scaledY = drawingAreaSize.height - scaledY;
       
       previewCtx.moveTo(scaledX, scaledY);
     } else if (cmd.type === "draw") {
@@ -4494,13 +4479,9 @@ function showPrintPreview() {
         previewCtx.shadowBlur = 0;
       }
       
-      // 送信側から受信側への座標変換（180度回転適用）
+      // 送信側から印刷用への座標変換（回転なし）
       let scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
       let scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
-      
-      // 180度回転座標変換
-      scaledX = drawingAreaSize.width - scaledX;
-      scaledY = drawingAreaSize.height - scaledY;
       
       previewCtx.lineTo(scaledX, scaledY);
       previewCtx.stroke();
@@ -4536,15 +4517,12 @@ function printFull() {
   printCtx.fillStyle = '#ffffff';
   printCtx.fillRect(0, 0, printCanvas.width, printCanvas.height);
   
-  // 印刷用に180度回転して描画
-  console.log('🖨️ 印刷用Canvas180度回転適用開始');
+  // 印刷用（回転なし）
+  console.log('🖨️ 印刷用Canvas設定開始');
   printCtx.save();
-  printCtx.translate(printCanvas.width / 2, printCanvas.height / 2);
-  printCtx.rotate(Math.PI); // 180度回転
-  printCtx.translate(-printCanvas.width / 2, -printCanvas.height / 2);
-  console.log('🖨️ 印刷用Canvas180度回転適用完了');
+  console.log('🖨️ 印刷用Canvas設定完了（回転なし）');
   
-  console.log('🖨️ 180度回転して描画開始');
+  console.log('🖨️ 描画開始（回転なし）');
   drawingData.forEach((cmd, index) => {
     if (cmd.type === "start") {
       printCtx.beginPath();
@@ -4610,15 +4588,12 @@ function printPen() {
   // 背景は透明のまま（描画データのみ）
   console.log('🖨️ 背景は透明 (ペンデータのみ)');
   
-  // ペン印刷用に180度回転して描画
-  console.log('🖨️ ペン印刷用Canvas180度回転適用開始');
+  // ペン印刷用（回転なし）
+  console.log('🖨️ ペン印刷用Canvas設定開始');
   printCtx.save();
-  printCtx.translate(printCanvas.width / 2, printCanvas.height / 2);
-  printCtx.rotate(Math.PI); // 180度回転
-  printCtx.translate(-printCanvas.width / 2, -printCanvas.height / 2);
-  console.log('🖨️ ペン印刷用Canvas180度回転適用完了');
+  console.log('🖨️ ペン印刷用Canvas設定完了（回転なし）');
   
-  console.log('🖨️ ペン印刷：180度回転して描画開始');
+  console.log('🖨️ ペン印刷：描画開始（回転なし）');
   drawingData.forEach((cmd, index) => {
     if (cmd.type === "start") {
       printCtx.beginPath();
@@ -4718,12 +4693,8 @@ function generatePrintImageData() {
       const bgX = (drawingAreaSize.width - bgWidth) / 2;
       const bgY = (drawingAreaSize.height - bgHeight) / 2;
       
-      // 背景画像を180度回転して送信側の元の向きに戻す
-      downloadCtx.translate(bgX + bgWidth / 2, bgY + bgHeight / 2);
-      downloadCtx.rotate(Math.PI);
-      downloadCtx.translate(-bgWidth / 2, -bgHeight / 2);
-      
-      downloadCtx.drawImage(backgroundImage, 0, 0, bgWidth, bgHeight);
+      // 背景画像を回転なしで描画
+      downloadCtx.drawImage(backgroundImage, bgX, bgY, bgWidth, bgHeight);
       downloadCtx.restore();
       
       //console.log(`🖨️ 背景画像を描画: ${bgWidth}x${bgHeight} at (${bgX}, ${bgY})`);
