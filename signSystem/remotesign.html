@@ -5,6 +5,26 @@
   <title>送信側1.2</title>
   <style>
     /* クラシックスタイル（デフォルト） */
+    body.classic .main-container {
+      display: flex;
+      gap: 20px;
+    }
+    body.classic .canvas-container {
+      flex: 1;
+    }
+    body.classic .color-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+      padding: 15px;
+      border: 1px solid #ccc;
+      background: #f9f9f9;
+    }
+    body.classic .color-panel h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+    }
     body.classic canvas {
       border: 1px solid black;
       display: block;
@@ -40,6 +60,33 @@
       padding: 30px;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
       backdrop-filter: blur(10px);
+      display: flex;
+      gap: 20px;
+    }
+    
+    body.modern .canvas-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    body.modern .color-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      align-items: center;
+      padding: 20px 10px;
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 15px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+    
+    body.modern .color-panel h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+      color: #2d3748;
+      text-align: center;
     }
     
     body.modern canvas {
@@ -175,11 +222,11 @@
       accent-color: #667eea;
     }
     body.modern .color-btn {
-      width: 50px;
-      height: 50px;
+      width: 60px;
+      height: 60px;
       border-radius: 50%;
       border: 3px solid rgba(255, 255, 255, 0.8);
-      margin: 0 8px;
+      margin: 0;
       cursor: pointer;
       transition: all 0.3s ease;
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
@@ -197,11 +244,11 @@
     }
     
     body.classic .color-btn {
-      width: 40px;
-      height: 40px;
+      width: 50px;
+      height: 50px;
       border-radius: 50%;
       border: 2px solid #ccc;
-      margin: 0 5px;
+      margin: 0;
       cursor: pointer;
     }
     
@@ -415,6 +462,7 @@
 <button id="themeToggle" onclick="toggleTheme()">📝 クラシック</button>
 
 <div class="main-container">
+<div class="canvas-container">
 <canvas id="drawCanvas" width="859" height="607" style="position: relative; z-index: 100; background: transparent;"></canvas>
 
 <div class="button-group">
@@ -441,16 +489,6 @@
   <button class="thickness-btn" onclick="setPenThickness(12)">極太</button>
 </div>
 
-<div class="button-group">
-  <label>色:</label>
-  <button class="color-btn selected" style="background: black;" onclick="setPenColor('black')"></button>
-  <button class="color-btn" style="background: white; border: 3px solid #333;" onclick="setPenColor('white')"></button>
-  <button class="color-btn" style="background: red;" onclick="setPenColor('red')"></button>
-  <button class="color-btn" style="background: blue;" onclick="setPenColor('blue')"></button>
-  <button class="color-btn" style="background: green;" onclick="setPenColor('green')"></button>
-  <button class="color-btn" style="background: #ff69b4;" onclick="setPenColor('pink')"></button>
-  <button class="color-btn neon" onclick="setPenColor('neon')"></button>
-</div>
 
 <div class="button-group">
   <button onclick="toggleDevTools()" style="background-color: #FFA500; color: white;">🔧 Dev Tool</button>
@@ -1474,7 +1512,12 @@ function setPenColor(color) {
   
   // ボタンの選択状態を更新
   document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
-  event.target.classList.add('selected');
+  
+  // クリックされたボタンを選択状態にする
+  const targetBtn = document.querySelector(`.color-btn[style*="background: ${color}"]`);
+  if (targetBtn) {
+    targetBtn.classList.add('selected');
+  }
   
   // ペンの色設定
   
@@ -3404,6 +3447,16 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 </script>
+</div>
+
+<div class="color-panel">
+  <h3>ペンの色</h3>
+  <button class="color-btn selected" style="background: black;" onclick="setPenColor('black')"></button>
+  <button class="color-btn" style="background: red;" onclick="setPenColor('red')"></button>
+  <button class="color-btn" style="background: blue;" onclick="setPenColor('blue')"></button>
+  <button class="color-btn" style="background: green;" onclick="setPenColor('green')"></button>
+</div>
+
 </div>
 </body>
 </html>
