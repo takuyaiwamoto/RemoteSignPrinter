@@ -606,19 +606,7 @@ socket.onopen = () => {
   console.log("✅ WebSocket接続完了（送信側）");
   
   // writer ID を要求
-  const requestMsg = {
-    type: "requestWriterId"
-  };
-  console.log("📤 Writer ID要求送信:", requestMsg);
-  socket.send(JSON.stringify(requestMsg));
-  
-  // 3秒後にWriter IDが設定されているかチェック
-  setTimeout(() => {
-    if (!myWriterId) {
-      console.warn("⚠️ Writer IDが3秒経っても割り当てられていません");
-      alert("Writer IDが割り当てられていません。右上の「ID確認」ボタンで状況を確認してください。");
-    }
-  }, 3000);
+  requestWriterId();
 };
 
 socket.onmessage = (event) => {
@@ -691,6 +679,33 @@ function processMessage(data) {
   }
 }
 
+// Writer ID要求関数
+function requestWriterId() {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    const requestMsg = {
+      type: "requestWriterId"
+    };
+    console.log("🔄 Writer ID再要求送信:", requestMsg);
+    socket.send(JSON.stringify(requestMsg));
+    
+    // 要求後の確認
+    setTimeout(() => {
+      if (myWriterId) {
+        alert(`✅ Writer ID割り当て成功: ${myWriterId}`);
+        // ステータス表示を更新
+        const statusDiv = document.getElementById('writerStatus');
+        if (statusDiv) {
+          statusDiv.childNodes[0].textContent = `Writer ID: ${myWriterId}`;
+        }
+      } else {
+        alert('❌ Writer ID割り当て失敗\n\n対処法:\n1. 受信側を先に起動してください\n2. ページをリロードしてください\n3. しばらく待ってから再試行してください');
+      }
+    }, 2000);
+  } else {
+    alert('❌ WebSocket未接続\n\nページをリロードしてください');
+  }
+}
+
 // Writer ID ステータス表示div を作成
 function createWriterStatusDiv() {
   const statusDiv = document.createElement('div');
@@ -724,7 +739,17 @@ function createWriterStatusDiv() {
     console.log(`🔍 現在のWriter ID: ${myWriterId}`);
     console.log(`🔍 WebSocket状態: ${socket ? socket.readyState : 'socket未初期化'}`);
     console.log(`🔍 他の書き手データ:`, otherWritersData);
-    alert(`Writer ID: ${myWriterId || '未割り当て'}\nWebSocket: ${socket ? socket.readyState : '未初期化'}\n他の書き手: ${Object.keys(otherWritersData).length}人`);
+    
+    let message = `Writer ID: ${myWriterId || '未割り当て'}\nWebSocket: ${socket ? socket.readyState : '未初期化'}\n他の書き手: ${Object.keys(otherWritersData).length}人`;
+    
+    if (!myWriterId) {
+      message += '\n\n🔄 Writer IDを再要求しますか？';
+      if (confirm(message)) {
+        requestWriterId();
+      }
+    } else {
+      alert(message);
+    }
   };
   statusDiv.appendChild(testBtn);
   
@@ -2234,7 +2259,9 @@ canvas.addEventListener("mousedown", (e) => {
   // Writer IDが未設定の場合は送信しない
   if (!myWriterId) {
     console.warn("⚠️ Writer ID未設定のため描画データを送信しません");
-    alert("Writer IDが設定されていません。右上の「ID確認」ボタンで確認してください。");
+    if (confirm("Writer IDが設定されていません。\n\n🔄 自動で再要求しますか？\n\n「OK」= 自動要求\n「キャンセル」= 手動で右上「ID確認」ボタン")) {
+      requestWriterId();
+    }
     return;
   }
   
@@ -2455,7 +2482,9 @@ canvas.addEventListener("touchstart", (e) => {
   // Writer IDが未設定の場合は送信しない
   if (!myWriterId) {
     console.warn("⚠️ Writer ID未設定のため描画データを送信しません");
-    alert("Writer IDが設定されていません。右上の「ID確認」ボタンで確認してください。");
+    if (confirm("Writer IDが設定されていません。\n\n🔄 自動で再要求しますか？\n\n「OK」= 自動要求\n「キャンセル」= 手動で右上「ID確認」ボタン")) {
+      requestWriterId();
+    }
     return;
   }
   
