@@ -743,9 +743,68 @@ function processMessage(data) {
       console.log("❌ 自分の描画のため無視");
     }
   } else if (data.type === "clear") {
-    // 全体クリア
+    // 受信側からの全体クリア
     otherWritersData = {};
     redrawCanvasWithOthers();
+  } else if (data.type === "globalClear") {
+    // 他の書き手からの全体クリア（自分が送信者でない場合のみ処理）
+    if (data.writerId !== myWriterId) {
+      console.log(`🧹 他の書き手(${data.writerId})からクリア指示を受信`);
+      
+      // キャンバスを完全にクリア
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (backgroundImage) {
+        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+      }
+      
+      // 全ての描画データをクリア
+      otherWritersData = {};
+      drawingCommands = [];
+      console.log('🧹 全ての描画データをクリア');
+      
+      // キャンバスを再描画（背景のみの状態にする）
+      redrawCanvasWithOthers();
+      
+      console.log('🧹 他の書き手からのクリア指示で完全クリア完了');
+    }
+  } else if (data.type === "globalSend") {
+    // 他の書き手からの送信実行（自分が送信者でない場合のみ処理）
+    if (data.writerId !== myWriterId) {
+      console.log(`📤 他の書き手(${data.writerId})から送信実行を受信`);
+      
+      // 送信ボタンの無効化（他の人が送信中表示）
+      const sendButton = document.querySelector('button[onclick="saveDoubleRotatedImage()"]');
+      if (sendButton) {
+        sendButton.style.backgroundColor = '#ffa500';
+        sendButton.textContent = `${data.writerId}が送信中...`;
+        sendButton.disabled = true;
+        
+        // 送信完了後にボタンを元に戻す
+        setTimeout(() => {
+          sendButton.style.backgroundColor = '';
+          sendButton.textContent = '送信';
+          sendButton.disabled = false;
+        }, (data.animationStartWaitTime + data.rotationWaitTime + 10) * 1000); // 全体の処理時間
+      }
+      
+      // 10秒後に自動クリア（送信処理と同期）
+      setTimeout(() => {
+        console.log('🧹 他の書き手の送信に同期してクリア実行');
+        
+        // キャンバスをクリア
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (backgroundImage) {
+          ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+        }
+        
+        // 他の書き手のデータもクリア
+        otherWritersData = {};
+        
+        // 描画コマンドをクリア
+        drawingCommands = [];
+        console.log('🧹 他の書き手の送信に同期してクリア完了');
+      }, 10000);
+    }
   } else if (data.type === "heartEffect") {
     // ハートエフェクト指示受信
     createHeart();
@@ -1548,16 +1607,27 @@ function startCountdown() {
 function clearCanvas() {
   // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
+  // キャンバスを完全にクリア
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (backgroundImage) {
     ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
   }
   
-  // 描画コマンドをクリア
+  // 全ての描画データをクリア
+  otherWritersData = {};
   drawingCommands = [];
-  console.log('🧹 描画コマンドをクリア');
+  console.log('🧹 全ての描画データをクリア');
   
-  socket.send(JSON.stringify({ type: "clear" }));
+  // キャンバスを再描画（背景のみの状態にする）
+  redrawCanvasWithOthers();
+  
+  // 全書き手同期のためのクリア命令を送信
+  socket.send(JSON.stringify({ 
+    type: "globalClear",
+    writerId: myWriterId,
+    timestamp: Date.now()
+  }));
+  console.log('📤 全書き手にクリア指示を送信');
 }
 
 // ペンの太さ設定関数
@@ -2899,6 +2969,16 @@ function saveDoubleRotatedImage() {
   // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
   console.log(`🔄 送信ボタン: 印刷処理開始→${animationStartWaitTime}秒後にアニメーション開始`);
+  
+  // 全書き手に送信実行を通知
+  socket.send(JSON.stringify({
+    type: "globalSend",
+    writerId: myWriterId,
+    timestamp: Date.now(),
+    animationStartWaitTime: animationStartWaitTime,
+    rotationWaitTime: rotationWaitTime
+  }));
+  console.log('📤 全書き手に送信実行を通知');
   
   // 🔸 送信ボタンの視覚的フィードバック
   const sendButton = event.target;

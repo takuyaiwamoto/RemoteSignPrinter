@@ -738,8 +738,11 @@ let drawingData = []; // 互換性のために残す（統合データ用）
 let multiWriterData = {
   writer1: [],
   writer2: [],
-  writer3: []
-}; // 3箇所執筆者別データ管理
+  writer3: [],
+  writer4: [],
+  writer5: [],
+  writer6: []
+}; // 6人執筆者別データ管理
 
 // 全執筆者のデータを統合する関数
 function consolidateDrawingData() {
@@ -761,7 +764,8 @@ function consolidateDrawingData() {
   // タイムスタンプでソート
   allData.sort((a, b) => a.timestamp - b.timestamp);
   
-  console.log(`📊 統合描画データ: ${allData.length}個のコマンド（writer1: ${multiWriterData.writer1.length}, writer2: ${multiWriterData.writer2.length}, writer3: ${multiWriterData.writer3.length}）`);
+  const writerCounts = Object.keys(multiWriterData).map(id => `${id}: ${multiWriterData[id].length}`).join(', ');
+  console.log(`📊 統合描画データ: ${allData.length}個のコマンド（${writerCounts}）`);
   
   return allData;
 }
@@ -2235,15 +2239,44 @@ function handleMessage(data) {
       saveDrawingDataAs0Degree();
     }
     
-    // 全ての執筆者データをクリア
+    // 全ての執筆者データをクリア（6人対応）
     multiWriterData = {
       writer1: [],
       writer2: [],
-      writer3: []
+      writer3: [],
+      writer4: [],
+      writer5: [],
+      writer6: []
     };
     drawingData = [];
     console.log('🧹 全執筆者データをクリア');
     redrawCanvas();
+  } else if (data.type === "globalClear") {
+    // 書き手からの全体クリア指示
+    console.log(`🧹 書き手(${data.writerId})から全体クリア指示受信`);
+    
+    // 全ての執筆者データをクリア
+    multiWriterData = {
+      writer1: [],
+      writer2: [],
+      writer3: [],
+      writer4: [],
+      writer5: [],
+      writer6: []
+    };
+    drawingData = [];
+    console.log('🧹 全執筆者データをクリア');
+    redrawCanvas();
+  } else if (data.type === "globalSend") {
+    // 書き手からの送信指示
+    console.log(`📤 書き手(${data.writerId})から送信指示受信`);
+    
+    // 送信前に描画データを保存
+    if (drawingData.length > 0) {
+      console.log("🔴 globalSend → 描画データを0度回転で保存");
+      saveDrawingDataAs0Degree();
+    }
+    // 特別な処理は不要（通常の印刷処理が別途実行される）
   } else if (data.type === "start") {
     // writer ID を取得（デフォルトは writer1 で後方互換性を保つ）
     const writerId = data.writerId || 'writer1';
@@ -2256,6 +2289,11 @@ function handleMessage(data) {
     };
     
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
+    // Writer IDが存在しない場合は配列を初期化
+    if (!multiWriterData[writerId]) {
+      multiWriterData[writerId] = [];
+      console.log(`🆕 新しいWriter ID ${writerId} の配列を初期化`);
+    }
     multiWriterData[writerId].push(startData);
     drawingData.push(startData); // 互換性のために統合データにも追加
     
@@ -2364,6 +2402,11 @@ function handleMessage(data) {
     };
     
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
+    // Writer IDが存在しない場合は配列を初期化
+    if (!multiWriterData[writerId]) {
+      multiWriterData[writerId] = [];
+      console.log(`🆕 新しいWriter ID ${writerId} の配列を初期化`);
+    }
     multiWriterData[writerId].push(drawData);
     drawingData.push(drawData); // 互換性のために統合データにも追加
     
