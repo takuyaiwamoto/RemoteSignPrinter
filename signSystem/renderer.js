@@ -899,6 +899,21 @@ function checkWriterTimeouts() {
   }
 }
 
+// アクティブなWriter IDのリストを取得
+function getActiveWriterIds() {
+  const now = Date.now();
+  const activeTimeoutMs = 10000; // 10秒以内にアクティビティがあるもの
+  const activeWriters = [];
+  
+  for (let [writerId, lastSeen] of writerLastSeen.entries()) {
+    if (now - lastSeen <= activeTimeoutMs) {
+      activeWriters.push(writerId);
+    }
+  }
+  
+  return activeWriters;
+}
+
 socket.onopen = () => {
   console.log("✅ 受信側WebSocket接続完了");
   
@@ -1845,6 +1860,9 @@ function handleMessage(data) {
   // Writer ID要求の処理
   if (data.type === "requestWriterId") {
     console.log("📨 Writer ID要求を受信:", data.sessionId);
+    console.log("📊 現在の管理状況:");
+    console.log(`  既存セッション: ${Array.from(writerSessions.entries()).map(([w,s]) => `${w}:${s}`).join(', ') || 'なし'}`);
+    console.log(`  接続中Writer: ${Array.from(connectedWriters).join(', ') || 'なし'}`);
     
     // セッションIDが提供されていない場合は旧方式
     if (!data.sessionId) {
@@ -1867,6 +1885,10 @@ function handleMessage(data) {
       console.log("🧹 新しいセッション要求 - タイムアウトセッションを即座にクリーンアップ");
       checkWriterTimeouts();
       
+      // アクティブなWriter IDをチェック
+      const activeWriters = getActiveWriterIds();
+      console.log(`📊 アクティブなWriter ID: ${activeWriters.join(', ') || 'なし'}`);
+      
       // さらに、5秒以上無通信のセッションも積極的にクリーンアップ
       const now = Date.now();
       const aggressiveTimeoutMs = 5000; // 5秒
@@ -1881,6 +1903,9 @@ function handleMessage(data) {
     
     // 既存セッションがある場合はそれを再利用
     if (existingWriterId) {
+      // 最終接触時刻も更新
+      writerLastSeen.set(existingWriterId, Date.now());
+      
       const assignMsg = {
         type: "assignWriterId",
         writerId: existingWriterId,
@@ -1894,21 +1919,50 @@ function handleMessage(data) {
     }
     
     // 利用可能なwriter IDを割り当て
-    console.log("📊 Writer ID割り当て前の状況:");
+    console.log("🆔 新規Writer ID割り当て処理開始");
+    console.log(`📊 セッション要求: ${data.sessionId}`);
+    console.log(`📊 Writer ID割り当て前の状況:`);
     console.log(`  接続中Writer: ${Array.from(connectedWriters).join(', ') || 'なし'}`);
     console.log(`  セッション数: ${writerSessions.size}`);
     console.log(`  最終接触時刻データ: ${writerLastSeen.size}件`);
     
+    // データ整合性チェック
+    for (let [writerId, sessionId] of writerSessions.entries()) {
+      if (!connectedWriters.has(writerId)) {
+        console.warn(`⚠️ データ不整合: Writer ${writerId} がセッションにあるが接続リストにない`);
+        connectedWriters.add(writerId);
+      }
+    }
+    
     let assignedId = null;
     for (let i = 1; i <= 6; i++) {
       const candidateId = `writer${i}`;
-      if (!connectedWriters.has(candidateId)) {
+      const isInConnected = connectedWriters.has(candidateId);
+      const isInSessions = writerSessions.has(candidateId);
+      
+      console.log(`🔍 Writer ID ${candidateId} チェック: 接続=${isInConnected}, セッション=${isInSessions}`);
+      
+      // さらにアクティブかどうかもチェック
+      const activeWriters = getActiveWriterIds();
+      const isActive = activeWriters.includes(candidateId);
+      
+      if (!isInConnected && !isInSessions && !isActive) {
         assignedId = candidateId;
         connectedWriters.add(candidateId);
         console.log(`✅ Writer ID ${candidateId} を新規割り当て`);
         break;
       } else {
-        console.log(`❌ Writer ID ${candidateId} は既に使用中`);
+        console.log(`❌ Writer ID ${candidateId} は既に使用中 (接続:${isInConnected}, セッション:${isInSessions}, アクティブ:${isActive})`);
+        
+        // 非アクティブなのに使用中の場合はクリーンアップ
+        if ((isInConnected || isInSessions) && !isActive) {
+          console.log(`🧽 非アクティブなWriter ID ${candidateId} をクリーンアップして再利用`);
+          cleanupWriterSession(candidateId);
+          assignedId = candidateId;
+          connectedWriters.add(candidateId);
+          console.log(`✅ Writer ID ${candidateId} をクリーンアップ後に割り当て`);
+          break;
+        }
       }
     }
     

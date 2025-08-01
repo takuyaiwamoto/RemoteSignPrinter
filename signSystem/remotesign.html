@@ -764,7 +764,26 @@ function processMessage(data) {
 
 // セッションID生成関数
 function generateSessionId() {
-  return 'session_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+  // より一意性の高いセッションIDを生成
+  const timestamp = Date.now();
+  const random1 = Math.random().toString(36).substr(2, 9);
+  const random2 = Math.random().toString(36).substr(2, 9);
+  const random3 = Math.random().toString(36).substr(2, 9);
+  
+  // デバイス固有情報の収集
+  const screen = `${window.screen.width}x${window.screen.height}`;
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const language = navigator.language || 'unknown';
+  const platform = navigator.platform || 'unknown';
+  const cookieEnabled = navigator.cookieEnabled ? '1' : '0';
+  const onlineStatus = navigator.onLine ? '1' : '0';
+  
+  // ブラウザフィンガープリント
+  const fingerprint = btoa(`${screen}_${timezone}_${language}_${platform}_${cookieEnabled}_${onlineStatus}`).replace(/[^a-zA-Z0-9]/g, '').substr(0, 10);
+  
+  const sessionId = `session_${random1}_${random2}_${random3}_${timestamp}_${fingerprint}`;
+  console.log("🆔 生成されたセッションID:", sessionId);
+  return sessionId;
 }
 
 // Writer ID要求関数
