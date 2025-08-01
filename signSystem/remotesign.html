@@ -2,12 +2,12 @@
 <html>
 <head>
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://realtime-sign-server-1.onrender.com ws://localhost:* wss://localhost:*; img-src 'self' data: blob:; media-src 'self';">
-  <title>送信側1.2</title>
+  <title>送信側1.3</title>
   <style>
     /* クラシックスタイル（デフォルト） */
     body.classic .main-container {
       display: flex;
-      gap: 20px;
+      gap: 10px;
     }
     body.classic .canvas-container {
       flex: 1;
@@ -61,7 +61,7 @@
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
       backdrop-filter: blur(10px);
       display: flex;
-      gap: 20px;
+      gap: 10px;
     }
     
     body.modern .canvas-container {
@@ -238,9 +238,27 @@
     }
     
     body.modern .color-btn.selected {
-      border: 4px solid #2d3748;
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-      transform: scale(1.1);
+      border: 4px solid #ffffff;
+      box-shadow: 0 0 0 3px #2d3748, 0 0 20px 5px rgba(45, 55, 72, 0.6), 0 8px 30px rgba(0, 0, 0, 0.4);
+      transform: scale(1.15);
+      background: attr(style) !important;
+    }
+    
+    /* 各色ボタンの選択時の背景色を個別に指定 */
+    body.modern .color-btn.selected[style*="background: black"] {
+      background: black !important;
+    }
+    
+    body.modern .color-btn.selected[style*="background: red"] {
+      background: red !important;
+    }
+    
+    body.modern .color-btn.selected[style*="background: blue"] {
+      background: blue !important;
+    }
+    
+    body.modern .color-btn.selected[style*="background: green"] {
+      background: green !important;
     }
     
     body.classic .color-btn {
@@ -253,8 +271,26 @@
     }
     
     body.classic .color-btn.selected {
-      border: 3px solid #333;
-      box-shadow: 0 0 5px rgba(0,0,0,0.5);
+      border: 3px solid #ffffff;
+      box-shadow: 0 0 0 2px #333, 0 0 15px 3px rgba(51, 51, 51, 0.7), 0 4px 20px rgba(0,0,0,0.6);
+      transform: scale(1.1);
+    }
+    
+    /* クラシック - 各色ボタンの選択時の背景色を個別に指定 */
+    body.classic .color-btn.selected[style*="background: black"] {
+      background: black !important;
+    }
+    
+    body.classic .color-btn.selected[style*="background: red"] {
+      background: red !important;
+    }
+    
+    body.classic .color-btn.selected[style*="background: blue"] {
+      background: blue !important;
+    }
+    
+    body.classic .color-btn.selected[style*="background: green"] {
+      background: green !important;
     }
     .color-btn.neon {
       background: linear-gradient(45deg, #ff0000, #0000ff, #ffff00);
@@ -644,8 +680,10 @@ const backgroundSizes = {
 socket.onopen = () => {
   console.log("✅ WebSocket接続完了（送信側）");
   
-  // writer ID を要求
-  requestWriterId();
+  // 少し待ってからwriter ID を要求（受信側の準備完了を待つ）
+  setTimeout(() => {
+    requestWriterId();
+  }, 500);
 };
 
 socket.onmessage = (event) => {
@@ -745,19 +783,37 @@ function requestWriterId() {
     console.log("🔄 Writer ID再要求送信:", requestMsg);
     socket.send(JSON.stringify(requestMsg));
     
-    // 要求後の確認
-    setTimeout(() => {
-      if (myWriterId) {
-        alert(`✅ Writer ID割り当て成功: ${myWriterId}`);
-        // ステータス表示を更新
-        const statusDiv = document.getElementById('writerStatus');
-        if (statusDiv) {
-          statusDiv.childNodes[0].textContent = `Writer ID: ${myWriterId}`;
+    // 要求後の確認（自動再試行機能付き）
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    const checkAndRetry = () => {
+      setTimeout(() => {
+        if (myWriterId) {
+          // ステータス表示を更新
+          const statusDiv = document.getElementById('writerStatus');
+          if (statusDiv) {
+            statusDiv.childNodes[0].textContent = `Writer ID: ${myWriterId}`;
+          }
+          console.log(`✅ Writer ID割り当て成功: ${myWriterId} (${retryCount + 1}回目で成功)`);
+        } else {
+          retryCount++;
+          if (retryCount < maxRetries) {
+            console.log(`🔄 Writer ID再試行 ${retryCount}/${maxRetries}`);
+            // 再試行
+            socket.send(JSON.stringify({
+              type: "requestWriterId",
+              sessionId: mySessionId
+            }));
+            checkAndRetry();
+          } else {
+            alert('❌ Writer ID割り当て失敗\n\n対処法:\n1. 受信側を先に起動してください\n2. ページをリロードしてください\n3. しばらく待ってから再試行してください');
+          }
         }
-      } else {
-        alert('❌ Writer ID割り当て失敗\n\n対処法:\n1. 受信側を先に起動してください\n2. ページをリロードしてください\n3. しばらく待ってから再試行してください');
-      }
-    }, 2000);
+      }, 2000);
+    };
+    
+    checkAndRetry();
   } else {
     alert('❌ WebSocket未接続\n\nページをリロードしてください');
   }
@@ -1514,10 +1570,13 @@ function setPenColor(color) {
   document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
   
   // クリックされたボタンを選択状態にする
-  const targetBtn = document.querySelector(`.color-btn[style*="background: ${color}"]`);
-  if (targetBtn) {
-    targetBtn.classList.add('selected');
-  }
+  document.querySelectorAll('.color-btn').forEach(btn => {
+    // ボタンのstyle属性から背景色を取得して比較
+    const btnStyle = btn.getAttribute('style') || '';
+    if (btnStyle.includes(`background: ${color}`) || btnStyle.includes(`background:${color}`)) {
+      btn.classList.add('selected');
+    }
+  });
   
   // ペンの色設定
   

@@ -866,10 +866,51 @@ let receiverCanvasSize = { width: 1202, height: 849 }; // 受信側のキャン�
 let socket = new WebSocket("wss://realtime-sign-server-1.onrender.com");
 let connectedWriters = new Set(); // 接続中の書き手管理
 let writerSessions = new Map(); // WriterID -> SessionID のマッピング
+let writerLastSeen = new Map(); // WriterID -> 最終接触時刻
 
-socket.onopen = () => console.log("✅ 受信側WebSocket接続完了");
+// Writer IDクリーンアップ関数
+function cleanupAllWriterSessions() {
+  console.log("🧹 全Writer IDセッションをクリーンアップ");
+  connectedWriters.clear();
+  writerSessions.clear();
+  console.log("✅ Writer IDクリーンアップ完了");
+}
+
+// 特定のWriter IDをクリーンアップ
+function cleanupWriterSession(writerId) {
+  if (connectedWriters.has(writerId)) {
+    connectedWriters.delete(writerId);
+    writerSessions.delete(writerId);
+    writerLastSeen.delete(writerId);
+    console.log(`🧹 Writer ID ${writerId} をクリーンアップ`);
+  }
+}
+
+// タイムアウトしたWriter IDをクリーンアップ（30秒無通信）
+function checkWriterTimeouts() {
+  const now = Date.now();
+  const timeoutMs = 30000; // 30秒
+  
+  for (let [writerId, lastSeen] of writerLastSeen.entries()) {
+    if (now - lastSeen > timeoutMs) {
+      console.log(`⏰ Writer ID ${writerId} がタイムアウト (${Math.floor((now - lastSeen) / 1000)}秒)`);
+      cleanupWriterSession(writerId);
+    }
+  }
+}
+
+socket.onopen = () => {
+  console.log("✅ 受信側WebSocket接続完了");
+  
+  // 定期的なWriter IDタイムアウトチェックを開始（10秒間隔）
+  setInterval(checkWriterTimeouts, 10000);
+};
 socket.onerror = e => console.error("❌ 受信側WebSocketエラー", e);
-socket.onclose = () => console.warn("⚠️ 受信側WebSocket切断");
+socket.onclose = () => {
+  console.warn("⚠️ 受信側WebSocket切断");
+  // Writer IDとセッション情報をクリーンアップ
+  cleanupAllWriterSessions();
+};
 
 // 🔍 受信側背景デバッグ表示関数
 function addReceiverBackgroundDebugVisuals(x, y, bgWidth, bgHeight) {
@@ -1757,7 +1798,12 @@ function redrawCanvas(withBackground = true) {
         ctx.lineWidth = adjustedThickness * (drawingAreaSize.width / senderCanvasSize.width);
         // 動画背景時の白色調整（動画キャプチャ後は通常の白に戻す）
         const whiteColor = isVideoBackgroundActive ? '#f0f0f0' : '#fff';
-        ctx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? whiteColor : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
+        ctx.strokeStyle = cmd.color === 'black' ? '#000' : 
+                         (cmd.color === 'white' ? whiteColor : 
+                         (cmd.color === 'red' ? '#ff0000' : 
+                         (cmd.color === 'blue' ? '#0000ff' : 
+                         (cmd.color === 'green' ? '#008000' : 
+                         (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))))));
         ctx.shadowBlur = 0;
         ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
         ctx.stroke();
@@ -1816,6 +1862,23 @@ function handleMessage(data) {
       }
     }
     
+    // 新しいセッションの場合、古いタイムアウトしたセッションを積極的にクリーンアップ
+    if (!existingWriterId) {
+      console.log("🧹 新しいセッション要求 - タイムアウトセッションを即座にクリーンアップ");
+      checkWriterTimeouts();
+      
+      // さらに、5秒以上無通信のセッションも積極的にクリーンアップ
+      const now = Date.now();
+      const aggressiveTimeoutMs = 5000; // 5秒
+      
+      for (let [writerId, lastSeen] of writerLastSeen.entries()) {
+        if (now - lastSeen > aggressiveTimeoutMs) {
+          console.log(`⚡ 積極的クリーンアップ: Writer ID ${writerId} (${Math.floor((now - lastSeen) / 1000)}秒無通信)`);
+          cleanupWriterSession(writerId);
+        }
+      }
+    }
+    
     // 既存セッションがある場合はそれを再利用
     if (existingWriterId) {
       const assignMsg = {
@@ -1831,19 +1894,28 @@ function handleMessage(data) {
     }
     
     // 利用可能なwriter IDを割り当て
+    console.log("📊 Writer ID割り当て前の状況:");
+    console.log(`  接続中Writer: ${Array.from(connectedWriters).join(', ') || 'なし'}`);
+    console.log(`  セッション数: ${writerSessions.size}`);
+    console.log(`  最終接触時刻データ: ${writerLastSeen.size}件`);
+    
     let assignedId = null;
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 1; i <= 6; i++) {
       const candidateId = `writer${i}`;
       if (!connectedWriters.has(candidateId)) {
         assignedId = candidateId;
         connectedWriters.add(candidateId);
+        console.log(`✅ Writer ID ${candidateId} を新規割り当て`);
         break;
+      } else {
+        console.log(`❌ Writer ID ${candidateId} は既に使用中`);
       }
     }
     
     if (assignedId) {
       // セッションマッピングを記録
       writerSessions.set(assignedId, data.sessionId);
+      writerLastSeen.set(assignedId, Date.now()); // 最終接触時刻を記録
       
       console.log(`📝 Writer ID割り当て: ${assignedId} セッション: ${data.sessionId} (接続中: ${Array.from(connectedWriters).join(', ')})`);
       console.log("📋 現在のセッション:", Array.from(writerSessions.entries()));
@@ -1860,8 +1932,51 @@ function handleMessage(data) {
         console.error("❌ WebSocket接続なし - Writer ID割り当て送信失敗");
       }
     } else {
-      console.warn("⚠️ 利用可能なwriter IDがありません（最大3人）");
+      console.warn("⚠️ 利用可能なwriter IDがありません（最大6人）");
       console.log("📋 現在のセッション:", Array.from(writerSessions.entries()));
+      
+      // 緊急時：最も古いセッションを強制クリーンアップして再試行
+      if (writerLastSeen.size > 0) {
+        let oldestWriterId = null;
+        let oldestTime = Date.now();
+        
+        for (let [writerId, lastSeen] of writerLastSeen.entries()) {
+          if (lastSeen < oldestTime) {
+            oldestTime = lastSeen;
+            oldestWriterId = writerId;
+          }
+        }
+        
+        if (oldestWriterId) {
+          console.log(`🚨 緊急クリーンアップ: 最古のWriter ID ${oldestWriterId} を削除 (${Math.floor((Date.now() - oldestTime) / 1000)}秒前)`);
+          cleanupWriterSession(oldestWriterId);
+          
+          // 再試行
+          for (let i = 1; i <= 6; i++) {
+            const candidateId = `writer${i}`;
+            if (!connectedWriters.has(candidateId)) {
+              assignedId = candidateId;
+              connectedWriters.add(candidateId);
+              console.log(`✅ 緊急割り当て成功: Writer ID ${candidateId}`);
+              
+              // セッションマッピングを記録
+              writerSessions.set(assignedId, data.sessionId);
+              writerLastSeen.set(assignedId, Date.now());
+              
+              const assignMsg = {
+                type: "assignWriterId",
+                writerId: assignedId,
+                sessionId: data.sessionId
+              };
+              console.log("📤 緊急Writer ID割り当て送信:", assignMsg);
+              if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify(assignMsg));
+              }
+              break;
+            }
+          }
+        }
+      }
     }
     return;
   }
@@ -2181,6 +2296,11 @@ function handleMessage(data) {
   } else if (data.type === "draw") {
     // writer ID を取得（デフォルトは writer1 で後方互換性を保つ）
     const writerId = data.writerId || 'writer1';
+    
+    // 最終接触時刻を更新
+    if (writerLastSeen.has(writerId)) {
+      writerLastSeen.set(writerId, Date.now());
+    }
     
     // タイムスタンプを追加
     const drawData = { 
