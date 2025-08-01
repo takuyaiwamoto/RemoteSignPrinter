@@ -3154,8 +3154,9 @@ function saveDoubleRotatedImage() {
     // キャンバスを再描画（空の状態）
     redrawCanvasWithOthers();
     
-    // 🔄 送信後に自動でClearボタンと同じアクションを実行
-    console.log('🔄 送信完了 → 自動Clear処理を実行');
+    // 🔄 受信側のアニメーション完了後に自動でClearボタンと同じアクションを実行
+    const totalAnimationTime = (animationStartWaitTime + 1 + rotationWaitTime) * 1000; // アニメーション開始待機 + 回転1秒 + 回転後待機
+    console.log(`🔄 送信完了 → ${totalAnimationTime/1000}秒後（アニメーション完了後）に自動Clear処理を実行`);
     setTimeout(() => {
       // Clearボタンと同じ処理を実行
       hasSentData = false; // 送信済みフラグをリセット
@@ -3168,8 +3169,8 @@ function saveDoubleRotatedImage() {
         timestamp: Date.now()
       }));
       console.log('📤 自動Clear: 全書き手にクリア指示を送信');
-      console.log('✅ 自動Clear処理完了');
-    }, 1000); // 1秒後に自動Clear実行
+      console.log('✅ 自動Clear処理完了（アニメーション完了後）');
+    }, totalAnimationTime); // アニメーション完了後に自動Clear実行
   }, 500); // 受信側の印刷処理が開始されるまで500ms待機
   
   // 🔸 送信ボタンの視覚的フィードバック
