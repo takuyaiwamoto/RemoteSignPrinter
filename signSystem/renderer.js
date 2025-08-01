@@ -1874,7 +1874,7 @@ function handleMessage(data) {
       return;
     }
     
-    // 既存セッションの確認と重複チェック
+    // 既存セッションの確認と重複チェック（より厳密）
     let existingWriterId = null;
     for (let [writerId, sessionId] of writerSessions.entries()) {
       if (sessionId === data.sessionId) {
@@ -1882,6 +1882,18 @@ function handleMessage(data) {
         console.log(`🔄 既存セッション発見: ${writerId} -> ${sessionId}`);
         break;
       }
+    }
+    
+    // セッションIDの一意性検証
+    const sessionIdMatches = Array.from(writerSessions.entries()).filter(([, sessionId]) => sessionId === data.sessionId);
+    if (sessionIdMatches.length > 1) {
+      console.error(`🚨 セッションID重複検出: ${data.sessionId} が ${sessionIdMatches.length} 個のWriter IDに割り当てられています`);
+      // 重複セッションをクリーンアップ
+      sessionIdMatches.forEach(([writerId, sessionId]) => {
+        console.log(`🧹 重複セッション削除: ${writerId} -> ${sessionId}`);
+        cleanupWriterSession(writerId);
+      });
+      existingWriterId = null; // 重複があったので新規割り当て
     }
     
     // 新しいセッションの場合、古いタイムアウトしたセッションを積極的にクリーンアップ
@@ -1939,8 +1951,14 @@ function handleMessage(data) {
     }
     
     let assignedId = null;
-    for (let i = 1; i <= 6; i++) {
-      const candidateId = `writer${i}`;
+    
+    // ランダムな順序でWriter IDをチェック（PC・スマホ両方がwriter1を取る問題を防ぐ）
+    const writerIds = ['writer1', 'writer2', 'writer3', 'writer4', 'writer5', 'writer6'];
+    const shuffledIds = [...writerIds].sort(() => Math.random() - 0.5);
+    
+    console.log(`🎲 Writer ID候補をランダム順序でチェック: ${shuffledIds.join(', ')}`);
+    
+    for (const candidateId of shuffledIds) {
       const isInConnected = connectedWriters.has(candidateId);
       const isInSessions = writerSessions.has(candidateId);
       
@@ -1950,13 +1968,18 @@ function handleMessage(data) {
       const activeWriters = getActiveWriterIds();
       const isActive = activeWriters.includes(candidateId);
       
-      if (!isInConnected && !isInSessions && !isActive) {
+      // セッションIDの重複チェックも追加
+      const sessionConflict = Array.from(writerSessions.entries()).some(([wId, sId]) => 
+        wId !== candidateId && sId === data.sessionId
+      );
+      
+      if (!isInConnected && !isInSessions && !isActive && !sessionConflict) {
         assignedId = candidateId;
         connectedWriters.add(candidateId);
         console.log(`✅ Writer ID ${candidateId} を新規割り当て`);
         break;
       } else {
-        console.log(`❌ Writer ID ${candidateId} は既に使用中 (接続:${isInConnected}, セッション:${isInSessions}, アクティブ:${isActive})`);
+        console.log(`❌ Writer ID ${candidateId} は既に使用中 (接続:${isInConnected}, セッション:${isInSessions}, アクティブ:${isActive}, 重複:${sessionConflict})`);
         
         // 非アクティブなのに使用中の場合はクリーンアップ
         if ((isInConnected || isInSessions) && !isActive) {
@@ -2073,6 +2096,37 @@ function handleMessage(data) {
           isCanvasRotated = false;
           //console.log('🔄 通常背景切り替え: 回転状態リセット');
           
+          // 新しい背景に変更された場合は古いWriter描画データを完全クリア
+          console.log('🧹 新しい背景変更: Writer描画データを完全クリア');
+          multiWriterData = {
+            writer1: [],
+            writer2: [],
+            writer3: [],
+            writer4: [],
+            writer5: [],
+            writer6: []
+          };
+          drawingData = [];
+          
+          // writer管理データもクリア
+          if (typeof writerLastSeen !== 'undefined') {
+            writerLastSeen.clear();
+            console.log('🧹 writerLastSeenもクリア');
+          }
+          if (typeof writerPositions !== 'undefined') {
+            writerPositions.clear(); 
+            console.log('🧹 writerPositionsもクリア');
+          }
+          
+          // otherWritersDataも存在する場合はクリア
+          if (typeof otherWritersData !== 'undefined') {
+            for (let writerId in otherWritersData) {
+              otherWritersData[writerId] = [];
+            }
+            console.log('🧹 otherWritersDataもクリア');
+          }
+          
+          console.log('🧹 背景変更に伴う完全データクリア完了');
         }
         
         // CSS背景を削除してcanvas描画に統一
@@ -2239,7 +2293,9 @@ function handleMessage(data) {
       saveDrawingDataAs0Degree();
     }
     
-    // 全ての執筆者データをクリア（6人対応）
+    console.log('🧹 受信側：complete clear処理開始');
+    
+    // 全ての執筆者データを完全クリア（6人対応）
     multiWriterData = {
       writer1: [],
       writer2: [],
@@ -2249,13 +2305,34 @@ function handleMessage(data) {
       writer6: []
     };
     drawingData = [];
-    console.log('🧹 全執筆者データをクリア');
+    
+    // writer管理データもクリア
+    if (typeof writerLastSeen !== 'undefined') {
+      writerLastSeen.clear();
+      console.log('🧹 writerLastSeenクリア');
+    }
+    if (typeof writerPositions !== 'undefined') {
+      writerPositions.clear();
+      console.log('🧹 writerPositionsクリア');
+    }
+    
+    // 他の可能性のあるデータ構造もクリア
+    if (typeof otherWritersData !== 'undefined') {
+      for (let writerId in otherWritersData) {
+        otherWritersData[writerId] = [];
+      }
+      console.log('🧹 otherWritersDataクリア');
+    }
+    
+    console.log('🧹 受信側：全執筆者データを完全クリア');
     redrawCanvas();
   } else if (data.type === "globalClear") {
     // 書き手からの全体クリア指示
     console.log(`🧹 書き手(${data.writerId})から全体クリア指示受信`);
     
-    // 全ての執筆者データをクリア
+    console.log('🧹 受信側：globalClear処理開始');
+    
+    // 全ての執筆者データを完全クリア
     multiWriterData = {
       writer1: [],
       writer2: [],
@@ -2265,7 +2342,26 @@ function handleMessage(data) {
       writer6: []
     };
     drawingData = [];
-    console.log('🧹 全執筆者データをクリア');
+    
+    // writer管理データもクリア
+    if (typeof writerLastSeen !== 'undefined') {
+      writerLastSeen.clear();
+      console.log('🧹 writerLastSeenクリア');
+    }
+    if (typeof writerPositions !== 'undefined') {
+      writerPositions.clear();
+      console.log('🧹 writerPositionsクリア');
+    }
+    
+    // 他の可能性のあるデータ構造もクリア
+    if (typeof otherWritersData !== 'undefined') {
+      for (let writerId in otherWritersData) {
+        otherWritersData[writerId] = [];
+      }
+      console.log('🧹 otherWritersDataクリア');
+    }
+    
+    console.log('🧹 受信側：globalClear全執筆者データを完全クリア');
     redrawCanvas();
   } else if (data.type === "globalSend") {
     // 書き手からの送信指示
@@ -2276,7 +2372,22 @@ function handleMessage(data) {
       console.log("🔴 globalSend → 描画データを0度回転で保存");
       saveDrawingDataAs0Degree();
     }
-    // 特別な処理は不要（通常の印刷処理が別途実行される）
+    
+    // 🔒 受信側はデータをクリアしない（回転後の描画を保持）
+    console.log('🔒 受信側: globalSend受信時もデータを保持（回転後描画保護）');
+    console.log(`🔒 保持中のデータ: ${Object.keys(multiWriterData).map(id => `${id}: ${multiWriterData[id].length}`).join(', ')}`);
+    
+    // ⚠️ データクリアを無効化：受信側は回転後の描画を保持
+    // multiWriterData = {...}; // コメントアウト
+    // drawingData = [];        // コメントアウト
+    
+    console.log('🔒 globalSend: 受信側データ保持完了');
+    
+    // 花火演出を全書き手に同期表示
+    console.log('🎆 globalSend: 花火演出を開始');
+    setTimeout(() => {
+      createReceiverFireworks();
+    }, 1000); // 送信処理完了後1秒で花火を実行
   } else if (data.type === "start") {
     // writer ID を取得（デフォルトは writer1 で後方互換性を保つ）
     const writerId = data.writerId || 'writer1';
@@ -2294,6 +2405,8 @@ function handleMessage(data) {
       multiWriterData[writerId] = [];
       console.log(`🆕 新しいWriter ID ${writerId} の配列を初期化`);
     }
+    
+    
     multiWriterData[writerId].push(startData);
     drawingData.push(startData); // 互換性のために統合データにも追加
     
@@ -2407,6 +2520,8 @@ function handleMessage(data) {
       multiWriterData[writerId] = [];
       console.log(`🆕 新しいWriter ID ${writerId} の配列を初期化`);
     }
+    
+    
     multiWriterData[writerId].push(drawData);
     drawingData.push(drawData); // 互換性のために統合データにも追加
     

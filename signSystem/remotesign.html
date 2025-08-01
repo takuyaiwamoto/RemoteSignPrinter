@@ -641,6 +641,7 @@ let animationStartWaitTime = 3.3; // アニメーション開始待機時間
 let rotationWaitTime = 7.5; // 回転後待機時間
 let currentPenThickness = 8; // 現在のペンの太さ（標準は太い）
 let currentPenColor = 'black'; // 現在のペンの色
+let hasSentData = false; // 送信済みフラグ
 let neonColorIndex = 0; // ネオン用の色インデックス
 let drawDistance = 0; // 描画距離の追跡（ネオン用）
 let lastPosition = null; // 前回の位置を記録
@@ -715,6 +716,10 @@ socket.onmessage = (event) => {
 
 function processMessage(data) {
   console.log(`📨 メッセージ受信: type=${data.type}, writerId=${data.writerId || 'なし'}`);
+  console.log(`📨 受信時の状態: hasSentData=${hasSentData}, drawingCommands数=${drawingCommands.length}, otherWritersDataキー数=${Object.keys(otherWritersData).length}`);
+  if (Object.keys(otherWritersData).length > 0) {
+    console.log(`📨 現在のotherWritersData詳細:`, Object.keys(otherWritersData).map(key => `${key}:${otherWritersData[key].length}件`));
+  }
   
   if (data.type === "assignWriterId") {
     // writer ID の割り当てを受信
@@ -736,6 +741,9 @@ function processMessage(data) {
   } else if (data.type === "start" || data.type === "draw") {
     // 他の執筆者からの描画データを受信
     console.log(`🖊️ 描画データ受信: writerId=${data.writerId}, myWriterId=${myWriterId}, 他の書き手？${data.writerId !== myWriterId}`);
+    console.log(`🖊️ 受信時のhasSentData状態: ${hasSentData}`);
+    console.log(`🖊️ 受信時のotherWritersDataキー数: ${Object.keys(otherWritersData).length}`);
+    
     if (data.writerId && data.writerId !== myWriterId) {
       console.log("✅ 他の書き手の描画として処理");
       handleOtherWriterDrawing(data);
@@ -787,6 +795,17 @@ function processMessage(data) {
         }, (data.animationStartWaitTime + data.rotationWaitTime + 10) * 1000); // 全体の処理時間
       }
       
+      // 花火演出を他の書き手にも同期表示
+      const fireworksCheckbox = document.getElementById('fireworksEffect');
+      if (fireworksCheckbox && fireworksCheckbox.checked) {
+        console.log(`🎆 ${data.writerId}の送信に同期して花火演出を実行`);
+        // 送信処理完了後少し遅れて花火を実行
+        const fireworksDelay = (data.animationStartWaitTime + 3) * 1000; // アニメーション開始待機時間 + 3秒
+        setTimeout(() => {
+          createFireworks();
+        }, fireworksDelay);
+      }
+      
       // 10秒後に自動クリア（送信処理と同期）
       setTimeout(() => {
         console.log('🧹 他の書き手の送信に同期してクリア実行');
@@ -797,11 +816,16 @@ function processMessage(data) {
           ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
         }
         
-        // 他の書き手のデータもクリア
+        // 全ての描画データを完全クリア
         otherWritersData = {};
-        
-        // 描画コマンドをクリア
         drawingCommands = [];
+        console.log('🧹 送信側：他の書き手の送信に同期して全データ完全クリア');
+        console.log('🧹 drawingCommands配列をクリア:', drawingCommands.length);
+        console.log('🧹 otherWritersData配列をクリア:', Object.keys(otherWritersData).length);
+        
+        // キャンバスを再描画
+        redrawCanvasWithOthers();
+        
         console.log('🧹 他の書き手の送信に同期してクリア完了');
       }, 10000);
     }
@@ -828,20 +852,54 @@ function generateSessionId() {
   const random1 = Math.random().toString(36).substr(2, 9);
   const random2 = Math.random().toString(36).substr(2, 9);
   const random3 = Math.random().toString(36).substr(2, 9);
+  const random4 = Math.random().toString(36).substr(2, 9); // 追加のランダム値
   
-  // デバイス固有情報の収集
-  const screen = `${window.screen.width}x${window.screen.height}`;
+  // デバイス固有情報の収集（拡張）
+  const screen = `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const language = navigator.language || 'unknown';
   const platform = navigator.platform || 'unknown';
   const cookieEnabled = navigator.cookieEnabled ? '1' : '0';
   const onlineStatus = navigator.onLine ? '1' : '0';
   
-  // ブラウザフィンガープリント
-  const fingerprint = btoa(`${screen}_${timezone}_${language}_${platform}_${cookieEnabled}_${onlineStatus}`).replace(/[^a-zA-Z0-9]/g, '').substr(0, 10);
+  // 追加のブラウザ固有情報
+  const userAgent = navigator.userAgent.length.toString(); // UAの長さ
+  const vendor = navigator.vendor || 'unknown';
+  const hardwareConcurrency = navigator.hardwareConcurrency || 'unknown';
+  const deviceMemory = navigator.deviceMemory || 'unknown';
+  const pixelRatio = window.devicePixelRatio || 'unknown';
+  const touchPoints = navigator.maxTouchPoints || 'unknown';
   
-  const sessionId = `session_${random1}_${random2}_${random3}_${timestamp}_${fingerprint}`;
+  // より高精度なタイムスタンプ
+  const performanceNow = performance.now().toString().replace('.', '');
+  
+  // キャンバスフィンガープリンティング（軽量版）
+  let canvasFingerprint = 'unknown';
+  try {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.textBaseline = 'top';
+      ctx.font = '14px Arial';
+      ctx.fillText('Device fingerprint test', 2, 2);
+      canvasFingerprint = canvas.toDataURL().slice(-10); // 最後の10文字のみ使用
+    }
+  } catch (e) {
+    canvasFingerprint = 'canvas-error';
+  }
+  
+  // すべての要素を結合
+  const deviceInfo = `${screen}_${timezone}_${language}_${platform}_${cookieEnabled}_${onlineStatus}_${userAgent}_${vendor}_${hardwareConcurrency}_${deviceMemory}_${pixelRatio}_${touchPoints}_${canvasFingerprint}`;
+  
+  // ブラウザフィンガープリント（より長い）
+  const fingerprint = btoa(deviceInfo).replace(/[^a-zA-Z0-9]/g, '').substr(0, 16);
+  
+  const sessionId = `session_${random1}_${random2}_${random3}_${random4}_${timestamp}_${performanceNow}_${fingerprint}`;
   console.log("🆔 生成されたセッションID:", sessionId);
+  console.log("🔍 デバイス情報:", {
+    screen, timezone, language, platform, userAgent: userAgent, 
+    vendor, hardwareConcurrency, deviceMemory, pixelRatio, touchPoints, canvasFingerprint
+  });
   return sessionId;
 }
 
@@ -952,18 +1010,42 @@ function createWriterStatusDiv() {
 function handleOtherWriterDrawing(data) {
   const writerId = data.writerId;
   
+  console.log(`🖊️ handleOtherWriterDrawing: ${writerId}, hasSentData: ${hasSentData}, データ型: ${data.type}`);
+  console.log(`🔍 現在のotherWritersDataキー数: ${Object.keys(otherWritersData).length}`);
+  console.log(`🔍 現在のotherWritersData内容:`, Object.keys(otherWritersData).map(key => `${key}: ${otherWritersData[key].length}件`));
+  
+  // 送信済みの場合は他のwriterのデータを受信しない
+  if (hasSentData) {
+    console.log(`🔒 送信済みのため他のwriterデータを無視: ${writerId} (データ型: ${data.type})`);
+    console.log(`🔒 otherWritersDataは空のまま維持: キー数=${Object.keys(otherWritersData).length}`);
+    return;
+  }
+  
   if (!otherWritersData[writerId]) {
     otherWritersData[writerId] = [];
+    console.log(`🆕 ${writerId}の新しい配列を作成`);
   }
   
   otherWritersData[writerId].push(data);
+  console.log(`📝 ${writerId}のデータを追加: 合計${otherWritersData[writerId].length}件`);
+  console.log(`📝 追加後のotherWritersData全体:`, Object.keys(otherWritersData).map(key => `${key}: ${otherWritersData[key].length}件`));
   
   // リアルタイムで他執筆者の描画を表示
+  console.log(`🎨 redrawCanvasWithOthers呼び出し: hasSentData=${hasSentData}`);
   redrawCanvasWithOthers();
 }
 
 // 自分と他執筆者の描画を統合して再描画
 function redrawCanvasWithOthers() {
+  console.log(`🎨 redrawCanvasWithOthers開始: hasSentData=${hasSentData}, otherWritersDataキー数=${Object.keys(otherWritersData).length}`);
+  console.log(`🎨 otherWritersData詳細:`, Object.keys(otherWritersData).map(key => `${key}: ${otherWritersData[key].length}件`));
+  
+  // 🔒 送信済みなのにdrawingCommandsにデータがある場合は強制クリア
+  if (hasSentData && drawingCommands.length > 0) {
+    console.log(`🚨 異常検出: 送信済みなのにdrawingCommandsに${drawingCommands.length}件のデータ → 強制クリア`);
+    drawingCommands = [];
+  }
+  
   // 背景をクリア
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
@@ -973,42 +1055,72 @@ function redrawCanvasWithOthers() {
   }
   
   // 自分の描画コマンドを再実行
-  drawingCommands.forEach(cmd => {
+  console.log(`🎨 自分の描画コマンド数: ${drawingCommands.length}`);
+  if (drawingCommands.length > 0) {
+    console.log(`🎨 自分の描画コマンド先頭3件:`, drawingCommands.slice(0, 3));
+  }
+  
+  drawingCommands.forEach((cmd, index) => {
     if (cmd.type === "start") {
       ctx.beginPath();
       ctx.moveTo(cmd.x, cmd.y);
+      if (index < 3) console.log(`🎨 自分 START[${index}]: (${cmd.x}, ${cmd.y})`);
     } else if (cmd.type === "draw") {
       ctx.lineWidth = cmd.thickness || currentPenThickness;
       ctx.strokeStyle = cmd.color || currentPenColor;
       ctx.lineTo(cmd.x, cmd.y);
       ctx.stroke();
+      if (index < 3) console.log(`🎨 自分 DRAW[${index}]: (${cmd.x}, ${cmd.y})`);
     }
   });
   
-  // 他執筆者の描画データを描画（半透明で表示）
-  Object.keys(otherWritersData).forEach(writerId => {
-    ctx.save();
-    ctx.globalAlpha = 0.7; // 他執筆者は少し透明に
-    
-    otherWritersData[writerId].forEach(cmd => {
-      if (cmd.type === "start") {
-        ctx.beginPath();
-        ctx.moveTo(cmd.x, cmd.y);
-      } else if (cmd.type === "draw") {
-        ctx.lineWidth = cmd.thickness || 4;
-        // そのIDが設定した実際の色を使用
-        ctx.strokeStyle = cmd.color || 'black';
-        ctx.lineTo(cmd.x, cmd.y);
-        ctx.stroke();
-      }
+  // 他執筆者の描画データを描画（送信済みでない場合のみ）
+  if (!hasSentData) {
+    console.log(`🎨 他執筆者描画開始: ${Object.keys(otherWritersData).length}人のデータを描画`);
+    Object.keys(otherWritersData).forEach(writerId => {
+      console.log(`🎨 ${writerId}の描画開始: ${otherWritersData[writerId].length}件のコマンド`);
+      ctx.save();
+      ctx.globalAlpha = 0.7; // 他執筆者は少し透明に
+      
+      otherWritersData[writerId].forEach((cmd, index) => {
+        if (cmd.type === "start") {
+          ctx.beginPath();
+          ctx.moveTo(cmd.x, cmd.y);
+          if (index < 3) console.log(`🎨 ${writerId} START[${index}]: (${cmd.x}, ${cmd.y})`);
+        } else if (cmd.type === "draw") {
+          ctx.lineWidth = cmd.thickness || 4;
+          ctx.strokeStyle = cmd.color || 'black';
+          ctx.lineTo(cmd.x, cmd.y);
+          ctx.stroke();
+          if (index < 3) console.log(`🎨 ${writerId} DRAW[${index}]: (${cmd.x}, ${cmd.y})`);
+        }
+      });
+      
+      ctx.restore();
+      console.log(`🎨 ${writerId}の描画完了`);
     });
-    
-    ctx.restore();
-  });
+  } else {
+    console.log('🔒 送信済みのため他のwriterデータは描画しない');
+    console.log(`🔒 スキップされたotherWritersData:`, Object.keys(otherWritersData).map(key => `${key}: ${otherWritersData[key].length}件`));
+  }
 }
 
 socket.onerror = (error) => console.error("❌ WebSocketエラー（送信側）:", error);
-socket.onclose = (event) => console.log("⚠️ WebSocket切断（送信側）:", event.code, event.reason);
+socket.onclose = (event) => {
+  console.log("⚠️ WebSocket切断（送信側）:", event.code, event.reason);
+  
+  // 接続切断時にセッション情報をリセット
+  mySessionId = null;
+  myWriterId = null;
+  console.log("🧹 WebSocket切断に伴いセッション情報をリセット");
+  
+  // Writer ID表示をクリア
+  const statusDiv = document.getElementById('writerStatus');
+  if (statusDiv) {
+    statusDiv.childNodes[0].textContent = 'Writer ID: 未割り当て';
+  }
+  document.title = '送信側 - 未接続';
+};
 
 // ハートエフェクト生成関数
 function createHeart() {
@@ -1263,6 +1375,10 @@ function resetCanvasToNormalSize() {
 
 function setBackground(src) {
   console.log('setBackground関数呼び出し:', src, 'WebSocket状態:', socket ? socket.readyState : 'socket未初期化');
+  
+  // 背景変更時に他のwriterの古いデータをクリア
+  console.log('🧹 背景変更: 他のwriter描画データをクリア');
+  otherWritersData = {};
   
   if (src === null) {
     backgroundImage = null;
@@ -1607,16 +1723,26 @@ function startCountdown() {
 function clearCanvas() {
   // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
+  console.log('🧹 clearCanvas開始 - 完全データクリア実行');
+  console.log(`🧹 クリア前のhasSentData: ${hasSentData}`);
+  console.log(`🧹 クリア前のotherWritersDataキー数: ${Object.keys(otherWritersData).length}`);
+  
+  // 送信済みフラグをリセット
+  hasSentData = false;
+  console.log('🔓 手動Clear: 送信済みフラグをリセット - 他のwriterデータ受信を再開');
+  
   // キャンバスを完全にクリア
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (backgroundImage) {
     ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
   }
   
-  // 全ての描画データをクリア
+  // 全ての描画データを完全クリア
   otherWritersData = {};
   drawingCommands = [];
-  console.log('🧹 全ての描画データをクリア');
+  console.log('🧹 送信側：全描画データを完全クリア');
+  console.log('🧹 drawingCommands配列をクリア:', drawingCommands.length);
+  console.log('🧹 otherWritersData配列をクリア:', Object.keys(otherWritersData).length);
   
   // キャンバスを再描画（背景のみの状態にする）
   redrawCanvasWithOthers();
@@ -1628,6 +1754,7 @@ function clearCanvas() {
     timestamp: Date.now()
   }));
   console.log('📤 全書き手にクリア指示を送信');
+  console.log('✅ clearCanvas完了');
 }
 
 // ペンの太さ設定関数
@@ -2421,6 +2548,12 @@ function interpolatePoints(startX, startY, endX, endY, steps) {
 }
 
 canvas.addEventListener("mousedown", (e) => {
+  // 送信済みの場合は描画を無効化
+  if (hasSentData) {
+    console.log('🔒 送信済みのため新しい描画を無効化 (mouse)');
+    return;
+  }
+  
   drawing = true;
   const x = e.offsetX;
   const y = e.offsetY;
@@ -2506,6 +2639,14 @@ canvas.addEventListener("mouseup", () => {
 
 canvas.addEventListener("mousemove", (e) => {
   if (!drawing) return;
+  
+  // 送信済みの場合は描画を無効化
+  if (hasSentData) {
+    console.log('🔒 送信済みのため描画継続を無効化 (mouse move)');
+    drawing = false; // 描画状態もリセット
+    return;
+  }
+  
   const x = e.offsetX;
   const y = e.offsetY;
   
@@ -2638,6 +2779,13 @@ canvas.addEventListener("mousemove", (e) => {
 // 🔸 スマホ対応：タッチイベントを追加
 canvas.addEventListener("touchstart", (e) => {
   e.preventDefault(); // スクロールを防止
+  
+  // 送信済みの場合は描画を無効化
+  if (hasSentData) {
+    console.log('🔒 送信済みのため新しい描画を無効化 (touch)');
+    return;
+  }
+  
   drawing = true;
   const touch = e.touches[0];
   const rect = canvas.getBoundingClientRect();
@@ -2725,6 +2873,14 @@ canvas.addEventListener("touchend", (e) => {
 canvas.addEventListener("touchmove", (e) => {
   e.preventDefault(); // スクロールを防止
   if (!drawing) return;
+  
+  // 送信済みの場合は描画を無効化
+  if (hasSentData) {
+    console.log('🔒 送信済みのため描画継続を無効化 (touch move)');
+    drawing = false; // 描画状態もリセット
+    return;
+  }
+  
   const touch = e.touches[0];
   const rect = canvas.getBoundingClientRect();
   
@@ -2970,7 +3126,8 @@ function saveDoubleRotatedImage() {
   
   console.log(`🔄 送信ボタン: 印刷処理開始→${animationStartWaitTime}秒後にアニメーション開始`);
   
-  // 全書き手に送信実行を通知
+  // 🔸 まず受信側に印刷指示を送信（データが残っている状態で）
+  console.log('📤 受信側に印刷指示を先に送信');
   socket.send(JSON.stringify({
     type: "globalSend",
     writerId: myWriterId,
@@ -2978,7 +3135,42 @@ function saveDoubleRotatedImage() {
     animationStartWaitTime: animationStartWaitTime,
     rotationWaitTime: rotationWaitTime
   }));
-  console.log('📤 全書き手に送信実行を通知');
+  console.log('✅ 受信側への印刷指示送信完了');
+  
+  // 🔸 少し待ってから送信側の印刷処理とデータクリアを実行
+  setTimeout(() => {
+    console.log('🖨️ 送信側印刷処理を実行');
+    console.log(`📝 印刷前の描画コマンド数: ${drawingCommands.length}`);
+    actualPrintProcess();
+    
+    // 🔸 印刷処理完了後に全ての描画データをクリア
+    hasSentData = true;
+    otherWritersData = {};
+    drawingCommands = []; // 🔥 印刷処理後に自分の描画コマンドをクリア
+    console.log('🔒 送信済みフラグを設定 + 全描画データをクリア（印刷処理後）');
+    console.log('🧹 otherWritersData遅延クリア:', Object.keys(otherWritersData).length);
+    console.log('🧹 drawingCommands印刷後クリア:', drawingCommands.length);
+    
+    // キャンバスを再描画（空の状態）
+    redrawCanvasWithOthers();
+    
+    // 🔄 送信後に自動でClearボタンと同じアクションを実行
+    console.log('🔄 送信完了 → 自動Clear処理を実行');
+    setTimeout(() => {
+      // Clearボタンと同じ処理を実行
+      hasSentData = false; // 送信済みフラグをリセット
+      console.log('🔓 自動Clear: 送信済みフラグをリセット - 他のwriterデータ受信を再開');
+      
+      // 全書き手同期のためのクリア命令を送信
+      socket.send(JSON.stringify({ 
+        type: "globalClear",
+        writerId: myWriterId,
+        timestamp: Date.now()
+      }));
+      console.log('📤 自動Clear: 全書き手にクリア指示を送信');
+      console.log('✅ 自動Clear処理完了');
+    }, 1000); // 1秒後に自動Clear実行
+  }, 500); // 受信側の印刷処理が開始されるまで500ms待機
   
   // 🔸 送信ボタンの視覚的フィードバック
   const sendButton = event.target;
@@ -3022,10 +3214,7 @@ function saveDoubleRotatedImage() {
     sendButton.disabled = false;
   }, 2000);
   
-  // 🔸 送信ボタンを押したと同時に印刷処理を実行（印刷機の起動を早くする）
-  console.log('🖨️ 印刷処理を即座に実行');
-  console.log(`📝 現在の描画コマンド数: ${drawingCommands.length}`);
-  actualPrintProcess();
+  // 🔸 印刷処理は既に上で実行済み
   
   // 🔸 印刷処理開始の設定時間後に回転アニメーションを開始
   console.log(`🎬 印刷処理開始から${animationStartWaitTime}秒後に回転アニメーション実行予定`);
@@ -3047,6 +3236,10 @@ function saveDoubleRotatedImage() {
   setTimeout(() => {
     console.log('🧹 送信ボタン押下から10秒後にクリア実行');
     
+    // 🔒 送信済みフラグは維持（手動でClearボタンを押すまで他のwriterデータを受信しない）
+    // hasSentData = false; // この行をコメントアウト
+    console.log('🔒 送信済みフラグを維持 - 他のwriterデータ受信を継続して拒否');
+    
     // キャンバスを完全にクリア
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
@@ -3056,9 +3249,12 @@ function saveDoubleRotatedImage() {
       console.log('🖼️ 背景画像を再描画');
     }
     
-    // 描画コマンドをクリア
+    // 全ての描画データを完全クリア
     drawingCommands = [];
+    otherWritersData = {};
+    console.log('🧹 送信側：全描画データを完全クリア');
     console.log('🧹 drawingCommands配列をクリア:', drawingCommands.length);
+    console.log('🧹 otherWritersData配列をクリア:', Object.keys(otherWritersData).length);
     
     // 受信側にもクリア指示を送信
     if (socket && socket.readyState === WebSocket.OPEN) {
