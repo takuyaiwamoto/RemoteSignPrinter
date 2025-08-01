@@ -25,6 +25,20 @@
       margin: 0 0 10px 0;
       font-size: 14px;
     }
+    body.classic .thickness-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+      padding: 15px;
+      border: 1px solid #ccc;
+      background: #f9f9f9;
+      margin-left: 10px;
+    }
+    body.classic .thickness-panel h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+    }
     body.classic canvas {
       border: 1px solid black;
       display: block;
@@ -83,6 +97,25 @@
     }
     
     body.modern .color-panel h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+      color: #2d3748;
+      text-align: center;
+    }
+    
+    body.modern .thickness-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      align-items: center;
+      padding: 20px 10px;
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 15px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+      margin-left: 15px;
+    }
+    
+    body.modern .thickness-panel h3 {
       margin: 0 0 10px 0;
       font-size: 16px;
       color: #2d3748;
@@ -261,6 +294,34 @@
       background: green !important;
     }
     
+    /* ペンの太さボタンのスタイル */
+    body.modern .thickness-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: 3px solid rgba(255, 255, 255, 0.8);
+      margin: 0;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      background: rgba(255, 255, 255, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    body.modern .thickness-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    }
+    
+    body.modern .thickness-btn.selected {
+      border: 4px solid #ffffff;
+      box-shadow: 0 0 0 3px #2d3748, 0 0 20px 5px rgba(45, 55, 72, 0.6), 0 8px 30px rgba(0, 0, 0, 0.4);
+      transform: scale(1.15);
+      background: rgba(255, 255, 255, 1);
+    }
+    
     body.classic .color-btn {
       width: 50px;
       height: 50px;
@@ -291,6 +352,27 @@
     
     body.classic .color-btn.selected[style*="background: green"] {
       background: green !important;
+    }
+    
+    /* クラシック - ペンの太さボタンのスタイル */
+    body.classic .thickness-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: 2px solid #ccc;
+      margin: 0;
+      cursor: pointer;
+      background: #f9f9f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    body.classic .thickness-btn.selected {
+      border: 3px solid #ffffff;
+      box-shadow: 0 0 0 2px #333, 0 0 15px 3px rgba(51, 51, 51, 0.7), 0 4px 20px rgba(0,0,0,0.6);
+      transform: scale(1.1);
+      background: #ffffff;
     }
     .color-btn.neon {
       background: linear-gradient(45deg, #ff0000, #0000ff, #ffff00);
@@ -1763,7 +1845,16 @@ function setPenThickness(thickness) {
   
   // ボタンの選択状態を更新
   document.querySelectorAll('.thickness-btn').forEach(btn => btn.classList.remove('selected'));
-  event.target.classList.add('selected');
+  
+  // クリックされたボタンを選択状態にする
+  document.querySelectorAll('.thickness-btn').forEach(btn => {
+    const onClick = btn.getAttribute('onclick');
+    if (onClick && onClick.includes(`setPenThickness(${thickness})`)) {
+      btn.classList.add('selected');
+    }
+  });
+  
+  console.log(`✏️ ペンの太さを${thickness}に設定`);
   
   // ペンの太さ設定
   
@@ -3811,6 +3902,22 @@ window.addEventListener('DOMContentLoaded', () => {
   <button class="color-btn" style="background: red;" onclick="setPenColor('red')"></button>
   <button class="color-btn" style="background: blue;" onclick="setPenColor('blue')"></button>
   <button class="color-btn" style="background: green;" onclick="setPenColor('green')"></button>
+</div>
+
+<div class="thickness-panel">
+  <h3>ペンの太さ</h3>
+  <button class="thickness-btn" onclick="setPenThickness(9)" title="太い (+15%)">
+    <div style="width: 18px; height: 18px; border-radius: 50%; background: #333;"></div>
+  </button>
+  <button class="thickness-btn selected" onclick="setPenThickness(8)" title="標準">
+    <div style="width: 16px; height: 16px; border-radius: 50%; background: #333;"></div>
+  </button>
+  <button class="thickness-btn" onclick="setPenThickness(7)" title="細い (-10%)">
+    <div style="width: 14px; height: 14px; border-radius: 50%; background: #333;"></div>
+  </button>
+  <button class="thickness-btn" onclick="setPenThickness(6)" title="とても細い (-20%)">
+    <div style="width: 12px; height: 12px; border-radius: 50%; background: #333;"></div>
+  </button>
 </div>
 
 </div>
