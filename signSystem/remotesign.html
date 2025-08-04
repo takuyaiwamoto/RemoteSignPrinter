@@ -1123,16 +1123,88 @@ function handleOtherWriterDrawing(data) {
   redrawCanvasWithOthers();
 }
 
+// Writer別に独立した描画関数
+function drawWriterCommands(commands, writerId, isMyself = false) {
+  if (commands.length === 0) return;
+  
+  ctx.save();
+  if (!isMyself) {
+    ctx.globalAlpha = 0.7; // 他執筆者は少し透明に
+  }
+  
+  let prevCmd = null;
+  commands.forEach((cmd, index) => {
+    if (cmd.type === "start") {
+      ctx.beginPath();
+      ctx.moveTo(cmd.x, cmd.y);
+      prevCmd = cmd;
+    } else if (cmd.type === "draw") {
+      if (cmd.color === 'white-red-border') {
+        // 白地赤縁の特別処理
+        if (prevCmd) {
+          // 外側の薄い赤を描画
+          ctx.beginPath();
+          ctx.moveTo(prevCmd.x, prevCmd.y);
+          ctx.lineWidth = (cmd.thickness || (isMyself ? currentPenThickness : 4)) + 8;
+          ctx.globalAlpha = isMyself ? 0.3 : 0.2;
+          ctx.strokeStyle = '#ffccdd';
+          ctx.shadowColor = '#ffccdd';
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.lineTo(cmd.x, cmd.y);
+          ctx.stroke();
+          
+          // 内側の濃い赤を描画
+          ctx.beginPath();
+          ctx.moveTo(prevCmd.x, prevCmd.y);
+          ctx.lineWidth = (cmd.thickness || (isMyself ? currentPenThickness : 4)) + 6;
+          ctx.globalAlpha = isMyself ? 0.8 : 0.6;
+          ctx.strokeStyle = '#ff88bb';
+          ctx.shadowColor = '#ff88bb';
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.lineTo(cmd.x, cmd.y);
+          ctx.stroke();
+          
+          // 白い中心を描画（グロー効果付き）
+          ctx.beginPath();
+          ctx.moveTo(prevCmd.x, prevCmd.y);
+          ctx.globalAlpha = isMyself ? 0.9 : 0.7;
+          ctx.lineWidth = Math.max(1, (cmd.thickness || (isMyself ? currentPenThickness : 4)) - 3);
+          ctx.strokeStyle = '#ffffff';
+          ctx.shadowColor = '#ffffff';
+          ctx.lineTo(cmd.x, cmd.y);
+          ctx.stroke();
+          ctx.globalAlpha = isMyself ? 1.0 : 0.7; // 透明度をリセット
+        }
+      } else {
+        // 通常の色の描画（新しいパスを開始しない、連続線として描画）
+        if (prevCmd && prevCmd.type === "start") {
+          // startコマンドの直後の場合のみbeginPathを実行
+          ctx.beginPath();
+          ctx.moveTo(prevCmd.x, prevCmd.y);
+          ctx.lineWidth = cmd.thickness || (isMyself ? currentPenThickness : 4);
+          ctx.strokeStyle = cmd.color || (isMyself ? currentPenColor : 'black');
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+        }
+        ctx.lineTo(cmd.x, cmd.y);
+        ctx.stroke();
+      }
+      prevCmd = cmd;
+    }
+  });
+  
+  ctx.restore();
+}
+
 // 自分と他執筆者の描画を統合して再描画
 function redrawCanvasWithOthers() {
   const redrawStart = performance.now();
   console.log('🎨 redrawCanvasWithOthers 開始');
-  // console.log(`🎨 redrawCanvasWithOthers開始: hasSentData=${hasSentData}, otherWritersDataキー数=${Object.keys(otherWritersData).length}`);
-  // console.log(`🎨 otherWritersData詳細:`, Object.keys(otherWritersData).map(key => `${key}: ${otherWritersData[key].length}件`));
   
   // 🔒 送信済みなのにdrawingCommandsにデータがある場合は強制クリア
   if (hasSentData && drawingCommands.length > 0) {
-    // console.log(`🚨 異常検出: 送信済みなのにdrawingCommandsに${drawingCommands.length}件のデータ → 強制クリア`);
     drawingCommands = [];
   }
   
@@ -1145,151 +1217,13 @@ function redrawCanvasWithOthers() {
   }
   
   // 自分の描画コマンドを再実行
-  // console.log(`🎨 自分の描画コマンド数: ${drawingCommands.length}`);
-  if (drawingCommands.length > 0) {
-    // console.log(`🎨 自分の描画コマンド先頭3件:`, drawingCommands.slice(0, 3));
-  }
-  
-  let prevCmd = null;
-  drawingCommands.forEach((cmd, index) => {
-    if (cmd.type === "start") {
-      ctx.beginPath();
-      ctx.moveTo(cmd.x, cmd.y);
-      if (index < 3) console.log(`🎨 自分 START[${index}]: (${cmd.x}, ${cmd.y})`);
-      prevCmd = cmd;
-    } else if (cmd.type === "draw") {
-      if (cmd.color === 'white-red-border') {
-        // 白地赤縁の特別処理
-        if (prevCmd) {
-          // 外側の薄い赤を描画
-          ctx.beginPath();
-          ctx.moveTo(prevCmd.x, prevCmd.y);
-          ctx.lineWidth = (cmd.thickness || currentPenThickness) + 8;
-          ctx.globalAlpha = 0.3;
-          ctx.strokeStyle = '#ffccdd';
-          // ctx.shadowBlur = 12; // パフォーマンス改善のため無効化
-          ctx.shadowColor = '#ffccdd';
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          ctx.lineTo(cmd.x, cmd.y);
-          ctx.stroke();
-          
-          // 内側の濃い赤を描画
-          ctx.beginPath();
-          ctx.moveTo(prevCmd.x, prevCmd.y);
-          ctx.lineWidth = (cmd.thickness || currentPenThickness) + 6;
-          ctx.globalAlpha = 0.8;
-          ctx.strokeStyle = '#ff88bb';
-          // ctx.shadowBlur = 8; // パフォーマンス改善のため無効化
-          ctx.shadowColor = '#ff88bb';
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          ctx.lineTo(cmd.x, cmd.y);
-          ctx.stroke();
-          
-          // 白い中心を描画（グロー効果付き）
-          ctx.beginPath();
-          ctx.moveTo(prevCmd.x, prevCmd.y);
-          ctx.globalAlpha = 0.9;
-          ctx.lineWidth = Math.max(1, (cmd.thickness || currentPenThickness) - 3);
-          ctx.strokeStyle = '#ffffff';
-          // ctx.shadowBlur = 8; // パフォーマンス改善のため無効化
-          ctx.shadowColor = '#ffffff';
-          ctx.lineTo(cmd.x, cmd.y);
-          ctx.stroke();
-          // ctx.shadowBlur = 0; // パフォーマンス改善のため無効化 // シャドウをリセット
-          ctx.globalAlpha = 1.0; // 透明度をリセット
-        }
-      } else {
-        ctx.lineWidth = cmd.thickness || currentPenThickness;
-        ctx.strokeStyle = cmd.color || currentPenColor;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.lineTo(cmd.x, cmd.y);
-        ctx.stroke();
-      }
-      if (index < 3) console.log(`🎨 自分 DRAW[${index}]: (${cmd.x}, ${cmd.y})`);
-      prevCmd = cmd;
-    }
-  });
+  drawWriterCommands(drawingCommands, myWriterId, true);
   
   // 他執筆者の描画データを描画（送信済みでない場合のみ）
   if (!hasSentData) {
-    // console.log(`🎨 他執筆者描画開始: ${Object.keys(otherWritersData).length}人のデータを描画`);
     Object.keys(otherWritersData).forEach(writerId => {
-      // console.log(`🎨 ${writerId}の描画開始: ${otherWritersData[writerId].length}件のコマンド`);
-      ctx.save();
-      ctx.globalAlpha = 0.7; // 他執筆者は少し透明に
-      
-      let prevOtherCmd = null;
-      otherWritersData[writerId].forEach((cmd, index) => {
-        if (cmd.type === "start") {
-          ctx.beginPath();
-          ctx.moveTo(cmd.x, cmd.y);
-          if (index < 3) console.log(`🎨 ${writerId} START[${index}]: (${cmd.x}, ${cmd.y})`);
-          prevOtherCmd = cmd;
-        } else if (cmd.type === "draw") {
-          if (cmd.color === 'white-red-border') {
-            // 白地赤縁の特別処理
-            if (prevOtherCmd) {
-              // 外側の薄い赤を描画
-              ctx.beginPath();
-              ctx.moveTo(prevOtherCmd.x, prevOtherCmd.y);
-              ctx.lineWidth = (cmd.thickness || 4) + 8;
-              ctx.globalAlpha = 0.3;
-              ctx.strokeStyle = '#ffccdd';
-              // ctx.shadowBlur = 12; // パフォーマンス改善のため無効化
-              ctx.shadowColor = '#ffccdd';
-              ctx.lineCap = 'round';
-              ctx.lineJoin = 'round';
-              ctx.lineTo(cmd.x, cmd.y);
-              ctx.stroke();
-              
-              // 内側の濃い赤を描画
-              ctx.beginPath();
-              ctx.moveTo(prevOtherCmd.x, prevOtherCmd.y);
-              ctx.lineWidth = (cmd.thickness || 4) + 6;
-              ctx.globalAlpha = 0.8;
-              ctx.strokeStyle = '#ff88bb';
-              // ctx.shadowBlur = 8; // パフォーマンス改善のため無効化
-              ctx.shadowColor = '#ff88bb';
-              ctx.lineCap = 'round';
-              ctx.lineJoin = 'round';
-              ctx.lineTo(cmd.x, cmd.y);
-              ctx.stroke();
-              
-              // 白い中心を描画（グロー効果付き）
-              ctx.beginPath();
-              ctx.moveTo(prevOtherCmd.x, prevOtherCmd.y);
-              ctx.globalAlpha = 0.9;
-              ctx.lineWidth = Math.max(1, (cmd.thickness || 4) - 3);
-              ctx.strokeStyle = '#ffffff';
-              // ctx.shadowBlur = 8; // パフォーマンス改善のため無効化
-              ctx.shadowColor = '#ffffff';
-              ctx.lineTo(cmd.x, cmd.y);
-              ctx.stroke();
-              // ctx.shadowBlur = 0; // パフォーマンス改善のため無効化 // シャドウをリセット
-          ctx.globalAlpha = 1.0; // 透明度をリセット
-            }
-          } else {
-            ctx.lineWidth = cmd.thickness || 4;
-            ctx.strokeStyle = cmd.color || 'black';
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.lineTo(cmd.x, cmd.y);
-            ctx.stroke();
-          }
-          if (index < 3) console.log(`🎨 ${writerId} DRAW[${index}]: (${cmd.x}, ${cmd.y})`);
-          prevOtherCmd = cmd;
-        }
-      });
-      
-      ctx.restore();
-      // console.log(`🎨 ${writerId}の描画完了`);
+      drawWriterCommands(otherWritersData[writerId], writerId, false);
     });
-  } else {
-    // console.log('🔒 送信済みのため他のwriterデータは描画しない');
-    // console.log(`🔒 スキップされたotherWritersData:`, Object.keys(otherWritersData).map(key => `${key}: ${otherWritersData[key].length}件`));
   }
   
   const redrawEnd = performance.now();
