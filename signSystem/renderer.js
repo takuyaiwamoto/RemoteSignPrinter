@@ -111,6 +111,31 @@ function easeInOutSine(x) {
   return -(Math.cos(Math.PI * x) - 1) / 2;
 }
 
+// アスペクト比を保持した座標変換関数
+function transformCoordinatesWithAspectRatio(x, y, senderSize, drawingAreaSize) {
+  const senderAspect = senderSize.width / senderSize.height;
+  const drawingAreaAspect = drawingAreaSize.width / drawingAreaSize.height;
+  
+  let actualDrawingWidth, actualDrawingHeight, offsetX = 0, offsetY = 0;
+  
+  if (senderAspect > drawingAreaAspect) {
+    // 送信側の方が横長 → 描画エリアの幅に合わせて、高さを調整
+    actualDrawingWidth = drawingAreaSize.width;
+    actualDrawingHeight = drawingAreaSize.width / senderAspect;
+    offsetY = (drawingAreaSize.height - actualDrawingHeight) / 2;
+  } else {
+    // 送信側の方が縦長 → 描画エリアの高さに合わせて、幅を調整
+    actualDrawingHeight = drawingAreaSize.height;
+    actualDrawingWidth = drawingAreaSize.height * senderAspect;
+    offsetX = (drawingAreaSize.width - actualDrawingWidth) / 2;
+  }
+  
+  const scaledX = (x / senderSize.width) * actualDrawingWidth + offsetX;
+  const scaledY = (y / senderSize.height) * actualDrawingHeight + offsetY;
+  
+  return { x: scaledX, y: scaledY, actualWidth: actualDrawingWidth, actualHeight: actualDrawingHeight };
+}
+
 function interpolateColor(color1, color2, factor) {
   // イージング関数を適用してより滑らかな変化
   const easedFactor = easeInOutSine(factor);
@@ -1760,18 +1785,24 @@ function redrawCanvas(withBackground = true) {
     if (cmd.type === "start") {
       ctx.beginPath();
       lastWriterId = cmd.writerId; // 現在のwriterIDを記録
-      // 🔸 描画エリア調整を適用した座標変換（Canvasレベルで180度回転するため座標変換は不要）
-      let scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
-      let scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+      // 🔸 アスペクト比を保持した座標変換
+      const coords = transformCoordinatesWithAspectRatio(cmd.x, cmd.y, senderCanvasSize, drawingAreaSize);
+      let scaledX = coords.x;
+      let scaledY = coords.y;
       
       if (cmd === drawingData.find(d => d.type === 'start')) { // 最初のstartコマンドでのみログ出力
-        //console.log(`  ////描画エリア中心: (${areaCenterX}, ${areaCenterY})`);
-        //console.log(`  描画エリア左上: (${areaLeft}, ${areaTop})`);
-        //console.log(`  送信側キャンバスサイズ: ${senderCanvasSize.width} x ${senderCanvasSize.height}`);
-        //console.log(`  描画エリアサイズ: ${drawingAreaSize.width} x ${drawingAreaSize.height}`);
-        //console.log(`  スケール比: X=${(drawingAreaSize.width / senderCanvasSize.width).toFixed(3)}, Y=${(drawingAreaSize.height / senderCanvasSize.height).toFixed(3)}`);
-        //console.log(`  座標変換例: (${cmd.x}, ${cmd.y}) → (${scaledX}, ${scaledY}) → (${areaLeft + scaledX}, ${areaTop + scaledY})`);
-        //console.log(`  180度回転後の最終座標: (${areaLeft + scaledX}, ${areaTop + scaledY})`);
+        console.log(`🔍 アスペクト比保持座標変換デバッグ:`);
+        console.log(`  送信側キャンバスサイズ: ${senderCanvasSize.width} x ${senderCanvasSize.height}`);
+        console.log(`  描画エリアサイズ: ${drawingAreaSize.width} x ${drawingAreaSize.height}`);
+        console.log(`  実際の描画サイズ: ${coords.actualWidth.toFixed(1)} x ${coords.actualHeight.toFixed(1)}`);
+        console.log(`  オフセット: (${((drawingAreaSize.width - coords.actualWidth) / 2).toFixed(1)}, ${((drawingAreaSize.height - coords.actualHeight) / 2).toFixed(1)})`);
+        console.log(`  座標変換例: (${cmd.x}, ${cmd.y}) → (${scaledX.toFixed(1)}, ${scaledY.toFixed(1)})`);
+        
+        // アスペクト比の確認
+        const senderAspect = senderCanvasSize.width / senderCanvasSize.height;
+        const drawingAreaAspect = drawingAreaSize.width / drawingAreaSize.height;
+        console.log(`  アスペクト比: 送信側=${senderAspect.toFixed(3)}, 描画エリア=${drawingAreaAspect.toFixed(3)}`);
+        console.log(`  ✅ アスペクト比を保持した変換を適用済み`);
       }
       
       ctx.moveTo(areaLeft + scaledX, areaTop + scaledY);
@@ -1780,52 +1811,126 @@ function redrawCanvas(withBackground = true) {
       if (cmd.writerId !== lastWriterId) {
         ctx.beginPath();
         lastWriterId = cmd.writerId;
-        // 新しいパスの場合、moveToから開始（Canvasレベルで180度回転するため座標変換は不要）
-        let scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
-        let scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
-        ctx.moveTo(areaLeft + scaledX, areaTop + scaledY);
+        // 新しいパスの場合、moveToから開始
+        const coords = transformCoordinatesWithAspectRatio(cmd.x, cmd.y, senderCanvasSize, drawingAreaSize);
+        ctx.moveTo(areaLeft + coords.x, areaTop + coords.y);
         return; // この点はmoveToのみで、strokeは行わない
       }
       
-      // 🔸 描画エリア調整を適用した座標変換（Canvasレベルで180度回転するため座標変換は不要）
-      let scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
-      let scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+      // 🔸 アスペクト比を保持した座標変換
+      const coords = transformCoordinatesWithAspectRatio(cmd.x, cmd.y, senderCanvasSize, drawingAreaSize);
+      let scaledX = coords.x;
+      let scaledY = coords.y;
       
       // ネオンの場合はセグメントごとに新しいパスを作成（送信側と同じ方式）
-      if (cmd.color === 'neon' && cmd.neonIndex !== null) {
-        ctx.beginPath();
+      if (cmd.color === 'neon' && typeof cmd.neonIndex === 'number') {
         // 前の位置から移動（前のdrawコマンドの位置を取得）
         const prevCmd = drawingData[drawingData.indexOf(cmd) - 1];
         if (prevCmd && (prevCmd.type === 'start' || prevCmd.type === 'draw')) {
-          const prevScaledX = (prevCmd.x / senderCanvasSize.width) * drawingAreaSize.width;
-          const prevScaledY = (prevCmd.y / senderCanvasSize.height) * drawingAreaSize.height;
-          ctx.moveTo(areaLeft + prevScaledX, areaTop + prevScaledY);
+          const prevCoords = transformCoordinatesWithAspectRatio(prevCmd.x, prevCmd.y, senderCanvasSize, drawingAreaSize);
+          const prevScaledX = prevCoords.x;
+          const prevScaledY = prevCoords.y;
+          
+          // 線分の長さを計算
+          const distance = Math.sqrt(Math.pow(scaledX - prevScaledX, 2) + Math.pow(scaledY - prevScaledY, 2));
+          
+          // 短い線分に分割してグラデーション効果を作成
+          const segments = Math.max(1, Math.ceil(distance / 3)); // 3ピクセルごとに分割
+          
+          for (let i = 0; i < segments; i++) {
+            const t = i / segments;
+            const nextT = (i + 1) / segments;
+            
+            const startX = prevScaledX + (scaledX - prevScaledX) * t;
+            const startY = prevScaledY + (scaledY - prevScaledY) * t;
+            const endX = prevScaledX + (scaledX - prevScaledX) * nextT;
+            const endY = prevScaledY + (scaledY - prevScaledY) * nextT;
+            
+            // 距離に基づいて色インデックスを進める
+            const segmentNeonIndex = cmd.neonIndex + (distance * t / 100);
+            const interpolatedColor = getNeonColorFromIndex(segmentNeonIndex);
+            
+            ctx.beginPath();
+            ctx.moveTo(areaLeft + startX, areaTop + startY);
+            ctx.lineWidth = (cmd.thickness || 4) * (drawingAreaSize.width / senderCanvasSize.width);
+            ctx.strokeStyle = interpolatedColor;
+            ctx.shadowBlur = 15; // より強いグロー効果
+            ctx.shadowColor = interpolatedColor;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.lineTo(areaLeft + endX, areaTop + endY);
+            ctx.stroke();
+          }
+        } else {
+          // startコマンドの場合は単一点
+          const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
+          ctx.beginPath();
+          ctx.arc(areaLeft + scaledX, areaTop + scaledY, (cmd.thickness || 4) * (drawingAreaSize.width / senderCanvasSize.width) / 2, 0, 2 * Math.PI);
+          ctx.fillStyle = interpolatedColor;
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = interpolatedColor;
+          ctx.fill();
         }
-        
-        const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
-        ctx.lineWidth = (cmd.thickness || 4) * (drawingAreaSize.width / senderCanvasSize.width);
-        ctx.strokeStyle = interpolatedColor;
-        ctx.shadowBlur = 5;
-        ctx.shadowColor = interpolatedColor;
-        ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
-        ctx.stroke();
       } else {
         // 通常の色の場合
         // 線の太さ（動画背景時の特殊処理は動画キャプチャ後は無効）
         const baseThickness = cmd.thickness || 4;
         const adjustedThickness = isVideoBackgroundActive ? baseThickness * 1.5 : baseThickness;
         ctx.lineWidth = adjustedThickness * (drawingAreaSize.width / senderCanvasSize.width);
-        // 動画背景時の白色調整（動画キャプチャ後は通常の白に戻す）
-        const whiteColor = isVideoBackgroundActive ? '#f0f0f0' : '#fff';
-        ctx.strokeStyle = cmd.color === 'black' ? '#000' : 
-                         (cmd.color === 'white' ? whiteColor : 
-                         (cmd.color === 'red' ? '#ff0000' : 
-                         (cmd.color === 'blue' ? '#0000ff' : 
-                         (cmd.color === 'green' ? '#008000' : 
-                         (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))))));
-        ctx.shadowBlur = 0;
-        ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
-        ctx.stroke();
+        // white-red-borderの特別処理
+        if (cmd.color === 'white-red-border') {
+          // 白赤枠の受信側表示処理（3層グラデーション効果）
+          const currentThickness = cmd.thickness || 4;
+          const scaledThickness = currentThickness * (drawingAreaSize.width / senderCanvasSize.width);
+          
+          // 外側の薄い赤
+          ctx.save();
+          ctx.globalAlpha = 0.2;
+          ctx.lineWidth = scaledThickness + 10;
+          ctx.strokeStyle = '#ffccdd';
+          ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
+          ctx.stroke();
+          ctx.restore();
+          
+          // 中間の赤
+          ctx.save();
+          ctx.globalAlpha = 0.5;
+          ctx.lineWidth = scaledThickness + 8;
+          ctx.strokeStyle = '#ffaacc';
+          ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
+          ctx.stroke();
+          ctx.restore();
+          
+          // 内側の濃い赤
+          ctx.save();
+          ctx.globalAlpha = 0.8;
+          ctx.lineWidth = scaledThickness + 6;
+          ctx.strokeStyle = '#ff88bb';
+          ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
+          ctx.stroke();
+          ctx.restore();
+          
+          // 白い中心
+          ctx.save();
+          ctx.globalAlpha = 0.9;
+          ctx.lineWidth = Math.max(1, scaledThickness - 3);
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
+          ctx.stroke();
+          ctx.restore();
+        } else {
+          // 動画背景時の白色調整（動画キャプチャ後は通常の白に戻す）
+          const whiteColor = isVideoBackgroundActive ? '#f0f0f0' : '#fff';
+          ctx.strokeStyle = cmd.color === 'black' ? '#000' : 
+                           (cmd.color === 'white' ? whiteColor : 
+                           (cmd.color === 'red' ? '#ff0000' : 
+                           (cmd.color === 'blue' ? '#0000ff' : 
+                           (cmd.color === 'green' ? '#008000' : 
+                           (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))))));
+          ctx.shadowBlur = 0;
+          ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
+          ctx.stroke();
+        }
       }
     }
   });
@@ -2432,12 +2537,14 @@ function handleMessage(data) {
     const areaLeft = areaCenterX - drawingAreaSize.width / 2;
     const areaTop = areaCenterY - drawingAreaSize.height / 2;
     
-    // 🔸 描画エリア調整を適用した座標変換
-    let scaledX = (data.x / senderCanvasSize.width) * drawingAreaSize.width;
-    let scaledY = (data.y / senderCanvasSize.height) * drawingAreaSize.height;
+    // 🔸 アスペクト比を保持した座標変換
+    const coords = transformCoordinatesWithAspectRatio(data.x, data.y, senderCanvasSize, drawingAreaSize);
+    let scaledX = coords.x;
+    let scaledY = coords.y;
     
     console.log(`🎯 START描画デバッグ: 送信側(${data.x}, ${data.y}) → スケール後(${scaledX.toFixed(1)}, ${scaledY.toFixed(1)})`);
     console.log('  描画エリアサイズ:', drawingAreaSize.width, 'x', drawingAreaSize.height);
+    console.log('  実際の描画サイズ:', coords.actualWidth, 'x', coords.actualHeight);
     console.log('  描画エリア左上:', areaLeft.toFixed(1), areaTop.toFixed(1));
     
     // 180度回転座標変換を適用
@@ -2543,9 +2650,10 @@ function handleMessage(data) {
     const areaLeft = areaCenterX - drawingAreaSize.width / 2;
     const areaTop = areaCenterY - drawingAreaSize.height / 2;
     
-    // 🔸 描画エリア調整を適用した座標変換
-    let scaledX = (data.x / senderCanvasSize.width) * drawingAreaSize.width;
-    let scaledY = (data.y / senderCanvasSize.height) * drawingAreaSize.height;
+    // 🔸 アスペクト比を保持した座標変換
+    const coords = transformCoordinatesWithAspectRatio(data.x, data.y, senderCanvasSize, drawingAreaSize);
+    let scaledX = coords.x;
+    let scaledY = coords.y;
     
     //console.log('DRAW描画デバッグ:');
     //console.log('送信側座標:', data.x, data.y);
@@ -2562,30 +2670,8 @@ function handleMessage(data) {
     const thickness = data.thickness || 4;
     
     // ネオンの場合はセグメントごとに新しいパスを作成（送信側と同じ方式）
-    if (data.color === 'neon' && data.neonIndex !== null) {
-      ctx.beginPath();
-      // 前の位置から移動（前のdrawコマンドの位置を取得）
-      const currentIndex = drawingData.length - 1;
-      if (currentIndex > 0) {
-        const prevData = drawingData[currentIndex - 1];
-        if (prevData && (prevData.type === 'start' || prevData.type === 'draw')) {
-          let prevScaledX = (prevData.x / senderCanvasSize.width) * drawingAreaSize.width;
-          let prevScaledY = (prevData.y / senderCanvasSize.height) * drawingAreaSize.height;
-          
-          // 180度回転座標変換
-          prevScaledX = drawingAreaSize.width - prevScaledX;
-          prevScaledY = drawingAreaSize.height - prevScaledY;
-          
-          ctx.moveTo(areaLeft + prevScaledX, areaTop + prevScaledY);
-        }
-      }
-      
-      const interpolatedColor = getNeonColorFromIndex(data.neonIndex);
-      ctx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
-      ctx.strokeStyle = interpolatedColor;
-      ctx.shadowBlur = 5;
-      ctx.shadowColor = interpolatedColor;
-      // リアルタイム描画はredrawCanvasに任せる
+    if (data.color === 'neon' && typeof data.neonIndex === 'number') {
+      // リアルタイム描画はredrawCanvasに任せる（redrawCanvasで詳細なグラデーション処理を実行）
       redrawCanvas();
     } else {
       // 通常の色の場合
@@ -2871,21 +2957,107 @@ function sendCanvasToMainProcess() {
       printCtx.moveTo(scaledX, scaledY);
       if (index < 3) console.log('🖨️ 送信座標[' + index + ']:', cmd.x, cmd.y, '->', scaledX, scaledY);
     } else if (cmd.type === "draw") {
+      // 送信側の元座標を直接スケールして使用
+      const scaledX = (cmd.x / senderCanvasSize.width) * printCanvas.width;
+      const scaledY = (cmd.y / senderCanvasSize.height) * printCanvas.height;
+      
       // ペンの太さと色を適用
       const thickness = cmd.thickness || 4;
       printCtx.lineWidth = thickness * (printCanvas.width / senderCanvasSize.width);
       
-      // ネオン効果の処理（印刷時も補間色を使用）
-      if (cmd.color === 'neon' && cmd.neonIndex !== null) {
-        const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
-        printCtx.strokeStyle = interpolatedColor;
+      // ネオン効果と白赤枠の処理（印刷時も適用）
+      if (cmd.color === 'neon' && typeof cmd.neonIndex === 'number') {
+        // 印刷時もグラデーション効果を適用
+        const prevCmd = drawingData[drawingData.indexOf(cmd) - 1];
+        if (prevCmd && (prevCmd.type === 'start' || prevCmd.type === 'draw')) {
+          const prevScaledX = (prevCmd.x / senderCanvasSize.width) * printCanvas.width;
+          const prevScaledY = (prevCmd.y / senderCanvasSize.height) * printCanvas.height;
+          
+          // 線分の長さを計算
+          const distance = Math.sqrt(Math.pow(scaledX - prevScaledX, 2) + Math.pow(scaledY - prevScaledY, 2));
+          
+          // 短い線分に分割してグラデーション効果を作成
+          const segments = Math.max(1, Math.ceil(distance / 3));
+          
+          for (let i = 0; i < segments; i++) {
+            const t = i / segments;
+            const nextT = (i + 1) / segments;
+            
+            const startX = prevScaledX + (scaledX - prevScaledX) * t;
+            const startY = prevScaledY + (scaledY - prevScaledY) * t;
+            const endX = prevScaledX + (scaledX - prevScaledX) * nextT;
+            const endY = prevScaledY + (scaledY - prevScaledY) * nextT;
+            
+            const segmentNeonIndex = cmd.neonIndex + (distance * t / 100);
+            const interpolatedColor = getNeonColorFromIndex(segmentNeonIndex);
+            
+            printCtx.beginPath();
+            printCtx.moveTo(startX, startY);
+            printCtx.lineWidth = thickness * (printCanvas.width / senderCanvasSize.width);
+            printCtx.strokeStyle = interpolatedColor;
+            printCtx.shadowBlur = 10;
+            printCtx.shadowColor = interpolatedColor;
+            printCtx.lineCap = 'round';
+            printCtx.lineJoin = 'round';
+            printCtx.lineTo(endX, endY);
+            printCtx.stroke();
+          }
+        } else {
+          // startコマンドの場合は単一点
+          const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
+          printCtx.beginPath();
+          printCtx.arc(scaledX, scaledY, thickness * (printCanvas.width / senderCanvasSize.width) / 2, 0, 2 * Math.PI);
+          printCtx.fillStyle = interpolatedColor;
+          printCtx.shadowBlur = 10;
+          printCtx.shadowColor = interpolatedColor;
+          printCtx.fill();
+        }
+      } else if (cmd.color === 'white-red-border') {
+        // 白赤枠の印刷処理（3層グラデーション効果）
+        const currentThickness = cmd.thickness || 4;
+        const scaledThickness = currentThickness * (printCanvas.width / senderCanvasSize.width);
+        
+        // 外側の薄い赤
+        printCtx.save();
+        printCtx.globalAlpha = 0.2;
+        printCtx.lineWidth = scaledThickness + 10;
+        printCtx.strokeStyle = '#ffccdd';
+        printCtx.lineTo(scaledX, scaledY);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 中間の赤
+        printCtx.save();
+        printCtx.globalAlpha = 0.5;
+        printCtx.lineWidth = scaledThickness + 8;
+        printCtx.strokeStyle = '#ffaacc';
+        printCtx.lineTo(scaledX, scaledY);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 内側の濃い赤
+        printCtx.save();
+        printCtx.globalAlpha = 0.8;
+        printCtx.lineWidth = scaledThickness + 6;
+        printCtx.strokeStyle = '#ff88bb';
+        printCtx.lineTo(scaledX, scaledY);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 白い中心
+        printCtx.save();
+        printCtx.globalAlpha = 0.9;
+        printCtx.lineWidth = Math.max(1, scaledThickness - 3);
+        printCtx.strokeStyle = '#ffffff';
+        printCtx.lineTo(scaledX, scaledY);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 次の処理をスキップするため return
+        return;
       } else {
         printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
       }
-      
-      // 送信側の元座標を直接スケールして使用
-      const scaledX = (cmd.x / senderCanvasSize.width) * printCanvas.width;
-      const scaledY = (cmd.y / senderCanvasSize.height) * printCanvas.height;
       printCtx.lineTo(scaledX, scaledY);
       printCtx.stroke();
       if (index < 3) console.log('🖨️ 送信座標[' + index + ']:', cmd.x, cmd.y, '->', scaledX, scaledY);
@@ -3072,9 +3244,13 @@ function saveDrawingDataAs0Degree() {
         saveCtx.lineWidth = thickness;
         
         // ネオン効果の処理
-        if (cmd.color === 'neon' && cmd.neonIndex !== null) {
+        if (cmd.color === 'neon' && typeof cmd.neonIndex === 'number') {
           const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
           saveCtx.strokeStyle = interpolatedColor;
+          saveCtx.shadowBlur = 10;
+          saveCtx.shadowColor = interpolatedColor;
+          saveCtx.lineCap = 'round';
+          saveCtx.lineJoin = 'round';
         } else {
           saveCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
         }
@@ -4800,12 +4976,59 @@ function showPrintPreview() {
       const thickness = cmd.thickness || 4;
       previewCtx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
       
-      // ネオン効果の処理（プレビューでも表示）
-      if (cmd.color === 'neon' && cmd.neonIndex !== null) {
+      // ネオン効果と白赤枠の処理（プレビューでも表示）
+      if (cmd.color === 'neon' && typeof cmd.neonIndex === 'number') {
         const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
         previewCtx.strokeStyle = interpolatedColor;
-        previewCtx.shadowBlur = 5;
+        previewCtx.shadowBlur = 10;
         previewCtx.shadowColor = interpolatedColor;
+        previewCtx.lineCap = 'round';
+        previewCtx.lineJoin = 'round';
+      } else if (cmd.color === 'white-red-border') {
+        // 白赤枠のプレビュー処理（3層グラデーション効果）
+        const currentThickness = cmd.thickness || 4;
+        const scaledThickness = currentThickness * (drawingAreaSize.width / senderCanvasSize.width);
+        
+        let scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+        let scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+        
+        // 外側の薄い赤
+        previewCtx.save();
+        previewCtx.globalAlpha = 0.2;
+        previewCtx.lineWidth = scaledThickness + 10;
+        previewCtx.strokeStyle = '#ffccdd';
+        previewCtx.lineTo(scaledX, scaledY);
+        previewCtx.stroke();
+        previewCtx.restore();
+        
+        // 中間の赤
+        previewCtx.save();
+        previewCtx.globalAlpha = 0.5;
+        previewCtx.lineWidth = scaledThickness + 8;
+        previewCtx.strokeStyle = '#ffaacc';
+        previewCtx.lineTo(scaledX, scaledY);
+        previewCtx.stroke();
+        previewCtx.restore();
+        
+        // 内側の濃い赤
+        previewCtx.save();
+        previewCtx.globalAlpha = 0.8;
+        previewCtx.lineWidth = scaledThickness + 6;
+        previewCtx.strokeStyle = '#ff88bb';
+        previewCtx.lineTo(scaledX, scaledY);
+        previewCtx.stroke();
+        previewCtx.restore();
+        
+        // 白い中心
+        previewCtx.save();
+        previewCtx.globalAlpha = 0.9;
+        previewCtx.lineWidth = Math.max(1, scaledThickness - 3);
+        previewCtx.strokeStyle = '#ffffff';
+        previewCtx.lineTo(scaledX, scaledY);
+        previewCtx.stroke();
+        previewCtx.restore();
+        
+        return; // 通常の描画処理をスキップ
       } else {
         previewCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
         previewCtx.shadowBlur = 0;
@@ -4864,10 +5087,57 @@ function printFull() {
       const thickness = cmd.thickness || 4;
       printCtx.lineWidth = thickness;
       
-      // ネオン効果の処理
-      if (cmd.color === 'neon' && cmd.neonIndex !== null) {
+      // ネオン効果と白赤枠の処理
+      if (cmd.color === 'neon' && typeof cmd.neonIndex === 'number') {
         const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
         printCtx.strokeStyle = interpolatedColor;
+        printCtx.shadowBlur = 10;
+        printCtx.shadowColor = interpolatedColor;
+        printCtx.lineCap = 'round';
+        printCtx.lineJoin = 'round';
+      } else if (cmd.color === 'white-red-border') {
+        // 白赤枠の印刷処理（3層グラデーション効果）
+        const currentThickness = cmd.thickness || 4;
+        
+        // 外側の薄い赤
+        printCtx.save();
+        printCtx.globalAlpha = 0.2;
+        printCtx.lineWidth = currentThickness + 10;
+        printCtx.strokeStyle = '#ffccdd';
+        printCtx.lineTo(cmd.x, cmd.y);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 中間の赤
+        printCtx.save();
+        printCtx.globalAlpha = 0.5;
+        printCtx.lineWidth = currentThickness + 8;
+        printCtx.strokeStyle = '#ffaacc';
+        printCtx.lineTo(cmd.x, cmd.y);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 内側の濃い赤
+        printCtx.save();
+        printCtx.globalAlpha = 0.8;
+        printCtx.lineWidth = currentThickness + 6;
+        printCtx.strokeStyle = '#ff88bb';
+        printCtx.lineTo(cmd.x, cmd.y);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 白い中心
+        printCtx.save();
+        printCtx.globalAlpha = 0.9;
+        printCtx.lineWidth = Math.max(1, currentThickness - 3);
+        printCtx.strokeStyle = '#ffffff';
+        printCtx.lineTo(cmd.x, cmd.y);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 次の処理をスキップ
+        if (index < 3) console.log('🖨️ 印刷draw[' + index + '] white-red-border:', cmd.x, cmd.y);
+        return;
       } else {
         printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
       }
@@ -4935,10 +5205,57 @@ function printPen() {
       const thickness = cmd.thickness || 4;
       printCtx.lineWidth = thickness;
       
-      // ネオン効果の処理
-      if (cmd.color === 'neon' && cmd.neonIndex !== null) {
+      // ネオン効果と白赤枠の処理
+      if (cmd.color === 'neon' && typeof cmd.neonIndex === 'number') {
         const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
         printCtx.strokeStyle = interpolatedColor;
+        printCtx.shadowBlur = 10;
+        printCtx.shadowColor = interpolatedColor;
+        printCtx.lineCap = 'round';
+        printCtx.lineJoin = 'round';
+      } else if (cmd.color === 'white-red-border') {
+        // 白赤枠の印刷処理（3層グラデーション効果）
+        const currentThickness = cmd.thickness || 4;
+        
+        // 外側の薄い赤
+        printCtx.save();
+        printCtx.globalAlpha = 0.2;
+        printCtx.lineWidth = currentThickness + 10;
+        printCtx.strokeStyle = '#ffccdd';
+        printCtx.lineTo(cmd.x, cmd.y);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 中間の赤
+        printCtx.save();
+        printCtx.globalAlpha = 0.5;
+        printCtx.lineWidth = currentThickness + 8;
+        printCtx.strokeStyle = '#ffaacc';
+        printCtx.lineTo(cmd.x, cmd.y);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 内側の濃い赤
+        printCtx.save();
+        printCtx.globalAlpha = 0.8;
+        printCtx.lineWidth = currentThickness + 6;
+        printCtx.strokeStyle = '#ff88bb';
+        printCtx.lineTo(cmd.x, cmd.y);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 白い中心
+        printCtx.save();
+        printCtx.globalAlpha = 0.9;
+        printCtx.lineWidth = Math.max(1, currentThickness - 3);
+        printCtx.strokeStyle = '#ffffff';
+        printCtx.lineTo(cmd.x, cmd.y);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 次の処理をスキップ
+        if (index < 3) console.log('🖨️ 印刷draw[' + index + '] white-red-border:', cmd.x, cmd.y);
+        return;
       } else {
         printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
       }
@@ -5051,10 +5368,59 @@ function generatePrintImageData() {
       const thickness = cmd.thickness || 4;
       downloadCtx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
       
-      // ネオン効果の処理
-      if (cmd.color === 'neon' && cmd.neonIndex !== null) {
+      // ネオン効果と白赤枠の処理
+      if (cmd.color === 'neon' && typeof cmd.neonIndex === 'number') {
         const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
         downloadCtx.strokeStyle = interpolatedColor;
+        downloadCtx.shadowBlur = 10;
+        downloadCtx.shadowColor = interpolatedColor;
+        downloadCtx.lineCap = 'round';
+        downloadCtx.lineJoin = 'round';
+      } else if (cmd.color === 'white-red-border') {
+        // 白赤枠の印刷処理（3層グラデーション効果）
+        const currentThickness = cmd.thickness || 4;
+        const scaledThickness = currentThickness * (drawingAreaSize.width / senderCanvasSize.width);
+        
+        const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+        const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+        
+        // 外側の薄い赤
+        downloadCtx.save();
+        downloadCtx.globalAlpha = 0.2;
+        downloadCtx.lineWidth = scaledThickness + 10;
+        downloadCtx.strokeStyle = '#ffccdd';
+        downloadCtx.lineTo(scaledX, scaledY);
+        downloadCtx.stroke();
+        downloadCtx.restore();
+        
+        // 中間の赤
+        downloadCtx.save();
+        downloadCtx.globalAlpha = 0.5;
+        downloadCtx.lineWidth = scaledThickness + 8;
+        downloadCtx.strokeStyle = '#ffaacc';
+        downloadCtx.lineTo(scaledX, scaledY);
+        downloadCtx.stroke();
+        downloadCtx.restore();
+        
+        // 内側の濃い赤
+        downloadCtx.save();
+        downloadCtx.globalAlpha = 0.8;
+        downloadCtx.lineWidth = scaledThickness + 6;
+        downloadCtx.strokeStyle = '#ff88bb';
+        downloadCtx.lineTo(scaledX, scaledY);
+        downloadCtx.stroke();
+        downloadCtx.restore();
+        
+        // 白い中心
+        downloadCtx.save();
+        downloadCtx.globalAlpha = 0.9;
+        downloadCtx.lineWidth = Math.max(1, scaledThickness - 3);
+        downloadCtx.strokeStyle = '#ffffff';
+        downloadCtx.lineTo(scaledX, scaledY);
+        downloadCtx.stroke();
+        downloadCtx.restore();
+        
+        return; // 通常の描画処理をスキップ
       } else {
         downloadCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
       }

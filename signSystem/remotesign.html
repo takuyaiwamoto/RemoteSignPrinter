@@ -1142,17 +1142,66 @@ function redrawCanvasWithOthers() {
     console.log(`🎨 自分の描画コマンド先頭3件:`, drawingCommands.slice(0, 3));
   }
   
+  let prevCmd = null;
   drawingCommands.forEach((cmd, index) => {
     if (cmd.type === "start") {
       ctx.beginPath();
       ctx.moveTo(cmd.x, cmd.y);
       if (index < 3) console.log(`🎨 自分 START[${index}]: (${cmd.x}, ${cmd.y})`);
+      prevCmd = cmd;
     } else if (cmd.type === "draw") {
-      ctx.lineWidth = cmd.thickness || currentPenThickness;
-      ctx.strokeStyle = cmd.color || currentPenColor;
-      ctx.lineTo(cmd.x, cmd.y);
-      ctx.stroke();
+      if (cmd.color === 'white-red-border') {
+        // 白地赤縁の特別処理
+        if (prevCmd) {
+          // 外側の薄い赤を描画
+          ctx.beginPath();
+          ctx.moveTo(prevCmd.x, prevCmd.y);
+          ctx.lineWidth = (cmd.thickness || currentPenThickness) + 8;
+          ctx.globalAlpha = 0.3;
+          ctx.strokeStyle = '#ffccdd';
+          ctx.shadowBlur = 12;
+          ctx.shadowColor = '#ffccdd';
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.lineTo(cmd.x, cmd.y);
+          ctx.stroke();
+          
+          // 内側の濃い赤を描画
+          ctx.beginPath();
+          ctx.moveTo(prevCmd.x, prevCmd.y);
+          ctx.lineWidth = (cmd.thickness || currentPenThickness) + 6;
+          ctx.globalAlpha = 0.8;
+          ctx.strokeStyle = '#ff88bb';
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = '#ff88bb';
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.lineTo(cmd.x, cmd.y);
+          ctx.stroke();
+          
+          // 白い中心を描画（ネオン効果付き）
+          ctx.beginPath();
+          ctx.moveTo(prevCmd.x, prevCmd.y);
+          ctx.globalAlpha = 0.9;
+          ctx.lineWidth = Math.max(1, (cmd.thickness || currentPenThickness) - 3);
+          ctx.strokeStyle = '#ffffff';
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = '#ffffff';
+          ctx.lineTo(cmd.x, cmd.y);
+          ctx.stroke();
+          ctx.shadowBlur = 0; // シャドウをリセット
+          ctx.globalAlpha = 1.0; // 透明度をリセット
+        }
+      } else {
+        ctx.lineWidth = cmd.thickness || currentPenThickness;
+        ctx.strokeStyle = cmd.color || currentPenColor;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineTo(cmd.x, cmd.y);
+        ctx.stroke();
+      }
       if (index < 3) console.log(`🎨 自分 DRAW[${index}]: (${cmd.x}, ${cmd.y})`);
+      prevCmd = cmd;
     }
   });
   
@@ -1164,17 +1213,66 @@ function redrawCanvasWithOthers() {
       ctx.save();
       ctx.globalAlpha = 0.7; // 他執筆者は少し透明に
       
+      let prevOtherCmd = null;
       otherWritersData[writerId].forEach((cmd, index) => {
         if (cmd.type === "start") {
           ctx.beginPath();
           ctx.moveTo(cmd.x, cmd.y);
           if (index < 3) console.log(`🎨 ${writerId} START[${index}]: (${cmd.x}, ${cmd.y})`);
+          prevOtherCmd = cmd;
         } else if (cmd.type === "draw") {
-          ctx.lineWidth = cmd.thickness || 4;
-          ctx.strokeStyle = cmd.color || 'black';
-          ctx.lineTo(cmd.x, cmd.y);
-          ctx.stroke();
+          if (cmd.color === 'white-red-border') {
+            // 白地赤縁の特別処理
+            if (prevOtherCmd) {
+              // 外側の薄い赤を描画
+              ctx.beginPath();
+              ctx.moveTo(prevOtherCmd.x, prevOtherCmd.y);
+              ctx.lineWidth = (cmd.thickness || 4) + 8;
+              ctx.globalAlpha = 0.3;
+              ctx.strokeStyle = '#ffccdd';
+              ctx.shadowBlur = 12;
+              ctx.shadowColor = '#ffccdd';
+              ctx.lineCap = 'round';
+              ctx.lineJoin = 'round';
+              ctx.lineTo(cmd.x, cmd.y);
+              ctx.stroke();
+              
+              // 内側の濃い赤を描画
+              ctx.beginPath();
+              ctx.moveTo(prevOtherCmd.x, prevOtherCmd.y);
+              ctx.lineWidth = (cmd.thickness || 4) + 6;
+              ctx.globalAlpha = 0.8;
+              ctx.strokeStyle = '#ff88bb';
+              ctx.shadowBlur = 8;
+              ctx.shadowColor = '#ff88bb';
+              ctx.lineCap = 'round';
+              ctx.lineJoin = 'round';
+              ctx.lineTo(cmd.x, cmd.y);
+              ctx.stroke();
+              
+              // 白い中心を描画（ネオン効果付き）
+              ctx.beginPath();
+              ctx.moveTo(prevOtherCmd.x, prevOtherCmd.y);
+              ctx.globalAlpha = 0.9;
+              ctx.lineWidth = Math.max(1, (cmd.thickness || 4) - 3);
+              ctx.strokeStyle = '#ffffff';
+              ctx.shadowBlur = 8;
+              ctx.shadowColor = '#ffffff';
+              ctx.lineTo(cmd.x, cmd.y);
+              ctx.stroke();
+              ctx.shadowBlur = 0; // シャドウをリセット
+          ctx.globalAlpha = 1.0; // 透明度をリセット
+            }
+          } else {
+            ctx.lineWidth = cmd.thickness || 4;
+            ctx.strokeStyle = cmd.color || 'black';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.lineTo(cmd.x, cmd.y);
+            ctx.stroke();
+          }
           if (index < 3) console.log(`🎨 ${writerId} DRAW[${index}]: (${cmd.x}, ${cmd.y})`);
+          prevOtherCmd = cmd;
         }
       });
       
@@ -1880,7 +1978,9 @@ function setPenColor(color) {
   document.querySelectorAll('.color-btn').forEach(btn => {
     // ボタンのstyle属性から背景色を取得して比較
     const btnStyle = btn.getAttribute('style') || '';
-    if (btnStyle.includes(`background: ${color}`) || btnStyle.includes(`background:${color}`)) {
+    const btnOnClick = btn.getAttribute('onclick') || '';
+    if (btnStyle.includes(`background: ${color}`) || btnStyle.includes(`background:${color}`) ||
+        btnOnClick.includes(`setPenColor('${color}')`)) {
       btn.classList.add('selected');
     }
   });
@@ -2651,6 +2751,9 @@ canvas.addEventListener("mousedown", (e) => {
   
   console.log(`🖱️ マウス開始座標: offsetX=${x}, offsetY=${y}`);
   
+  // 現在のパスを初期化
+  currentPath = [{ x, y }];
+  
   // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
   // ネオンモードの初期設定
@@ -2701,6 +2804,7 @@ canvas.addEventListener("mousedown", (e) => {
     y,
     thickness: currentPenThickness,
     color: currentPenColor,
+    neonIndex: currentPenColor === 'neon' ? neonColorIndex : null,
     starEffect: starEffectEnabled,
     fairyDustEffect: fairyDustEffectEnabled,
     canvasSize: { width: canvas.width, height: canvas.height }
@@ -2725,6 +2829,82 @@ canvas.addEventListener("mousedown", (e) => {
 
 canvas.addEventListener("mouseup", () => {
   drawing = false;
+  
+  // 白地赤縁の場合は赤い縁を追加
+  if (currentPenColor === 'white-red-border' && currentPath.length > 1) {
+    // ネオン風赤い太線を描画（グラデーション効果付き）
+    ctx.save();
+    
+    // 外側の薄い赤（最も太い）
+    ctx.beginPath();
+    ctx.moveTo(currentPath[0].x, currentPath[0].y);
+    ctx.lineWidth = currentPenThickness + 10;
+    ctx.globalAlpha = 0.2;
+    ctx.strokeStyle = '#ffccdd';
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#ffccdd';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let i = 1; i < currentPath.length; i++) {
+      ctx.lineTo(currentPath[i].x, currentPath[i].y);
+    }
+    ctx.stroke();
+    
+    // 中間の赤
+    ctx.beginPath();
+    ctx.moveTo(currentPath[0].x, currentPath[0].y);
+    ctx.lineWidth = currentPenThickness + 8;
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = '#ffaacc';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#ffaacc';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    for (let i = 1; i < currentPath.length; i++) {
+      ctx.lineTo(currentPath[i].x, currentPath[i].y);
+    }
+    ctx.stroke();
+    
+    // 内側の濃い赤（コア）
+    ctx.beginPath();
+    ctx.moveTo(currentPath[0].x, currentPath[0].y);
+    ctx.lineWidth = currentPenThickness + 6;
+    ctx.globalAlpha = 0.8;
+    ctx.strokeStyle = '#ff88bb';
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = '#ff88bb';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let i = 1; i < currentPath.length; i++) {
+      ctx.lineTo(currentPath[i].x, currentPath[i].y);
+    }
+    ctx.stroke();
+    
+    ctx.restore();
+    
+    // 元の白い線を上に再描画（ネオン効果付き）
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(currentPath[0].x, currentPath[0].y);
+    ctx.lineWidth = Math.max(1, currentPenThickness - 3);
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = '#ffffff';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#ffffff';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    for (let i = 1; i < currentPath.length; i++) {
+      ctx.lineTo(currentPath[i].x, currentPath[i].y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+  
+  // パスをクリア
+  currentPath = [];
+  
   // 🔸 不要な"end"メッセージを削除（受信側で処理していないため）
 });
 
@@ -2774,6 +2954,19 @@ canvas.addEventListener("mousemove", (e) => {
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
           drawSmoothLine(interpX, interpY);
+        } else if (currentPenColor === 'white-red-border') {
+          // 白地赤縁の描画 - 描画中は白い線のみ表示（ネオン効果付き）
+          actualColor = 'white-red-border';
+          ctx.globalAlpha = 0.9;
+          ctx.lineWidth = Math.max(1, currentPenThickness - 3);
+          ctx.strokeStyle = '#ffffff';
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = '#ffffff';
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          drawSmoothLine(interpX, interpY);
+          currentPath.push({ x: interpX, y: interpY });
+          ctx.globalAlpha = 1.0; // 透明度をリセット
         } else {
           actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : (currentPenColor === 'green' ? '#008000' : (currentPenColor === 'pink' ? '#ff69b4' : currentPenColor)));
           ctx.lineWidth = currentPenThickness;
@@ -2802,6 +2995,19 @@ canvas.addEventListener("mousemove", (e) => {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         drawSmoothLine(x, y);
+      } else if (currentPenColor === 'white-red-border') {
+        // 白地赤縁の描画 - 描画中は白い線のみ表示（ネオン効果付き）
+        actualColor = 'white-red-border';
+        ctx.globalAlpha = 0.9;
+        ctx.lineWidth = Math.max(1, currentPenThickness - 3);
+        ctx.strokeStyle = '#ffffff';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#ffffff';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        drawSmoothLine(x, y);
+        currentPath.push({ x, y });
+        ctx.globalAlpha = 1.0; // 透明度をリセット
       } else {
         actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : (currentPenColor === 'green' ? '#008000' : (currentPenColor === 'pink' ? '#ff69b4' : currentPenColor)));
         ctx.lineWidth = currentPenThickness;
@@ -2889,6 +3095,9 @@ canvas.addEventListener("touchstart", (e) => {
   
   console.log(`📱 タッチ開始座標: clientX=${touch.clientX}, clientY=${touch.clientY}, rect=${rect.left},${rect.top}, scale=${scaleX},${scaleY}, final=${x},${y}`);
   
+  // 現在のパスを初期化
+  currentPath = [{ x, y }];
+  
   // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
   // ネオンモードの初期設定
@@ -2939,6 +3148,7 @@ canvas.addEventListener("touchstart", (e) => {
     y,
     thickness: currentPenThickness,
     color: currentPenColor,
+    neonIndex: currentPenColor === 'neon' ? neonColorIndex : null,
     starEffect: starEffectEnabled,
     fairyDustEffect: fairyDustEffectEnabled
   };
@@ -2959,6 +3169,81 @@ canvas.addEventListener("touchstart", (e) => {
 canvas.addEventListener("touchend", (e) => {
   e.preventDefault();
   drawing = false;
+  
+  // 白地赤縁の場合は赤い縁を追加
+  if (currentPenColor === 'white-red-border' && currentPath.length > 1) {
+    // ネオン風赤い太線を描画（グラデーション効果付き）
+    ctx.save();
+    
+    // 外側の薄い赤（最も太い）
+    ctx.beginPath();
+    ctx.moveTo(currentPath[0].x, currentPath[0].y);
+    ctx.lineWidth = currentPenThickness + 10;
+    ctx.globalAlpha = 0.2;
+    ctx.strokeStyle = '#ffccdd';
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#ffccdd';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let i = 1; i < currentPath.length; i++) {
+      ctx.lineTo(currentPath[i].x, currentPath[i].y);
+    }
+    ctx.stroke();
+    
+    // 中間の赤
+    ctx.beginPath();
+    ctx.moveTo(currentPath[0].x, currentPath[0].y);
+    ctx.lineWidth = currentPenThickness + 8;
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = '#ffaacc';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#ffaacc';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    for (let i = 1; i < currentPath.length; i++) {
+      ctx.lineTo(currentPath[i].x, currentPath[i].y);
+    }
+    ctx.stroke();
+    
+    // 内側の濃い赤（コア）
+    ctx.beginPath();
+    ctx.moveTo(currentPath[0].x, currentPath[0].y);
+    ctx.lineWidth = currentPenThickness + 6;
+    ctx.globalAlpha = 0.8;
+    ctx.strokeStyle = '#ff88bb';
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = '#ff88bb';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let i = 1; i < currentPath.length; i++) {
+      ctx.lineTo(currentPath[i].x, currentPath[i].y);
+    }
+    ctx.stroke();
+    
+    ctx.restore();
+    
+    // 元の白い線を上に再描画（ネオン効果付き）
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(currentPath[0].x, currentPath[0].y);
+    ctx.lineWidth = Math.max(1, currentPenThickness - 3);
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = '#ffffff';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#ffffff';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    for (let i = 1; i < currentPath.length; i++) {
+      ctx.lineTo(currentPath[i].x, currentPath[i].y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+  
+  // パスをクリア
+  currentPath = [];
 });
 
 canvas.addEventListener("touchmove", (e) => {
@@ -3902,6 +4187,7 @@ window.addEventListener('DOMContentLoaded', () => {
   <button class="color-btn" style="background: red;" onclick="setPenColor('red')"></button>
   <button class="color-btn" style="background: blue;" onclick="setPenColor('blue')"></button>
   <button class="color-btn" style="background: green;" onclick="setPenColor('green')"></button>
+  <button class="color-btn" style="background: white; border: 4px solid red; box-sizing: border-box;" onclick="setPenColor('white-red-border')"></button>
 </div>
 
 <div class="thickness-panel">
