@@ -843,7 +843,14 @@ let multiWriterData = {
 function drawWriterCommandsReceiver(commands, writerId) {
   if (commands.length === 0) return;
   
+  // 各Writer描画前に完全にcontextを初期化
   ctx.save();
+  
+  // デフォルト描画設定をリセット
+  ctx.globalAlpha = 1.0;
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
+  ctx.globalCompositeOperation = 'source-over';
   
   // 描画エリアの中心で180度回転を適用（受信側の表示）
   const areaCenterX = canvas.width / 2 + drawingAreaOffset.x;
@@ -857,27 +864,50 @@ function drawWriterCommandsReceiver(commands, writerId) {
   
   let prevCmd = null;
   let isInPath = false;
+  let currentPath = null; // 現在のパスを明示的に管理
   
   commands.forEach((cmd, index) => {
     if (cmd.type === "start") {
-      if (isInPath) {
-        ctx.stroke(); // 前のパスを完了
+      // 前のパスがあれば完了させる
+      if (isInPath && currentPath) {
+        ctx.stroke();
+        isInPath = false;
+        currentPath = null;
       }
       
       const coords = transformCoordinatesWithAspectRatio(cmd.x, cmd.y, senderCanvasSize, drawingAreaSize);
       const scaledX = coords.x;
       const scaledY = coords.y;
       
+      // 新しいパスを開始
       ctx.beginPath();
       ctx.moveTo(areaLeft + scaledX, areaTop + scaledY);
+      
+      // パス情報を記録
+      currentPath = {
+        writerId: writerId,
+        startX: scaledX,
+        startY: scaledY,
+        commands: [cmd]
+      };
+      
       prevCmd = cmd;
       isInPath = true;
       
-    } else if (cmd.type === "draw" && prevCmd) {
+    } else if (cmd.type === "draw" && prevCmd && currentPath) {
+      // 現在のパスのWriterIDと異なる場合はスキップ（安全性確保）
+      if (currentPath.writerId !== writerId) {
+        console.warn(`⚠️ WriterID不整合: currentPath=${currentPath.writerId}, cmd.writerId=${writerId}`);
+        return;
+      }
+      
       const coords = transformCoordinatesWithAspectRatio(cmd.x, cmd.y, senderCanvasSize, drawingAreaSize);
       const scaledX = coords.x;
       const scaledY = coords.y;
       const scaledThickness = (cmd.thickness || 8) * (drawingAreaSize.width / senderCanvasSize.width);
+      
+      // パス情報を更新
+      currentPath.commands.push(cmd);
       
       if (cmd.color === 'white-red-border') {
         // 白地赤縁の特別処理
@@ -958,10 +988,14 @@ function drawWriterCommandsReceiver(commands, writerId) {
     }
   });
   
-  if (isInPath) {
-    ctx.stroke(); // 最後のパスを完了
+  // 最後のパスを完了
+  if (isInPath && currentPath) {
+    ctx.stroke();
+    isInPath = false;
+    currentPath = null;
   }
   
+  // contextを完全に復元
   ctx.restore();
 }
 
@@ -2983,28 +3017,7 @@ function handleMessage(data) {
           currentNeonPaths[writerId] = [];
         }
         
-        // 描画中は白い線で表示（書き手側と同様）
-        const thickness = (data.thickness || 4) * (drawingAreaSize.width / senderCanvasSize.width);
-        
-        // 180度回転を適用
-        ctx.save();
-        ctx.translate(areaCenterX, areaCenterY);
-        ctx.rotate(Math.PI);
-        ctx.translate(-areaCenterX, -areaCenterY);
-        
-        ctx.beginPath();
-        ctx.moveTo(areaLeft + prevScaledX, areaTop + prevScaledY);
-        ctx.lineWidth = Math.max(1, thickness - 3);
-        ctx.strokeStyle = '#ffffff';
-        ctx.globalAlpha = 0.9;
-        ctx.shadowBlur = 5;
-        ctx.shadowColor = '#ffffff';
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
-        ctx.stroke();
-        
-        ctx.restore();
+        // 描画中は白い線で表示（redrawCanvasに任せて複数Writer混在を防ぐ）
         
         // パスに座標を追加
         currentNeonPaths[writerId].push({
@@ -3021,27 +3034,10 @@ function handleMessage(data) {
           finishNeonPath(writerId);
         }, 500);
         
-        // 設定をリセット
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1.0;
+        // リアルタイム描画はredrawCanvasに任せる
+        redrawCanvas();
       } else {
-        // startコマンド直後の最初のdrawの場合は点を描画
-        const thickness = (data.thickness || 4) * (drawingAreaSize.width / senderCanvasSize.width);
-        
-        // 180度回転を適用
-        ctx.save();
-        ctx.translate(areaCenterX, areaCenterY);
-        ctx.rotate(Math.PI);
-        ctx.translate(-areaCenterX, -areaCenterY);
-        
-        ctx.beginPath();
-        ctx.arc(areaLeft + scaledX, areaTop + scaledY, Math.max(1, thickness - 3) / 2, 0, 2 * Math.PI);
-        ctx.fillStyle = '#ffffff';
-        ctx.globalAlpha = 0.9;
-        ctx.fill();
-        
-        ctx.restore();
-        ctx.globalAlpha = 1.0;
+        // startコマンド直後の最初のdrawの場合 - redrawCanvasに任せる
         
         // 新しいパスを開始
         currentNeonPaths[writerId] = [{
@@ -3059,16 +3055,8 @@ function handleMessage(data) {
         }, 200);
       }
     } else {
-      // 通常の色の場合
-      ctx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
-      // 動画背景時の白色調整（動画キャプチャ後は通常の白に戻す）
-      const whiteColor = isVideoBackgroundActive ? '#f0f0f0' : '#fff';
-      ctx.strokeStyle = data.color === 'black' ? '#000' : (data.color === 'white' ? whiteColor : (data.color === 'green' ? '#008000' : (data.color === 'pink' ? '#ff69b4' : (data.color || '#000'))));
-      ctx.shadowBlur = 0;
-      const finalX = areaLeft + scaledX;
-      const finalY = areaTop + scaledY;
-      //console.log('最終描画位置:', finalX.toFixed(1), finalY.toFixed(1));
-      // リアルタイム描画はredrawCanvasに任せる
+      // 通常の色の場合 - リアルタイム描画はredrawCanvasに完全に任せる
+      // 複数Writer同時描画時の線混在を防ぐため、直接的なcontext操作を避ける
       redrawCanvas();
     }
     

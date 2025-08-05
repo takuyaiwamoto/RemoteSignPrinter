@@ -806,7 +806,7 @@ function processMessage(data) {
       
       // Writer ID表示を更新
       const statusDiv = document.getElementById('writerStatus') || createWriterStatusDiv();
-      statusDiv.childNodes[0].textContent = `Writer ID: ${myWriterId}`;
+      statusDiv.childNodes[1].textContent = `Writer ID: ${myWriterId}`;
     } else {
       // console.log("❌ セッションID不一致のため無視:", data.sessionId, "vs", mySessionId);
     }
@@ -1059,6 +1059,21 @@ function createWriterStatusDiv() {
     z-index: 1000;
   `;
   
+  // Version情報を表示
+  const versionSpan = document.createElement('span');
+  versionSpan.textContent = 'v1.3';
+  versionSpan.style.cssText = `
+    display: block;
+    color: #FFD700;
+    font-weight: bold;
+    margin-bottom: 4px;
+  `;
+  statusDiv.appendChild(versionSpan);
+  
+  // Writer IDテキストノード
+  const writerIdText = document.createTextNode('Writer ID: 接続中...');
+  statusDiv.appendChild(writerIdText);
+  
   // デバッグ用テストボタンを追加
   const testBtn = document.createElement('button');
   testBtn.textContent = 'ID確認';
@@ -1077,7 +1092,7 @@ function createWriterStatusDiv() {
     // console.log(`🔍 WebSocket状態: ${socket ? socket.readyState : 'socket未初期化'}`);
     // console.log(`🔍 他の書き手データ:`, otherWritersData);
     
-    let message = `Writer ID: ${myWriterId || '未割り当て'}\nWebSocket: ${socket ? socket.readyState : '未初期化'}\n他の書き手: ${Object.keys(otherWritersData).length}人`;
+    let message = `Version: 1.3\nWriter ID: ${myWriterId || '未割り当て'}\nWebSocket: ${socket ? socket.readyState : '未初期化'}\n他の書き手: ${Object.keys(otherWritersData).length}人`;
     
     if (!myWriterId) {
       message += '\n\n🔄 Writer IDを再要求しますか？';
