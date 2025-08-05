@@ -708,6 +708,10 @@ let rotationWaitTime = 7.5; // 回転後待機時間
 let currentPenThickness = 8; // 現在のペンの太さ（標準は太い）
 let currentPenColor = 'black'; // 現在のペンの色
 let hasSentData = false; // 送信済みフラグ
+// WriterID別の描画状態管理（書き手側用）
+const writerDrawingStates = {};
+
+// 現在の書き手用のレガシー変数（後方互換性のため保持）
 let lastPosition = null; // 前回の位置を記録
 // secondLastPosition変数を削除（パフォーマンス改善）
 let currentPath = []; // 現在のストロークのポイント配列
@@ -1061,7 +1065,7 @@ function createWriterStatusDiv() {
   
   // Version情報を表示
   const versionSpan = document.createElement('span');
-  versionSpan.textContent = 'v1.6';
+  versionSpan.textContent = 'v1.7';
   versionSpan.style.cssText = `
     display: block;
     color: #FFD700;
@@ -1092,7 +1096,7 @@ function createWriterStatusDiv() {
     // console.log(`🔍 WebSocket状態: ${socket ? socket.readyState : 'socket未初期化'}`);
     // console.log(`🔍 他の書き手データ:`, otherWritersData);
     
-    let message = `Version: 1.6\nWriter ID: ${myWriterId || '未割り当て'}\nWebSocket: ${socket ? socket.readyState : '未初期化'}\n他の書き手: ${Object.keys(otherWritersData).length}人`;
+    let message = `Version: 1.7\nWriter ID: ${myWriterId || '未割り当て'}\nWebSocket: ${socket ? socket.readyState : '未初期化'}\n他の書き手: ${Object.keys(otherWritersData).length}人`;
     
     if (!myWriterId) {
       message += '\n\n🔄 Writer IDを再要求しますか？';
@@ -1147,8 +1151,6 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
   
   // このWriterのパス状態を完全にリセット（他Writerとの混在防止）
   senderWriterPathStates[writerId] = {
-    isInPath: false,
-    currentPath: null,
     prevCmd: null
   };
   
@@ -1165,16 +1167,8 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
   ctx.lineJoin = 'round';
   commands.forEach((cmd, index) => {
     if (cmd.type === "start") {
-      // 前のパスがあれば完了させる
-      if (writerState.isInPath) {
-        ctx.stroke();
-        writerState.isInPath = false;
-      }
-      
-      ctx.beginPath();
-      ctx.moveTo(cmd.x, cmd.y);
+      // startコマンドは単純に記録のみ
       writerState.prevCmd = cmd;
-      writerState.isInPath = true;
     } else if (cmd.type === "draw" && writerState.prevCmd) {
       if (cmd.color === 'white-red-border') {
         // 白地赤縁の特別処理
@@ -1215,28 +1209,19 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
           ctx.globalAlpha = isMyself ? 1.0 : 0.7; // 透明度をリセット
         }
       } else {
-        // 通常の色の描画（新しいパスを開始しない、連続線として描画）
-        if (!writerState.isInPath) {
-          // パスが開始されていない場合のみbeginPathを実行
-          ctx.beginPath();
-          ctx.moveTo(writerState.prevCmd.x, writerState.prevCmd.y);
-          ctx.lineWidth = cmd.thickness || (isMyself ? currentPenThickness : 4);
-          ctx.strokeStyle = cmd.color || (isMyself ? currentPenColor : 'black');
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          writerState.isInPath = true;
-        }
+        // 通常の色の描画（各線分を独立して描画）
+        ctx.beginPath();
+        ctx.moveTo(writerState.prevCmd.x, writerState.prevCmd.y);
+        ctx.lineWidth = cmd.thickness || (isMyself ? currentPenThickness : 4);
+        ctx.strokeStyle = cmd.color || (isMyself ? currentPenColor : 'black');
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
         ctx.lineTo(cmd.x, cmd.y);
+        ctx.stroke(); // 各線分を即座に描画
       }
       writerState.prevCmd = cmd;
     }
   });
-  
-  // 最後のパスを完了
-  if (writerState.isInPath) {
-    ctx.stroke();
-    writerState.isInPath = false;
-  }
   
   ctx.restore();
 }
@@ -2601,13 +2586,38 @@ function createConfetti() {
   }
 }
 
-// 🎨 連続的な描画関数（一般的なペイントツールスタイル）
-function drawContinuousLine(x, y) {
-  if (!lastPosition) {
+// 🎨 WriterID別描画状態ヘルパー関数
+function getWriterDrawingState(writerId) {
+  if (!writerId) writerId = 'self'; // 自分の描画の場合
+  
+  if (!writerDrawingStates[writerId]) {
+    writerDrawingStates[writerId] = {
+      lastPosition: null,
+      currentPath: [],
+      isDrawing: false
+    };
+  }
+  return writerDrawingStates[writerId];
+}
+
+function resetWriterDrawingState(writerId) {
+  if (!writerId) writerId = 'self';
+  writerDrawingStates[writerId] = {
+    lastPosition: null,
+    currentPath: [],
+    isDrawing: false
+  };
+}
+
+// 🎨 WriterID別連続描画関数
+function drawContinuousLineForWriter(x, y, writerId = 'self') {
+  const writerState = getWriterDrawingState(writerId);
+  
+  if (!writerState.lastPosition) {
     // 描画開始点
     ctx.beginPath();
     ctx.moveTo(x, y);
-    lastPosition = { x, y };
+    writerState.lastPosition = { x, y };
     return;
   }
   
@@ -2615,6 +2625,14 @@ function drawContinuousLine(x, y) {
   ctx.lineTo(x, y);
   ctx.stroke();
   
+  writerState.lastPosition = { x, y };
+}
+
+// 🎨 連続的な描画関数（一般的なペイントツールスタイル）- レガシー互換用
+function drawContinuousLine(x, y) {
+  // 新しいWriterID別描画システムを使用
+  drawContinuousLineForWriter(x, y, 'self');
+  // レガシー変数も更新（後方互換性のため）
   lastPosition = { x, y };
 }
 
@@ -2638,8 +2656,12 @@ canvas.addEventListener("mousedown", (e) => {
   ctx.shadowColor = 'transparent';
   ctx.globalAlpha = 1.0;
   
-  // 現在のパスを初期化
-  currentPath = [{ x, y }];
+  // WriterID別描画状態をリセット
+  resetWriterDrawingState('self');
+  const selfState = getWriterDrawingState('self');
+  selfState.lastPosition = { x, y };
+  selfState.currentPath = [{ x, y }];
+  selfState.isDrawing = true;
   
   // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
@@ -2653,6 +2675,7 @@ canvas.addEventListener("mousedown", (e) => {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   
+  // レガシー変数も更新（後方互換性のため）
   lastPosition = { x, y }; // 初期位置を記録
   currentPath = [{ x, y }]; // 新しいパスを開始
   
@@ -2706,6 +2729,10 @@ canvas.addEventListener("mousedown", (e) => {
 
 canvas.addEventListener("mouseup", () => {
   drawing = false;
+  
+  // WriterID別描画状態を更新
+  const selfState = getWriterDrawingState('self');
+  selfState.isDrawing = false;
   
   // 白地赤縁の場合は赤い縁を追加
   if (currentPenColor === 'white-red-border' && currentPath.length > 1) {
@@ -2967,8 +2994,12 @@ canvas.addEventListener("touchstart", (e) => {
   
   // console.log(`📱 タッチ開始座標: clientX=${touch.clientX}, clientY=${touch.clientY}, rect=${rect.left},${rect.top}, scale=${scaleX},${scaleY}, final=${x},${y}`);
   
-  // 現在のパスを初期化
-  currentPath = [{ x, y }];
+  // WriterID別描画状態をリセット
+  resetWriterDrawingState('self');
+  const selfState = getWriterDrawingState('self');
+  selfState.lastPosition = { x, y };
+  selfState.currentPath = [{ x, y }];
+  selfState.isDrawing = true;
   
   // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
@@ -2982,6 +3013,7 @@ canvas.addEventListener("touchstart", (e) => {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   
+  // レガシー変数も更新（後方互換性のため）
   lastPosition = { x, y }; // 初期位置を記録
   currentPath = [{ x, y }]; // 新しいパスを開始
   
@@ -3031,6 +3063,10 @@ canvas.addEventListener("touchstart", (e) => {
 canvas.addEventListener("touchend", (e) => {
   e.preventDefault();
   drawing = false;
+  
+  // WriterID別描画状態を更新
+  const selfState = getWriterDrawingState('self');
+  selfState.isDrawing = false;
   
   // 白地赤縁の場合は赤い縁を追加
   if (currentPenColor === 'white-red-border' && currentPath.length > 1) {
