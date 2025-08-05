@@ -1138,28 +1138,47 @@ function handleOtherWriterDrawing(data) {
   redrawCanvasWithOthers();
 }
 
+// WriterID別パス状態管理（書き手側用）
+const senderWriterPathStates = {};
+
 // Writer別に独立した描画関数
 function drawWriterCommands(commands, writerId, isMyself = false) {
   if (commands.length === 0) return;
+  
+  // このWriterのパス状態を初期化
+  if (!senderWriterPathStates[writerId]) {
+    senderWriterPathStates[writerId] = {
+      isInPath: false,
+      currentPath: null,
+      prevCmd: null
+    };
+  }
+  
+  const writerState = senderWriterPathStates[writerId];
   
   ctx.save();
   if (!isMyself) {
     ctx.globalAlpha = 0.7; // 他執筆者は少し透明に
   }
-  
-  let prevCmd = null;
   commands.forEach((cmd, index) => {
     if (cmd.type === "start") {
+      // 前のパスがあれば完了させる
+      if (writerState.isInPath) {
+        ctx.stroke();
+        writerState.isInPath = false;
+      }
+      
       ctx.beginPath();
       ctx.moveTo(cmd.x, cmd.y);
-      prevCmd = cmd;
-    } else if (cmd.type === "draw") {
+      writerState.prevCmd = cmd;
+      writerState.isInPath = true;
+    } else if (cmd.type === "draw" && writerState.prevCmd) {
       if (cmd.color === 'white-red-border') {
         // 白地赤縁の特別処理
-        if (prevCmd) {
+        if (writerState.prevCmd) {
           // 外側の薄い赤を描画
           ctx.beginPath();
-          ctx.moveTo(prevCmd.x, prevCmd.y);
+          ctx.moveTo(writerState.prevCmd.x, writerState.prevCmd.y);
           ctx.lineWidth = (cmd.thickness || (isMyself ? currentPenThickness : 4)) + 8;
           ctx.globalAlpha = isMyself ? 0.3 : 0.2;
           ctx.strokeStyle = '#ffccdd';
@@ -1171,7 +1190,7 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
           
           // 内側の濃い赤を描画
           ctx.beginPath();
-          ctx.moveTo(prevCmd.x, prevCmd.y);
+          ctx.moveTo(writerState.prevCmd.x, writerState.prevCmd.y);
           ctx.lineWidth = (cmd.thickness || (isMyself ? currentPenThickness : 4)) + 6;
           ctx.globalAlpha = isMyself ? 0.8 : 0.6;
           ctx.strokeStyle = '#ff88bb';
@@ -1183,7 +1202,7 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
           
           // 白い中心を描画（グロー効果付き）
           ctx.beginPath();
-          ctx.moveTo(prevCmd.x, prevCmd.y);
+          ctx.moveTo(writerState.prevCmd.x, writerState.prevCmd.y);
           ctx.globalAlpha = isMyself ? 0.9 : 0.7;
           ctx.lineWidth = Math.max(1, (cmd.thickness || (isMyself ? currentPenThickness : 4)) - 3);
           ctx.strokeStyle = '#ffffff';
@@ -1194,21 +1213,27 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
         }
       } else {
         // 通常の色の描画（新しいパスを開始しない、連続線として描画）
-        if (prevCmd && prevCmd.type === "start") {
-          // startコマンドの直後の場合のみbeginPathを実行
+        if (!writerState.isInPath) {
+          // パスが開始されていない場合のみbeginPathを実行
           ctx.beginPath();
-          ctx.moveTo(prevCmd.x, prevCmd.y);
+          ctx.moveTo(writerState.prevCmd.x, writerState.prevCmd.y);
           ctx.lineWidth = cmd.thickness || (isMyself ? currentPenThickness : 4);
           ctx.strokeStyle = cmd.color || (isMyself ? currentPenColor : 'black');
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
+          writerState.isInPath = true;
         }
         ctx.lineTo(cmd.x, cmd.y);
-        ctx.stroke();
       }
-      prevCmd = cmd;
+      writerState.prevCmd = cmd;
     }
   });
+  
+  // 最後のパスを完了
+  if (writerState.isInPath) {
+    ctx.stroke();
+    writerState.isInPath = false;
+  }
   
   ctx.restore();
 }
