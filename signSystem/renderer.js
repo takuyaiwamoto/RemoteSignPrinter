@@ -1084,6 +1084,112 @@ function drawWriterCommandsReceiver(commands, writerId) {
   ctx.restore();
 }
 
+// 🖨️ WriterID別印刷用描画関数（Canvas状態完全分離）
+function drawWriterCommandsForPrint(commands, writerId, printCtx) {
+  if (commands.length === 0) return;
+  
+  // 🔥 印刷用WriterID別Canvas状態完全分離
+  printCtx.save();
+  printCtx.beginPath(); // 重要：他のWriterのパス状態を完全にクリア
+  printCtx.setTransform(1, 0, 0, 1, 0, 0); // 変換行列をリセット
+  
+  // デフォルト描画設定をリセット
+  printCtx.globalAlpha = 1.0;
+  printCtx.shadowBlur = 0;
+  printCtx.shadowColor = 'transparent';
+  printCtx.globalCompositeOperation = 'source-over';
+  printCtx.lineCap = 'round';
+  printCtx.lineJoin = 'round';
+  
+  let isInPath = false;
+  
+  commands.forEach((cmd, index) => {
+    if (cmd.type === "start") {
+      // 前のパスがあれば完了
+      if (isInPath) {
+        printCtx.stroke();
+      }
+      
+      // 新しいパスを開始（既にbeginPath済み）
+      printCtx.moveTo(cmd.x, cmd.y);
+      isInPath = true;
+      
+    } else if (cmd.type === "draw" && isInPath) {
+      const thickness = cmd.thickness || 4;
+      printCtx.lineWidth = thickness;
+      
+      // 色とエフェクトの処理
+      if (cmd.color === 'neon' && typeof cmd.neonIndex === 'number') {
+        const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
+        printCtx.strokeStyle = interpolatedColor;
+        printCtx.shadowBlur = 10;
+        printCtx.shadowColor = interpolatedColor;
+      } else if (cmd.color === 'white-red-border') {
+        // 白地赤縁の印刷処理（複数層）
+        const currentThickness = cmd.thickness || 4;
+        
+        // 外側の薄い赤
+        printCtx.save();
+        printCtx.globalAlpha = 0.2;
+        printCtx.lineWidth = currentThickness + 10;
+        printCtx.strokeStyle = '#ffccdd';
+        printCtx.lineTo(cmd.x, cmd.y);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 中間の赤
+        printCtx.save();
+        printCtx.globalAlpha = 0.5;
+        printCtx.lineWidth = currentThickness + 8;
+        printCtx.strokeStyle = '#ffaacc';
+        printCtx.lineTo(cmd.x, cmd.y);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 内側の濃い赤
+        printCtx.save();
+        printCtx.globalAlpha = 0.8;
+        printCtx.lineWidth = currentThickness + 6;
+        printCtx.strokeStyle = '#ff88bb';
+        printCtx.lineTo(cmd.x, cmd.y);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        // 白い中心
+        printCtx.save();
+        printCtx.globalAlpha = 0.9;
+        printCtx.lineWidth = Math.max(1, currentThickness - 3);
+        printCtx.strokeStyle = '#ffffff';
+        printCtx.lineTo(cmd.x, cmd.y);
+        printCtx.stroke();
+        printCtx.restore();
+        
+        return; // 通常の描画処理をスキップ
+      } else {
+        // 通常の色
+        const actualColor = cmd.color === 'black' ? '#000' : 
+                           (cmd.color === 'white' ? '#fff' : 
+                           (cmd.color === 'red' ? '#ff0000' : 
+                           (cmd.color === 'blue' ? '#0000ff' : 
+                           (cmd.color === 'green' ? '#008000' : 
+                           (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))))));
+        printCtx.strokeStyle = actualColor;
+        printCtx.shadowBlur = 0;
+      }
+      
+      printCtx.lineTo(cmd.x, cmd.y);
+      printCtx.stroke();
+    }
+  });
+  
+  // 最終パスを完了
+  if (isInPath) {
+    printCtx.stroke();
+  }
+  
+  printCtx.restore();
+}
+
 // 全執筆者のデータを統合する関数（旧バージョン - 廃止予定）
 function consolidateDrawingData() {
   const consolidated = [];
@@ -5575,13 +5681,37 @@ function printFull() {
   printCtx.save();
   console.log('🖨️ 印刷用Canvas設定完了（回転なし）');
   
-  console.log('🖨️ 描画開始（回転なし）');
-  drawingData.forEach((cmd, index) => {
-    if (cmd.type === "start") {
-      printCtx.beginPath();
-      printCtx.moveTo(cmd.x, cmd.y);
-      if (index < 3) console.log('🖨️ 印刷start[' + index + ']:', cmd.x, cmd.y);
-    } else if (cmd.type === "draw") {
+  console.log('🖨️ 描画開始（WriterID別、回転なし）');
+  
+  // WriterID別に独立して印刷描画（線の混在を防ぐ）
+  Object.keys(multiWriterData).forEach(writerId => {
+    if (multiWriterData[writerId].length > 0) {
+      console.log(`🖨️ Writer ${writerId} の描画開始: ${multiWriterData[writerId].length}コマンド`);
+      drawWriterCommandsForPrint(multiWriterData[writerId], writerId, printCtx);
+    }
+  });
+  
+  // 旧方式（統合データ）のフォールバック（互換性のため）
+  if (Object.keys(multiWriterData).length === 0 && drawingData.length > 0) {
+    console.log('🖨️ フォールバック: 統合データで印刷');
+    let lastWriterId = null;
+    drawingData.forEach((cmd, index) => {
+      if (cmd.type === "start") {
+        // WriterIDが変わった場合は新しいパスを開始
+        if (cmd.writerId !== lastWriterId) {
+          printCtx.beginPath();
+          lastWriterId = cmd.writerId;
+        }
+        printCtx.moveTo(cmd.x, cmd.y);
+        if (index < 3) console.log('🖨️ 印刷start[' + index + ']:', cmd.x, cmd.y);
+      } else if (cmd.type === "draw") {
+        // WriterIDが変わった場合は新しいパスを開始
+        if (cmd.writerId !== lastWriterId) {
+          printCtx.beginPath();
+          lastWriterId = cmd.writerId;
+          printCtx.moveTo(cmd.x, cmd.y);
+          return;
+        }
       const thickness = cmd.thickness || 4;
       printCtx.lineWidth = thickness;
       
@@ -5640,11 +5770,12 @@ function printFull() {
         printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
       }
       
-      printCtx.lineTo(cmd.x, cmd.y);
-      printCtx.stroke();
-      if (index < 3) console.log('🖨️ 印刷draw[' + index + ']:', cmd.x, cmd.y);
-    }
-  });
+        printCtx.lineTo(cmd.x, cmd.y);
+        printCtx.stroke();
+        if (index < 3) console.log('🖨️ 印刷draw[' + index + ']:', cmd.x, cmd.y);
+      }
+    });
+  }
   
   printCtx.restore();
   console.log('🖨️ 印刷描画完了 (180度回転)');
@@ -5693,13 +5824,37 @@ function printPen() {
   printCtx.save();
   console.log('🖨️ ペン印刷用Canvas設定完了（回転なし）');
   
-  console.log('🖨️ ペン印刷：描画開始（回転なし）');
-  drawingData.forEach((cmd, index) => {
-    if (cmd.type === "start") {
-      printCtx.beginPath();
-      printCtx.moveTo(cmd.x, cmd.y);
-      if (index < 3) console.log('🖨️ ペン印刷start[' + index + ']:', cmd.x, cmd.y);
-    } else if (cmd.type === "draw") {
+  console.log('🖨️ ペン印刷：描画開始（WriterID別、回転なし）');
+  
+  // WriterID別に独立してペン印刷描画（線の混在を防ぐ）
+  Object.keys(multiWriterData).forEach(writerId => {
+    if (multiWriterData[writerId].length > 0) {
+      console.log(`🖨️ ペン印刷 Writer ${writerId} の描画開始: ${multiWriterData[writerId].length}コマンド`);
+      drawWriterCommandsForPrint(multiWriterData[writerId], writerId, printCtx);
+    }
+  });
+  
+  // 旧方式（統合データ）のフォールバック（互換性のため）
+  if (Object.keys(multiWriterData).length === 0 && drawingData.length > 0) {
+    console.log('🖨️ ペン印刷フォールバック: 統合データで印刷');
+    let lastWriterId = null;
+    drawingData.forEach((cmd, index) => {
+      if (cmd.type === "start") {
+        // WriterIDが変わった場合は新しいパスを開始
+        if (cmd.writerId !== lastWriterId) {
+          printCtx.beginPath();
+          lastWriterId = cmd.writerId;
+        }
+        printCtx.moveTo(cmd.x, cmd.y);
+        if (index < 3) console.log('🖨️ ペン印刷start[' + index + ']:', cmd.x, cmd.y);
+      } else if (cmd.type === "draw") {
+        // WriterIDが変わった場合は新しいパスを開始  
+        if (cmd.writerId !== lastWriterId) {
+          printCtx.beginPath();
+          lastWriterId = cmd.writerId;
+          printCtx.moveTo(cmd.x, cmd.y);
+          return;
+        }
       const thickness = cmd.thickness || 4;
       printCtx.lineWidth = thickness;
       
@@ -5758,11 +5913,12 @@ function printPen() {
         printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
       }
       
-      printCtx.lineTo(cmd.x, cmd.y);
-      printCtx.stroke();
-      if (index < 3) console.log('🖨️ ペン印刷draw[' + index + ']:', cmd.x, cmd.y);
-    }
-  });
+        printCtx.lineTo(cmd.x, cmd.y);
+        printCtx.stroke();
+        if (index < 3) console.log('🖨️ ペン印刷draw[' + index + ']:', cmd.x, cmd.y);
+      }
+    });
+  }
   
   printCtx.restore();
   console.log('🖨️ ペン印刷描画完了 (180度回転)');
