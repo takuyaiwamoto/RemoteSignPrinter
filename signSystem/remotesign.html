@@ -1065,7 +1065,7 @@ function createWriterStatusDiv() {
   
   // Version情報を表示
   const versionSpan = document.createElement('span');
-  versionSpan.textContent = 'v1.9';
+  versionSpan.textContent = 'v2.0';
   versionSpan.style.cssText = `
     display: block;
     color: #FFD700;
@@ -1096,7 +1096,7 @@ function createWriterStatusDiv() {
     // console.log(`🔍 WebSocket状態: ${socket ? socket.readyState : 'socket未初期化'}`);
     // console.log(`🔍 他の書き手データ:`, otherWritersData);
     
-    let message = `Version: 1.9\nWriter ID: ${myWriterId || '未割り当て'}\nWebSocket: ${socket ? socket.readyState : '未初期化'}\n他の書き手: ${Object.keys(otherWritersData).length}人`;
+    let message = `Version: 2.0\nWriter ID: ${myWriterId || '未割り当て'}\nWebSocket: ${socket ? socket.readyState : '未初期化'}\n他の書き手: ${Object.keys(otherWritersData).length}人`;
     
     if (!myWriterId) {
       message += '\n\n🔄 Writer IDを再要求しますか？';
