@@ -862,6 +862,10 @@ function drawRealtimeWriterPath(writerId, currentCmd, prevCmd) {
   
   ctx.save();
   
+  // 🔥 WriterID別Canvas状態完全分離（書き手側と同様の処理）
+  ctx.beginPath(); // 重要：他のWriterのパス状態を完全にクリア
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // 変換行列をリセット
+  
   // デフォルト描画設定をリセット
   ctx.globalAlpha = 1.0;
   ctx.shadowBlur = 0;
@@ -887,8 +891,7 @@ function drawRealtimeWriterPath(writerId, currentCmd, prevCmd) {
   const currX = areaLeft + currCoords.x;
   const currY = areaTop + currCoords.y;
   
-  // 線を描画
-  ctx.beginPath();
+  // 線を描画（既にbeginPath済み、WriterID別に独立したパス）
   ctx.moveTo(prevX, prevY);
   ctx.lineTo(currX, currY);
   
@@ -929,6 +932,10 @@ function drawWriterCommandsReceiver(commands, writerId) {
   // 各Writer描画前に完全にcontextを初期化
   ctx.save();
   
+  // 🔥 WriterID別Canvas状態完全分離（書き手側と同様の処理）
+  ctx.beginPath(); // 重要：他のWriterのパス状態を完全にクリア
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // 変換行列をリセット
+  
   // デフォルト描画設定をリセット
   ctx.globalAlpha = 1.0;
   ctx.shadowBlur = 0;
@@ -958,8 +965,7 @@ function drawWriterCommandsReceiver(commands, writerId) {
       const scaledX = coords.x;
       const scaledY = coords.y;
       
-      // 新しいパスを開始
-      ctx.beginPath();
+      // 新しいパスを開始（既にWriterID別にbeginPath済み）
       ctx.moveTo(areaLeft + scaledX, areaTop + scaledY);
       
       // パス情報を記録
