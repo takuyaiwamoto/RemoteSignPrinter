@@ -839,9 +839,23 @@ let multiWriterData = {
   writer6: []
 }; // 6人執筆者別データ管理
 
+// WriterID別にパス状態を管理するオブジェクト
+const writerPathStates = {};
+
 // WriterID別に独立して描画する関数（受信側用）
 function drawWriterCommandsReceiver(commands, writerId) {
   if (commands.length === 0) return;
+  
+  // このWriterのパス状態を初期化
+  if (!writerPathStates[writerId]) {
+    writerPathStates[writerId] = {
+      isInPath: false,
+      currentPath: null,
+      prevCmd: null
+    };
+  }
+  
+  const writerState = writerPathStates[writerId];
   
   // 各Writer描画前に完全にcontextを初期化
   ctx.save();
@@ -862,17 +876,13 @@ function drawWriterCommandsReceiver(commands, writerId) {
   ctx.rotate(Math.PI);
   ctx.translate(-areaCenterX, -areaCenterY);
   
-  let prevCmd = null;
-  let isInPath = false;
-  let currentPath = null; // 現在のパスを明示的に管理
-  
   commands.forEach((cmd, index) => {
     if (cmd.type === "start") {
       // 前のパスがあれば完了させる
-      if (isInPath && currentPath) {
+      if (writerState.isInPath && writerState.currentPath) {
         ctx.stroke();
-        isInPath = false;
-        currentPath = null;
+        writerState.isInPath = false;
+        writerState.currentPath = null;
       }
       
       const coords = transformCoordinatesWithAspectRatio(cmd.x, cmd.y, senderCanvasSize, drawingAreaSize);
@@ -884,20 +894,20 @@ function drawWriterCommandsReceiver(commands, writerId) {
       ctx.moveTo(areaLeft + scaledX, areaTop + scaledY);
       
       // パス情報を記録
-      currentPath = {
+      writerState.currentPath = {
         writerId: writerId,
         startX: scaledX,
         startY: scaledY,
         commands: [cmd]
       };
       
-      prevCmd = cmd;
-      isInPath = true;
+      writerState.prevCmd = cmd;
+      writerState.isInPath = true;
       
-    } else if (cmd.type === "draw" && prevCmd && currentPath) {
+    } else if (cmd.type === "draw" && writerState.prevCmd && writerState.currentPath) {
       // 現在のパスのWriterIDと異なる場合はスキップ（安全性確保）
-      if (currentPath.writerId !== writerId) {
-        console.warn(`⚠️ WriterID不整合: currentPath=${currentPath.writerId}, cmd.writerId=${writerId}`);
+      if (writerState.currentPath.writerId !== writerId) {
+        console.warn(`⚠️ WriterID不整合: currentPath=${writerState.currentPath.writerId}, cmd.writerId=${writerId}`);
         return;
       }
       
@@ -907,16 +917,16 @@ function drawWriterCommandsReceiver(commands, writerId) {
       const scaledThickness = (cmd.thickness || 8) * (drawingAreaSize.width / senderCanvasSize.width);
       
       // パス情報を更新
-      currentPath.commands.push(cmd);
+      writerState.currentPath.commands.push(cmd);
       
       if (cmd.color === 'white-red-border') {
         // 白地赤縁の特別処理
-        if (isInPath) {
+        if (writerState.isInPath) {
           ctx.stroke(); // 現在のパスを完了
-          isInPath = false;
+          writerState.isInPath = false;
         }
         
-        const prevCoords = transformCoordinatesWithAspectRatio(prevCmd.x, prevCmd.y, senderCanvasSize, drawingAreaSize);
+        const prevCoords = transformCoordinatesWithAspectRatio(writerState.prevCmd.x, writerState.prevCmd.y, senderCanvasSize, drawingAreaSize);
         const prevScaledX = prevCoords.x;
         const prevScaledY = prevCoords.y;
         
@@ -959,13 +969,13 @@ function drawWriterCommandsReceiver(commands, writerId) {
         
       } else {
         // 通常の色の描画
-        if (!isInPath) {
-          const prevCoords = transformCoordinatesWithAspectRatio(prevCmd.x, prevCmd.y, senderCanvasSize, drawingAreaSize);
+        if (!writerState.isInPath) {
+          const prevCoords = transformCoordinatesWithAspectRatio(writerState.prevCmd.x, writerState.prevCmd.y, senderCanvasSize, drawingAreaSize);
           const prevScaledX = prevCoords.x;
           const prevScaledY = prevCoords.y;
           ctx.beginPath();
           ctx.moveTo(areaLeft + prevScaledX, areaTop + prevScaledY);
-          isInPath = true;
+          writerState.isInPath = true;
         }
         
         // 線の設定
@@ -984,15 +994,15 @@ function drawWriterCommandsReceiver(commands, writerId) {
         ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
       }
       
-      prevCmd = cmd;
+      writerState.prevCmd = cmd;
     }
   });
   
   // 最後のパスを完了
-  if (isInPath && currentPath) {
+  if (writerState.isInPath && writerState.currentPath) {
     ctx.stroke();
-    isInPath = false;
-    currentPath = null;
+    writerState.isInPath = false;
+    writerState.currentPath = null;
   }
   
   // contextを完全に復元
