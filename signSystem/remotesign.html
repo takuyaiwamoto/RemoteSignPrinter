@@ -1061,7 +1061,7 @@ function createWriterStatusDiv() {
   
   // Version情報を表示
   const versionSpan = document.createElement('span');
-  versionSpan.textContent = 'v1.5';
+  versionSpan.textContent = 'v1.6';
   versionSpan.style.cssText = `
     display: block;
     color: #FFD700;
@@ -1092,7 +1092,7 @@ function createWriterStatusDiv() {
     // console.log(`🔍 WebSocket状態: ${socket ? socket.readyState : 'socket未初期化'}`);
     // console.log(`🔍 他の書き手データ:`, otherWritersData);
     
-    let message = `Version: 1.5\nWriter ID: ${myWriterId || '未割り当て'}\nWebSocket: ${socket ? socket.readyState : '未初期化'}\n他の書き手: ${Object.keys(otherWritersData).length}人`;
+    let message = `Version: 1.6\nWriter ID: ${myWriterId || '未割り当て'}\nWebSocket: ${socket ? socket.readyState : '未初期化'}\n他の書き手: ${Object.keys(otherWritersData).length}人`;
     
     if (!myWriterId) {
       message += '\n\n🔄 Writer IDを再要求しますか？';
@@ -1145,21 +1145,24 @@ const senderWriterPathStates = {};
 function drawWriterCommands(commands, writerId, isMyself = false) {
   if (commands.length === 0) return;
   
-  // このWriterのパス状態を初期化
-  if (!senderWriterPathStates[writerId]) {
-    senderWriterPathStates[writerId] = {
-      isInPath: false,
-      currentPath: null,
-      prevCmd: null
-    };
-  }
+  // このWriterのパス状態を完全にリセット（他Writerとの混在防止）
+  senderWriterPathStates[writerId] = {
+    isInPath: false,
+    currentPath: null,
+    prevCmd: null
+  };
   
   const writerState = senderWriterPathStates[writerId];
   
   ctx.save();
-  if (!isMyself) {
-    ctx.globalAlpha = 0.7; // 他執筆者は少し透明に
-  }
+  
+  // デフォルト描画設定を完全にリセット
+  ctx.globalAlpha = isMyself ? 1.0 : 0.7;
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   commands.forEach((cmd, index) => {
     if (cmd.type === "start") {
       // 前のパスがあれば完了させる
@@ -1262,7 +1265,18 @@ function redrawCanvasWithOthers() {
   // 他執筆者の描画データを描画（送信済みでない場合のみ）
   if (!hasSentData) {
     Object.keys(otherWritersData).forEach(writerId => {
+      // 各Writer描画前にcanvas状態を完全にリセット
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // 変換行列をリセット
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1.0;
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = 'transparent';
+      
       drawWriterCommands(otherWritersData[writerId], writerId, false);
+      
+      // 各Writer描画後にcanvas状態を復元
+      ctx.restore();
     });
   }
   
