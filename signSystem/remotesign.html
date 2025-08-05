@@ -1158,6 +1158,10 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
   
   ctx.save();
   
+  // Canvas状態を完全にクリア（他WriterIDとの状態混在を防止）
+  ctx.beginPath(); // 重要：前のパスをクリア
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // 変換行列をリセット
+  
   // デフォルト描画設定を完全にリセット
   ctx.globalAlpha = isMyself ? 1.0 : 0.7;
   ctx.shadowBlur = 0;
@@ -1167,7 +1171,8 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
   ctx.lineJoin = 'round';
   commands.forEach((cmd, index) => {
     if (cmd.type === "start") {
-      // startコマンドは単純に記録のみ
+      // startコマンド時にこのWriterのパス状態を完全にリセット
+      ctx.beginPath(); // 前のパスをクリア
       writerState.prevCmd = cmd;
     } else if (cmd.type === "draw" && writerState.prevCmd) {
       if (cmd.color === 'white-red-border') {
@@ -1245,13 +1250,17 @@ function redrawCanvasWithOthers() {
   }
   
   // 自分の描画コマンドを再実行
+  ctx.save();
+  ctx.beginPath(); // パス状態をリセット
   drawWriterCommands(drawingCommands, myWriterId, true);
+  ctx.restore();
   
   // 他執筆者の描画データを描画（送信済みでない場合のみ）
   if (!hasSentData) {
     Object.keys(otherWritersData).forEach(writerId => {
       // 各Writer描画前にcanvas状態を完全にリセット
       ctx.save();
+      ctx.beginPath(); // 重要：前のWriterのパス状態を完全にクリア
       ctx.setTransform(1, 0, 0, 1, 0, 0); // 変換行列をリセット
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1.0;
@@ -2614,8 +2623,8 @@ function drawContinuousLineForWriter(x, y, writerId = 'self') {
   const writerState = getWriterDrawingState(writerId);
   
   if (!writerState.lastPosition) {
-    // 描画開始点
-    ctx.beginPath();
+    // 描画開始点 - 他WriterIDとの状態混在を完全に防止
+    ctx.beginPath(); // 重要：他のWriterの未完了パスをクリア
     ctx.moveTo(x, y);
     writerState.lastPosition = { x, y };
     return;
@@ -2665,8 +2674,10 @@ canvas.addEventListener("mousedown", (e) => {
   
   // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
-  
-  ctx.beginPath();
+  // Canvas状態を完全に初期化（他WriterIDとの状態混在を防止）
+  ctx.beginPath(); // 重要：他のWriterの未完了パスを完全にクリア
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // 変換行列をリセット
+  ctx.globalCompositeOperation = 'source-over'; // 合成モードをリセット
   ctx.moveTo(x, y);
   
   // 線の品質を向上させる設定
@@ -3003,8 +3014,10 @@ canvas.addEventListener("touchstart", (e) => {
   
   // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
-  
-  ctx.beginPath();
+  // Canvas状態を完全に初期化（他WriterIDとの状態混在を防止）
+  ctx.beginPath(); // 重要：他のWriterの未完了パスを完全にクリア
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // 変換行列をリセット
+  ctx.globalCompositeOperation = 'source-over'; // 合成モードをリセット
   ctx.moveTo(x, y);
   
   // 線の品質を向上させる設定
