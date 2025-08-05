@@ -830,6 +830,20 @@ let drawingData = []; // 互換性のために残す（統合データ用）
 let currentNeonPaths = {}; // WriterID別の現在進行中のネオンパスを管理
 let completedNeonPaths = []; // 完了したネオンパスの履歴
 let neonPathTimers = {}; // WriterID別のパス完了タイマー
+
+// 通常描画パス管理用
+let normalPathTimers = {}; // WriterID別の通常描画パス完了タイマー
+
+// 通常描画パス完了処理
+function finishNormalPath(writerId) {
+  if (normalPathTimers[writerId]) {
+    clearTimeout(normalPathTimers[writerId]);
+    delete normalPathTimers[writerId];
+  }
+  
+  // パス完了時に全体再描画（他のWriterとの混在を防ぐため）
+  redrawCanvas();
+}
 let multiWriterData = {
   writer1: [],
   writer2: [],
@@ -841,6 +855,61 @@ let multiWriterData = {
 
 // WriterID別にパス状態を管理するオブジェクト
 const writerPathStates = {};
+
+// WriterID別リアルタイム描画用の独立した描画関数
+function drawRealtimeWriterPath(writerId, currentCmd, prevCmd) {
+  if (!currentCmd || !prevCmd) return;
+  
+  ctx.save();
+  
+  // デフォルト描画設定をリセット
+  ctx.globalAlpha = 1.0;
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
+  ctx.globalCompositeOperation = 'source-over';
+  
+  // 描画エリアの中心で180度回転を適用
+  const areaCenterX = canvas.width / 2 + drawingAreaOffset.x;
+  const areaCenterY = canvas.height / 2 + drawingAreaOffset.y;
+  const areaLeft = areaCenterX - drawingAreaSize.width / 2;
+  const areaTop = areaCenterY - drawingAreaSize.height / 2;
+  
+  ctx.translate(areaCenterX, areaCenterY);
+  ctx.rotate(Math.PI);
+  ctx.translate(-areaCenterX, -areaCenterY);
+  
+  // 前の座標と現在の座標を変換
+  const prevCoords = transformCoordinatesWithAspectRatio(prevCmd.x, prevCmd.y, senderCanvasSize, drawingAreaSize);
+  const currCoords = transformCoordinatesWithAspectRatio(currentCmd.x, currentCmd.y, senderCanvasSize, drawingAreaSize);
+  
+  const prevX = areaLeft + prevCoords.x;
+  const prevY = areaTop + prevCoords.y;
+  const currX = areaLeft + currCoords.x;
+  const currY = areaTop + currCoords.y;
+  
+  // 線を描画
+  ctx.beginPath();
+  ctx.moveTo(prevX, prevY);
+  ctx.lineTo(currX, currY);
+  
+  const scaledThickness = (currentCmd.thickness || 8) * (drawingAreaSize.width / senderCanvasSize.width);
+  ctx.lineWidth = scaledThickness;
+  
+  // 色の設定
+  const whiteColor = isVideoBackgroundActive ? '#f0f0f0' : '#fff';
+  ctx.strokeStyle = currentCmd.color === 'black' ? '#000' : 
+                   (currentCmd.color === 'white' ? whiteColor : 
+                   (currentCmd.color === 'red' ? '#ff0000' : 
+                   (currentCmd.color === 'blue' ? '#0000ff' : 
+                   (currentCmd.color === 'green' ? '#008000' : 
+                   (currentCmd.color === 'pink' ? '#ff69b4' : (currentCmd.color || '#000'))))));
+  
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  
+  ctx.restore();
+}
 
 // WriterID別に独立して描画する関数（受信側用）
 function drawWriterCommandsReceiver(commands, writerId) {
@@ -3044,10 +3113,38 @@ function handleMessage(data) {
           finishNeonPath(writerId);
         }, 500);
         
-        // リアルタイム描画はredrawCanvasに任せる
-        redrawCanvas();
+        // リアルタイム描画は独立したWriter描画で実行（混在防止）
+        const prevCmd = allWriterData[allWriterData.length - 2];
+        if (prevCmd) {
+          // ネオン色の場合は白い線でリアルタイム描画
+          const whiteCmd = { ...data, color: 'white', thickness: Math.max(1, (data.thickness || 4) - 3) };
+          drawRealtimeWriterPath(writerId, whiteCmd, prevCmd);
+        }
       } else {
-        // startコマンド直後の最初のdrawの場合 - redrawCanvasに任せる
+        // startコマンド直後の最初のdrawの場合 - 独立した点描画で実行
+        
+        // 点描画をリアルタイムで実行
+        ctx.save();
+        ctx.globalAlpha = 1.0;
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+        
+        const areaCenterX = canvas.width / 2 + drawingAreaOffset.x;
+        const areaCenterY = canvas.height / 2 + drawingAreaOffset.y;
+        const areaLeft = areaCenterX - drawingAreaSize.width / 2;
+        const areaTop = areaCenterY - drawingAreaSize.height / 2;
+        
+        ctx.translate(areaCenterX, areaCenterY);
+        ctx.rotate(Math.PI);
+        ctx.translate(-areaCenterX, -areaCenterY);
+        
+        ctx.beginPath();
+        ctx.arc(areaLeft + scaledX, areaTop + scaledY, Math.max(1, (data.thickness || 4) - 3) / 2, 0, 2 * Math.PI);
+        ctx.fillStyle = '#ffffff';
+        ctx.globalAlpha = 0.9;
+        ctx.fill();
+        
+        ctx.restore();
         
         // 新しいパスを開始
         currentNeonPaths[writerId] = [{
@@ -3065,9 +3162,20 @@ function handleMessage(data) {
         }, 200);
       }
     } else {
-      // 通常の色の場合 - リアルタイム描画はredrawCanvasに完全に任せる
-      // 複数Writer同時描画時の線混在を防ぐため、直接的なcontext操作を避ける
-      redrawCanvas();
+      // 通常の色の場合 - リアルタイム描画は独立したWriter描画で実行（混在防止）
+      const allWriterData = multiWriterData[writerId] || [];
+      const prevCmd = allWriterData[allWriterData.length - 2]; // 最新は現在のコマンド
+      if (prevCmd && (prevCmd.type === 'start' || prevCmd.type === 'draw')) {
+        drawRealtimeWriterPath(writerId, data, prevCmd);
+      }
+      
+      // パス完了タイマーを設定（500ms後に完了とみなす）
+      if (normalPathTimers[writerId]) {
+        clearTimeout(normalPathTimers[writerId]);
+      }
+      normalPathTimers[writerId] = setTimeout(() => {
+        finishNormalPath(writerId);
+      }, 500);
     }
     
     // 星エフェクトが有効で受信側に星を表示（2回に1回の頻度）
