@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://realtime-sign-server-1.onrender.com ws://localhost:* wss://localhost:*; img-src 'self' data: blob:; media-src 'self';">
-  <title>送信側2.1</title>
+  <title>送信側2.2</title>
   <style>
     /* クラシックスタイル（デフォルト） */
     body.classic .main-container {
@@ -1149,35 +1149,40 @@ function processMessage(data) {
   }
 }
 
-// 背景画像をアスペクト比を保持して描画する関数
+// 背景画像をアスペクト比を保持して描画する関数（0.7倍サイズ）
 function drawBackgroundImage(ctx, image, canvas) {
   if (!image) return;
   
   const canvasRatio = canvas.width / canvas.height;
   const imageRatio = image.width / image.height;
   
-  let drawWidth, drawHeight, offsetX, offsetY;
+  let baseWidth, baseHeight;
   
-  // contain: 画像全体が見えるように調整
+  // 基本サイズを計算（contain方式）
   if (imageRatio > canvasRatio) {
     // 画像の方が横長
-    drawWidth = canvas.width;
-    drawHeight = canvas.width / imageRatio;
-    offsetX = 0;
-    offsetY = (canvas.height - drawHeight) / 2;
+    baseWidth = canvas.width;
+    baseHeight = canvas.width / imageRatio;
   } else {
     // 画像の方が縦長
-    drawHeight = canvas.height;
-    drawWidth = canvas.height * imageRatio;
-    offsetX = (canvas.width - drawWidth) / 2;
-    offsetY = 0;
+    baseHeight = canvas.height;
+    baseWidth = canvas.height * imageRatio;
   }
+  
+  // 0.7倍に縮小
+  const scale = 0.7;
+  const drawWidth = baseWidth * scale;
+  const drawHeight = baseHeight * scale;
+  
+  // 中央配置の座標を計算
+  const offsetX = (canvas.width - drawWidth) / 2;
+  const offsetY = (canvas.height - drawHeight) / 2;
   
   // 背景色を白で塗りつぶし
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
-  // 画像を中央に配置して描画
+  // 画像を中央に配置して描画（0.7倍サイズ）
   ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
 }
 
