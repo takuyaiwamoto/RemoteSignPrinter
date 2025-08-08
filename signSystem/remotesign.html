@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://realtime-sign-server-1.onrender.com ws://localhost:* wss://localhost:*; img-src 'self' data: blob:; media-src 'self';">
-  <title>送信側1.3</title>
+  <title>送信側1.8</title>
   <style>
     /* クラシックスタイル（デフォルト） */
     body.classic .main-container {
@@ -13,27 +13,14 @@
       flex: 1;
     }
     body.classic .color-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      align-items: center;
-      padding: 15px;
-      border: 1px solid #ccc;
-      background: #f9f9f9;
+      display: none; /* 新しいレイアウトで置き換えのため非表示 */
     }
     body.classic .color-panel h3 {
       margin: 0 0 10px 0;
       font-size: 14px;
     }
     body.classic .thickness-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      align-items: center;
-      padding: 15px;
-      border: 1px solid #ccc;
-      background: #f9f9f9;
-      margin-left: 10px;
+      display: none; /* 新しいレイアウトで置き換えのため非表示 */
     }
     body.classic .thickness-panel h3 {
       margin: 0 0 10px 0;
@@ -43,6 +30,9 @@
       border: 1px solid black;
       display: block;
       margin-bottom: 10px;
+      max-width: 100%;
+      height: auto;
+      aspect-ratio: 859 / 607; /* 元のアスペクト比を固定 */
     }
     body.classic button {
       margin-right: 5px;
@@ -85,15 +75,46 @@
       align-items: center;
     }
     
-    body.modern .color-panel {
+    body.modern .main-controls {
+      width: 100%;
       display: flex;
-      flex-direction: column;
+      justify-content: center;
       gap: 15px;
+      margin: 15px 0;
+    }
+    
+    body.modern .pen-controls {
+      width: 100%;
+      display: flex;
+      justify-content: center;
       align-items: center;
-      padding: 20px 10px;
-      background: rgba(255, 255, 255, 0.7);
-      border-radius: 15px;
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+      gap: 30px;
+      margin: 15px 0;
+    }
+    
+    body.modern .pen-colors {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    body.modern .pen-thickness {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    body.modern .background-controls {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 15px 0;
+    }
+    
+    body.modern .color-panel {
+      display: none; /* 新しいレイアウトで置き換えのため非表示 */
     }
     
     body.modern .color-panel h3 {
@@ -104,15 +125,7 @@
     }
     
     body.modern .thickness-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-      align-items: center;
-      padding: 20px 10px;
-      background: rgba(255, 255, 255, 0.7);
-      border-radius: 15px;
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-      margin-left: 15px;
+      display: none; /* 新しいレイアウトで置き換えのため非表示 */
     }
     
     body.modern .thickness-panel h3 {
@@ -129,6 +142,9 @@
       margin: 0 auto 20px auto;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
       background: white;
+      max-width: 100%;
+      height: auto;
+      aspect-ratio: 859 / 607; /* 元のアスペクト比を固定 */
     }
     
     body.modern button {
@@ -565,6 +581,174 @@
       top: 0;
       left: -60px;
     }
+    
+    /* PC画面での新しいレイアウト */
+    body.classic .canvas-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+    
+    body.classic .main-controls {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    
+    body.classic .pen-controls {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      margin: 10px 0;
+    }
+    
+    body.classic .pen-colors {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    body.classic .pen-thickness {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    body.classic .background-controls {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    
+    /* 縦向きタブレット用レイアウト */
+    @media screen and (orientation: portrait) and (max-width: 1024px) {
+      body {
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+      }
+      
+      .main-container {
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+        height: 100vh;
+        box-sizing: border-box;
+      }
+      
+      .canvas-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        margin-bottom: 10px;
+      }
+      
+      #drawCanvas {
+        width: 100% !important;
+        height: auto !important;
+        max-height: 60vh;
+        aspect-ratio: 1.414;
+        margin: 0 auto;
+      }
+      
+      /* ボタングループのレイアウト調整 */
+      .button-group {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      
+      /* 送信・クリアボタンは大きく */
+      .canvas-container > .button-group:first-of-type button {
+        font-size: 16px;
+        padding: 15px 25px;
+        min-width: 120px;
+      }
+      
+      /* 色とペンのパネルを横並びに */
+      .color-panel, .thickness-panel {
+        display: none !important; /* 既存のパネルを非表示 */
+      }
+      
+      /* 新しい色・ペンセクション */
+      .color-thickness-section {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        gap: 15px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 10px;
+        margin-top: auto;
+      }
+      
+      .color-row, .thickness-row {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      
+      .color-row label, .thickness-row label {
+        width: 100%;
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+      
+      /* Dev Toolsボタンを右下に固定 */
+      .button-group:has(button[onclick*="toggleDevTools"]) {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        margin: 0;
+        z-index: 1000;
+      }
+      
+      /* 背景選択ボタンを小さく */
+      .button-group:has(button[onclick*="setBackground"]) {
+        font-size: 12px;
+      }
+      
+      .button-group:has(button[onclick*="setBackground"]) button {
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+      
+      /* Writer IDステータスを上部に固定 */
+      #writerStatus {
+        position: fixed;
+        top: 5px;
+        right: 5px;
+        z-index: 1001;
+        font-size: 12px;
+        padding: 5px 10px;
+      }
+      
+      /* テーマトグルボタンを左上に */
+      #themeToggle {
+        position: fixed;
+        top: 5px;
+        left: 5px;
+        z-index: 1001;
+        padding: 5px 10px;
+        font-size: 12px;
+      }
+    }
   </style>
 </head>
 <body class="modern">
@@ -574,12 +758,41 @@
 <div class="canvas-container">
 <canvas id="drawCanvas" width="859" height="607" style="position: relative; z-index: 100; background: transparent;"></canvas>
 
-<div class="button-group">
+<!-- メインコントロール: Clear、自分だけ削除、送信 -->
+<div class="main-controls">
   <button onclick="clearCanvas()">Clear</button>
+  <button onclick="clearMyDrawing()" style="background-color: #FF6B6B; color: white;">自分だけ消去</button>
   <button onclick="saveDoubleRotatedImage()" style="background-color: #4CAF50; color: white; font-size: 18px; padding: 12px 24px; font-weight: bold;">送信</button>
 </div>
 
-<div class="button-group">
+<!-- ペンの色と太さ: 同じ列に -->
+<div class="pen-controls">
+  <div class="pen-colors">
+    <button class="color-btn selected" style="background: black; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #ccc;" onclick="setPenColor('black')"></button>
+    <button class="color-btn" style="background: red; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #ccc;" onclick="setPenColor('red')"></button>
+    <button class="color-btn" style="background: blue; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #ccc;" onclick="setPenColor('blue')"></button>
+    <button class="color-btn" style="background: green; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #ccc;" onclick="setPenColor('green')"></button>
+    <button class="color-btn" style="background: white; border: 4px solid red; box-sizing: border-box; width: 40px; height: 40px; border-radius: 50%;" onclick="setPenColor('white-red-border')"></button>
+  </div>
+  
+  <div class="pen-thickness">
+    <button class="thickness-btn" onclick="setPenThickness(10)" title="太い (+30%)" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ccc; background: white; display: flex; align-items: center; justify-content: center;">
+      <div style="width: 21px; height: 21px; border-radius: 50%; background: #333;"></div>
+    </button>
+    <button class="thickness-btn selected" onclick="setPenThickness(8)" title="標準" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid #333; background: white; display: flex; align-items: center; justify-content: center;">
+      <div style="width: 16px; height: 16px; border-radius: 50%; background: #333;"></div>
+    </button>
+    <button class="thickness-btn" onclick="setPenThickness(6)" title="細い (-25%)" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ccc; background: white; display: flex; align-items: center; justify-content: center;">
+      <div style="width: 12px; height: 12px; border-radius: 50%; background: #333;"></div>
+    </button>
+    <button class="thickness-btn" onclick="setPenThickness(4)" title="とても細い (-50%)" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ccc; background: white; display: flex; align-items: center; justify-content: center;">
+      <div style="width: 8px; height: 8px; border-radius: 50%; background: #333;"></div>
+    </button>
+  </div>
+</div>
+
+<!-- 背景コントロール: 最下段 -->
+<div class="background-controls">
   <label>背景:</label>
   <button onclick="setBackground('./back3.png')">背景1</button>
   <button onclick="setBackground('./back2.png')">背景2</button>
@@ -800,19 +1013,37 @@ function processMessage(data) {
   
   if (data.type === "assignWriterId") {
     // writer ID の割り当てを受信
-    // console.log("📨 Writer ID割り当てメッセージ受信:", data);
+    console.log("📨 Writer ID割り当てメッセージ受信:", data);
     
     // セッションIDが一致する場合のみ受け入れる
     if (data.sessionId && data.sessionId === mySessionId) {
+      // 既に同じWriterIDを持っている他のブラウザがいないかチェック
+      if (data.conflictDetected) {
+        console.warn("⚠️ WriterID重複検出！再割り当てを要求します");
+        mySessionId = generateSessionId(); // 新しいセッションIDを生成
+        setTimeout(() => {
+          requestWriterId(); // 再要求
+        }, 100);
+        return;
+      }
+      
       myWriterId = data.writerId;
-      // console.log(`📝 Writer ID 割り当て: ${myWriterId} (SessionID: ${mySessionId})`);
+      console.log(`📝 Writer ID 割り当て: ${myWriterId} (SessionID: ${mySessionId})`);
       document.title = `送信側 - ${myWriterId}`;
       
       // Writer ID表示を更新
       const statusDiv = document.getElementById('writerStatus') || createWriterStatusDiv();
       statusDiv.childNodes[1].textContent = `Writer ID: ${myWriterId}`;
+      
+      // 割り当て成功をサーバーに通知
+      socket.send(JSON.stringify({
+        type: "confirmWriterId",
+        writerId: myWriterId,
+        sessionId: mySessionId,
+        timestamp: Date.now()
+      }));
     } else {
-      // console.log("❌ セッションID不一致のため無視:", data.sessionId, "vs", mySessionId);
+      console.log("❌ セッションID不一致のため無視:", data.sessionId, "vs", mySessionId);
     }
     
   } else if (data.type === "start" || data.type === "draw") {
@@ -839,7 +1070,7 @@ function processMessage(data) {
       // キャンバスを完全にクリア
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (backgroundImage) {
-        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+        drawBackgroundImage(ctx, backgroundImage, canvas);
       }
       
       // 全ての描画データをクリア
@@ -890,7 +1121,7 @@ function processMessage(data) {
         // キャンバスをクリア
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (backgroundImage) {
-          ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+          drawBackgroundImage(ctx, backgroundImage, canvas);
         }
         
         // 全ての描画データを完全クリア
@@ -922,14 +1153,74 @@ function processMessage(data) {
   }
 }
 
+// 背景画像をアスペクト比を保持して描画する関数
+function drawBackgroundImage(ctx, image, canvas) {
+  if (!image) return;
+  
+  const canvasRatio = canvas.width / canvas.height;
+  const imageRatio = image.width / image.height;
+  
+  let drawWidth, drawHeight, offsetX, offsetY;
+  
+  // contain: 画像全体が見えるように調整
+  if (imageRatio > canvasRatio) {
+    // 画像の方が横長
+    drawWidth = canvas.width;
+    drawHeight = canvas.width / imageRatio;
+    offsetX = 0;
+    offsetY = (canvas.height - drawHeight) / 2;
+  } else {
+    // 画像の方が縦長
+    drawHeight = canvas.height;
+    drawWidth = canvas.height * imageRatio;
+    offsetX = (canvas.width - drawWidth) / 2;
+    offsetY = 0;
+  }
+  
+  // 背景色を白で塗りつぶし
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // 画像を中央に配置して描画
+  ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+}
+
+// 画面の向きを検出してUIを切り替える関数
+function checkOrientation() {
+  const isPortrait = window.matchMedia("(orientation: portrait)").matches;
+  const isTablet = window.matchMedia("(max-width: 1024px)").matches;
+  const colorThicknessSection = document.querySelector('.color-thickness-section');
+  
+  if (isPortrait && isTablet) {
+    // 縦向きタブレット用UIを表示
+    if (colorThicknessSection) {
+      colorThicknessSection.style.display = 'flex';
+    }
+  } else {
+    // 通常のUIを使用
+    if (colorThicknessSection) {
+      colorThicknessSection.style.display = 'none';
+    }
+  }
+}
+
+// 画面の向きが変わった時にUIを更新
+window.addEventListener('orientationchange', checkOrientation);
+window.addEventListener('resize', checkOrientation);
+
+// 初期チェック
+document.addEventListener('DOMContentLoaded', checkOrientation);
+
 // セッションID生成関数
 function generateSessionId() {
   // より一意性の高いセッションIDを生成
   const timestamp = Date.now();
+  const nanoTime = performance.now() * 1000000; // ナノ秒精度に近づける
   const random1 = Math.random().toString(36).substr(2, 9);
   const random2 = Math.random().toString(36).substr(2, 9);
   const random3 = Math.random().toString(36).substr(2, 9);
-  const random4 = Math.random().toString(36).substr(2, 9); // 追加のランダム値
+  const random4 = Math.random().toString(36).substr(2, 9);
+  const random5 = crypto.getRandomValues(new Uint32Array(1))[0].toString(36); // 暗号学的に安全な乱数
   
   // デバイス固有情報の収集（拡張）
   const screen = `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`;
@@ -971,12 +1262,28 @@ function generateSessionId() {
   // ブラウザフィンガープリント（より長い）
   const fingerprint = btoa(deviceInfo).replace(/[^a-zA-Z0-9]/g, '').substr(0, 16);
   
-  const sessionId = `session_${random1}_${random2}_${random3}_${random4}_${timestamp}_${performanceNow}_${fingerprint}`;
-  // console.log("🆔 生成されたセッションID:", sessionId);
-  // console.log("🔍 デバイス情報:", {
-  //   screen, timezone, language, platform, userAgent: userAgent, 
-  //   vendor, hardwareConcurrency, deviceMemory, pixelRatio, touchPoints, canvasFingerprint
-  // });
+  // localStorage/sessionStorageを使った永続的な識別子
+  let storageId = '';
+  try {
+    // 既存のストレージIDを確認
+    storageId = localStorage.getItem('senderBrowserId') || '';
+    if (!storageId) {
+      // 新規生成
+      storageId = `browser_${crypto.getRandomValues(new Uint32Array(2)).join('_')}_${Date.now()}`;
+      localStorage.setItem('senderBrowserId', storageId);
+    }
+  } catch (e) {
+    // localStorage使用不可の場合
+    storageId = 'no_storage';
+  }
+  
+  const sessionId = `session_${random1}_${random2}_${random3}_${random4}_${random5}_${timestamp}_${nanoTime.toString().replace('.', '')}_${performanceNow}_${fingerprint}_${storageId}`;
+  console.log("🆔 生成されたセッションID:", sessionId);
+  console.log("🔍 デバイス情報:", {
+    screen, timezone, language, platform, userAgent: userAgent, 
+    vendor, hardwareConcurrency, deviceMemory, pixelRatio, touchPoints, 
+    canvasFingerprint, storageId, nanoTime
+  });
   return sessionId;
 }
 
@@ -1259,7 +1566,7 @@ function redrawCanvasWithOthers() {
   
   // 背景画像があれば描画
   if (backgroundImage) {
-    ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+    drawBackgroundImage(ctx, backgroundImage, canvas);
   }
   
   // 自分の描画コマンドを再実行
@@ -1656,7 +1963,7 @@ function setBackground(src) {
       }
       
       // 書き手側では背景画像を回転なしで表示
-      ctx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
+      drawBackgroundImage(ctx, backgroundImage, canvas);
       
       // 背景ソースを記録
       lastBackgroundSrc = src;
@@ -1785,7 +2092,7 @@ function setSpecialBackground(src) {
         // キャンバスをクリアして背景を描画
         ctx.restore();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+        drawBackgroundImage(ctx, backgroundImage, canvas);
         
         // 受信側に背景変更を通知
         socket.send(JSON.stringify({ 
@@ -1922,7 +2229,7 @@ function startCountdown() {
       // ✅ カウントダウン終了後、筆跡のみ削除（背景維持）
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (backgroundImage) {
-        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+        drawBackgroundImage(ctx, backgroundImage, canvas);
       }
       
       // 描画コマンドをクリア
@@ -1951,7 +2258,7 @@ function clearCanvas() {
   // キャンバスを完全にクリア
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (backgroundImage) {
-    ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+    drawBackgroundImage(ctx, backgroundImage, canvas);
   }
   
   // 全ての描画データを完全クリア
@@ -1972,6 +2279,45 @@ function clearCanvas() {
   }));
   // console.log('📤 全書き手にクリア指示を送信');
   // console.log('✅ clearCanvas完了');
+}
+
+// 自分の描画だけを消去する関数
+function clearMyDrawing() {
+  console.log('🧹 自分だけ消去開始');
+  
+  // 自分の描画コマンドのみをクリア
+  drawingCommands = [];
+  console.log('🧹 自分の描画コマンドをクリア:', drawingCommands.length);
+  
+  // WriterID別描画状態をリセット
+  if (writerDrawingStates['self']) {
+    writerDrawingStates['self'] = {
+      lastPosition: null,
+      currentPath: [],
+      isDrawing: false
+    };
+  }
+  
+  // キャンバスを再描画（背景 + 他の書き手の描画のみ）
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (backgroundImage) {
+    drawBackgroundImage(ctx, backgroundImage, canvas);
+  }
+  
+  // 他の書き手の描画を再描画
+  redrawCanvasWithOthers();
+  
+  // 受信側に自分の描画クリア指示を送信
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ 
+      type: "clearWriter",
+      writerId: myWriterId,
+      timestamp: Date.now()
+    }));
+    console.log('📤 受信側に自分の描画クリア指示を送信');
+  }
+  
+  console.log('✅ 自分だけ消去完了');
 }
 
 // ペンの太さ設定関数
@@ -2147,11 +2493,28 @@ function toggleBackgroundDebug() {
       offsetY = 0;
     }
     
-    ctx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
+    drawBackgroundImage(ctx, backgroundImage, canvas);
     
     // デバッグ表示が有効な場合のみ視覚的な表示を追加
     if (backgroundDebugEnabled) {
-      addBackgroundDebugVisuals(offsetX, offsetY, drawWidth, drawHeight);
+      // デバッグ表示用に計算された値を使用
+      const imageAspectDebug = backgroundImage.naturalWidth / backgroundImage.naturalHeight;
+      const canvasAspectDebug = canvas.width / canvas.height;
+      let debugDrawWidth, debugDrawHeight, debugOffsetX, debugOffsetY;
+      
+      if (imageAspectDebug > canvasAspectDebug) {
+        debugDrawWidth = canvas.width;
+        debugDrawHeight = canvas.width / imageAspectDebug;
+        debugOffsetX = 0;
+        debugOffsetY = (canvas.height - debugDrawHeight) / 2;
+      } else {
+        debugDrawHeight = canvas.height;
+        debugDrawWidth = canvas.height * imageAspectDebug;
+        debugOffsetX = (canvas.width - debugDrawWidth) / 2;
+        debugOffsetY = 0;
+      }
+      
+      addBackgroundDebugVisuals(debugOffsetX, debugOffsetY, debugDrawWidth, debugDrawHeight);
     }
   }
 }
@@ -3566,7 +3929,7 @@ function saveDoubleRotatedImage() {
     
     // 背景画像があれば再描画（回転なし）
     if (backgroundImage) {
-      ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+      drawBackgroundImage(ctx, backgroundImage, canvas);
       // console.log('🖼️ 背景画像を再描画');
     }
     
@@ -4069,7 +4432,7 @@ function updateBackgroundTransform() {
     const offsetX = (canvas.width - scaledWidth) / 2;
     const offsetY = (canvas.height - scaledHeight) / 2 + backgroundOffsetY;
     
-    ctx.drawImage(backgroundImage, offsetX, offsetY, scaledWidth, scaledHeight);
+    drawBackgroundImage(ctx, backgroundImage, canvas);
     
     // 描画コマンドを再実行
     if (drawingCommands && drawingCommands.length > 0) {
@@ -4147,6 +4510,34 @@ window.addEventListener('DOMContentLoaded', () => {
   <button class="thickness-btn" onclick="setPenThickness(4)" title="とても細い (-50%)">
     <div style="width: 8px; height: 8px; border-radius: 50%; background: #333; flex-shrink: 0;"></div>
   </button>
+</div>
+
+<!-- 縦向きタブレット用の色・ペンセクション -->
+<div class="color-thickness-section" style="display: none;">
+  <div class="color-row">
+    <label>ペンの色</label>
+    <button class="color-btn selected" style="background: black; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ccc;" onclick="setPenColor('black')"></button>
+    <button class="color-btn" style="background: red; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ccc;" onclick="setPenColor('red')"></button>
+    <button class="color-btn" style="background: blue; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ccc;" onclick="setPenColor('blue')"></button>
+    <button class="color-btn" style="background: green; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ccc;" onclick="setPenColor('green')"></button>
+    <button class="color-btn" style="background: white; border: 4px solid red; box-sizing: border-box; width: 50px; height: 50px; border-radius: 50%;" onclick="setPenColor('white-red-border')"></button>
+  </div>
+  
+  <div class="thickness-row">
+    <label>ペンの太さ</label>
+    <button class="thickness-btn" onclick="setPenThickness(10)" title="太い (+30%)" style="width: 60px; height: 60px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.8); background: rgba(255, 255, 255, 0.9); display: flex; align-items: center; justify-content: center;">
+      <div style="width: 21px; height: 21px; border-radius: 50%; background: #333;"></div>
+    </button>
+    <button class="thickness-btn selected" onclick="setPenThickness(8)" title="標準" style="width: 60px; height: 60px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.8); background: rgba(255, 255, 255, 0.9); display: flex; align-items: center; justify-content: center;">
+      <div style="width: 16px; height: 16px; border-radius: 50%; background: #333;"></div>
+    </button>
+    <button class="thickness-btn" onclick="setPenThickness(6)" title="細い (-25%)" style="width: 60px; height: 60px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.8); background: rgba(255, 255, 255, 0.9); display: flex; align-items: center; justify-content: center;">
+      <div style="width: 12px; height: 12px; border-radius: 50%; background: #333;"></div>
+    </button>
+    <button class="thickness-btn" onclick="setPenThickness(4)" title="とても細い (-50%)" style="width: 60px; height: 60px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.8); background: rgba(255, 255, 255, 0.9); display: flex; align-items: center; justify-content: center;">
+      <div style="width: 8px; height: 8px; border-radius: 50%; background: #333;"></div>
+    </button>
+  </div>
 </div>
 
 </div>
