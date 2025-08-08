@@ -1001,6 +1001,12 @@ socket.onopen = () => {
   // 少し待ってからwriter ID を要求（受信側の準備完了を待つ）
   setTimeout(() => {
     requestWriterId();
+    
+    // 初期背景画像を設定（まだ設定されていない場合）
+    if (!backgroundImage && !lastBackgroundSrc) {
+      console.log('🖼️ 初期背景画像を設定: back2.png');
+      setBackground('./back2.png');
+    }
   }, 500);
 };
 
@@ -1814,6 +1820,8 @@ function redrawCanvasWithOthers() {
   if (backgroundImage) {
     drawBackgroundImage(ctx, backgroundImage, canvas);
     console.log('🖼️ 背景画像を描画');
+  } else {
+    console.log('⚠️ 背景画像がnullまたは未定義');
   }
   
   // 自分の描画コマンドを再実行
