@@ -3387,6 +3387,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function getBackgroundArea() {
       if (!backgroundImage) {
         // 背景画像がない場合は全範囲を許可
+        console.log('🖼️ 背景画像なし - 全範囲を許可');
         return {
           x: 0,
           y: 0,
@@ -3395,35 +3396,55 @@ document.addEventListener('DOMContentLoaded', function() {
         };
       }
       
-      // canvasScaleを使用（書き手側の設定）
-      const currentScale = typeof canvasScale !== 'undefined' ? canvasScale : 0.7;
-      const maxWidth = canvas.width * currentScale;
-      const maxHeight = canvas.height * currentScale;
+      // drawBackgroundImage関数と同じ計算ロジック（2倍拡大を含む）
+      const canvasRatio = canvas.width / canvas.height;
+      const imageRatio = backgroundImage.width / backgroundImage.height;
       
-      const imgAspect = backgroundImage.width / backgroundImage.height;
+      let baseWidth, baseHeight;
       
-      let bgWidth, bgHeight;
-      if (imgAspect > maxWidth / maxHeight) {
-        bgWidth = maxWidth;
-        bgHeight = maxWidth / imgAspect;
+      // 基本サイズを計算（contain方式）
+      if (imageRatio > canvasRatio) {
+        // 画像の方が横長
+        baseWidth = canvas.width;
+        baseHeight = canvas.width / imageRatio;
       } else {
-        bgHeight = maxHeight;
-        bgWidth = maxHeight * imgAspect;
+        // 画像の方が縦長
+        baseHeight = canvas.height;
+        baseWidth = canvas.height * imageRatio;
       }
       
-      const drawX = canvas.width / 2 - bgWidth / 2;
-      const drawY = canvas.height / 2 - bgHeight / 2;
+      // 2倍に拡大
+      const scale = 2.0;
+      const drawWidth = baseWidth * scale;
+      const drawHeight = baseHeight * scale;
+      
+      // 中央に配置するためのオフセット
+      const offsetX = (canvas.width - drawWidth) / 2;
+      const offsetY = (canvas.height - drawHeight) / 2;
+      
+      console.log('🖼️ 背景画像範囲計算:', {
+        canvasSize: { width: canvas.width, height: canvas.height },
+        imageSize: { width: backgroundImage.width, height: backgroundImage.height },
+        baseSize: { width: baseWidth, height: baseHeight },
+        scale: scale,
+        drawArea: { x: offsetX, y: offsetY, width: drawWidth, height: drawHeight }
+      });
       
       return {
-        x: drawX,
-        y: drawY,
-        width: bgWidth,
-        height: bgHeight
+        x: offsetX,
+        y: offsetY,
+        width: drawWidth,
+        height: drawHeight
       };
     }
     
     // 座標が背景画像の範囲内かチェックする関数
     function isWithinBackgroundArea(x, y) {
+      // 一時的に範囲チェックを無効化（背景画像が2倍拡大されて画面外にはみ出すため）
+      // TODO: 将来的には適切な範囲計算を実装
+      return true;
+      
+      /* オリジナルのチェックロジック（参考用）
       const bgArea = getBackgroundArea();
       
       console.log('🖼️ 背景画像範囲チェック:', {
@@ -3441,6 +3462,7 @@ document.addEventListener('DOMContentLoaded', function() {
              x <= bgArea.x + bgArea.width && 
              y >= bgArea.y && 
              y <= bgArea.y + bgArea.height;
+      */
     }
     
     // PointerEventsを使用（より確実なイベント処理）
