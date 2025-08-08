@@ -1771,12 +1771,13 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
 // 自分と他執筆者の描画を統合して再描画
 function redrawCanvasWithOthers() {
   const redrawStart = performance.now();
-  console.log('🎨 redrawCanvasWithOthers 開始');
+  // console.log('🎨 redrawCanvasWithOthers 開始');
   
   // 🔒 送信済みなのにdrawingCommandsにデータがある場合は強制クリア
-  if (hasSentData && drawingCommands.length > 0) {
-    drawingCommands = [];
-  }
+  // ※ この処理は削除 - 他の書き手の描画を受信した時に自分の描画が消える原因
+  // if (hasSentData && drawingCommands.length > 0) {
+  //   drawingCommands = [];
+  // }
   
   // 🔥 現在描画中の場合は、現在の描画状態を保存
   let currentDrawingState = null;
@@ -2129,8 +2130,11 @@ function setBackground(src) {
   // console.log('setBackground関数呼び出し:', src, 'WebSocket状態:', socket ? socket.readyState : 'socket未初期化');
   
   // 背景変更時に他のwriterの古いデータをクリア
-  // console.log('🧹 背景変更: 他のwriter描画データをクリア');
-  otherWritersData = {};
+  // ※ 自分が明示的に背景を変更した場合のみクリアする（初期化時は除く）
+  if (lastBackgroundSrc !== undefined && lastBackgroundSrc !== src) {
+    // console.log('🧹 背景変更: 他のwriter描画データをクリア');
+    otherWritersData = {};
+  }
   
   if (src === null) {
     backgroundImage = null;
