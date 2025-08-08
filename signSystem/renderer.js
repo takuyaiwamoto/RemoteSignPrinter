@@ -2303,10 +2303,17 @@ function redrawCanvas(withBackground = true) {
     ctx.restore();
     
     
-    // 📐 描画エリアサイズを背景画像サイズに合わせる
+    // 📐 描画エリアサイズを背景画像サイズに合わせる（最優先）
     // 書き手側と受信側の背景画像が同じ比率なので、描画エリアも背景画像と同じサイズにする
     drawingAreaSize.width = Math.round(bgWidth);
     drawingAreaSize.height = Math.round(bgHeight);
+    
+    // 🔒 背景画像サイズ設定を強制適用（他の処理による上書きを防ぐ）
+    Object.defineProperty(window, 'backgroundImageBasedDrawingAreaSize', {
+      value: { width: drawingAreaSize.width, height: drawingAreaSize.height },
+      writable: false
+    });
+    
     console.log(`📐 描画エリアを背景画像サイズに調整: ${drawingAreaSize.width}x${drawingAreaSize.height}`);
     
     // 📍 描画エリア位置を背景画像位置に合わせる
@@ -2985,8 +2992,15 @@ function handleMessage(data) {
         const scaleY = senderCanvasSize.height / oldSenderSize.height;
         
         // 描画エリアサイズを連動してスケール
-        drawingAreaSize.width = Math.round(drawingAreaSize.width * scaleX);
-        drawingAreaSize.height = Math.round(drawingAreaSize.height * scaleY);
+        if (backgroundImage && window.backgroundImageBasedDrawingAreaSize) {
+          // 🔒 背景画像サイズを優先（スケールは無視）
+          drawingAreaSize.width = window.backgroundImageBasedDrawingAreaSize.width;
+          drawingAreaSize.height = window.backgroundImageBasedDrawingAreaSize.height;
+          console.log(`🔒 背景画像サイズを優先（送信側スケール無視）: ${drawingAreaSize.width}x${drawingAreaSize.height}`);
+        } else {
+          drawingAreaSize.width = Math.round(drawingAreaSize.width * scaleX);
+          drawingAreaSize.height = Math.round(drawingAreaSize.height * scaleY);
+        }
         
         // 描画エリアの位置（オフセット）も連動してスケール
         drawingAreaOffset.x = Math.round(drawingAreaOffset.x * scaleX);
@@ -3600,8 +3614,15 @@ function handleMessage(data) {
       const scaleRatio = devCanvasScale / oldCanvasScale;
       
       // 描画エリアサイズを連動してスケール
-      drawingAreaSize.width = Math.round(drawingAreaSize.width * scaleRatio);
-      drawingAreaSize.height = Math.round(drawingAreaSize.height * scaleRatio);
+      if (backgroundImage && window.backgroundImageBasedDrawingAreaSize) {
+        // 🔒 背景画像サイズを優先（スケールは無視）
+        drawingAreaSize.width = window.backgroundImageBasedDrawingAreaSize.width;
+        drawingAreaSize.height = window.backgroundImageBasedDrawingAreaSize.height;
+        console.log(`🔒 背景画像サイズを優先（スケール無視）: ${drawingAreaSize.width}x${drawingAreaSize.height}`);
+      } else {
+        drawingAreaSize.width = Math.round(drawingAreaSize.width * scaleRatio);
+        drawingAreaSize.height = Math.round(drawingAreaSize.height * scaleRatio);
+      }
       
       // 描画エリアの位置（オフセット）も連動してスケール
       drawingAreaOffset.x = Math.round(drawingAreaOffset.x * scaleRatio);
@@ -4021,8 +4042,17 @@ function setReceiverCanvasSize() {
   
   // 描画エリアサイズをキャンバスサイズに自動調整
   const oldDrawingAreaSize = { ...drawingAreaSize };
-  drawingAreaSize.width = Math.floor(newWidth * 0.8); // キャンバスの80%
-  drawingAreaSize.height = Math.floor(newHeight * 0.8);
+  
+  // 🔒 背景画像が設定されている場合は背景画像サイズを優先
+  if (backgroundImage && window.backgroundImageBasedDrawingAreaSize) {
+    drawingAreaSize.width = window.backgroundImageBasedDrawingAreaSize.width;
+    drawingAreaSize.height = window.backgroundImageBasedDrawingAreaSize.height;
+    console.log(`🔒 背景画像サイズを優先適用: ${drawingAreaSize.width}x${drawingAreaSize.height}`);
+  } else {
+    drawingAreaSize.width = Math.floor(newWidth * 0.8); // キャンバスの80%
+    drawingAreaSize.height = Math.floor(newHeight * 0.8);
+    console.log(`📐 キャンバス80%サイズを適用: ${drawingAreaSize.width}x${drawingAreaSize.height}`);
+  }
   
   // 受信側のキャンバスサイズを記録
   receiverCanvasSize = { width: newWidth, height: newHeight };
