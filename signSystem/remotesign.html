@@ -1725,7 +1725,8 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
       writerState.prevCmd = cmd;
       
       if (index === 0) {
-        console.log(`    🎯 最初のstart: x=${cmd.x}, y=${cmd.y}`);
+        const isValid = cmd.x >= 0 && cmd.x <= canvas.width && cmd.y >= 0 && cmd.y <= canvas.height;
+        console.log(`    🎯 最初のstart: x=${cmd.x}, y=${cmd.y} (canvas: ${canvas.width}x${canvas.height}) 範囲内？${isValid}`);
       }
     } else if (cmd.type === "draw" && writerState.prevCmd) {
       drawCount++;
@@ -1782,7 +1783,15 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
     }
   });
   
-  console.log(`    ✅ 描画完了: start=${startCount}件, draw=${drawCount}件`);
+  // 画面外描画の警告チェック
+  let outOfBoundsCount = 0;
+  commands.forEach(cmd => {
+    if (cmd.x < 0 || cmd.x > canvas.width || cmd.y < 0 || cmd.y > canvas.height) {
+      outOfBoundsCount++;
+    }
+  });
+  
+  console.log(`    ✅ 描画完了: start=${startCount}件, draw=${drawCount}件${outOfBoundsCount > 0 ? `, ⚠️画面外=${outOfBoundsCount}件` : ''}`);
   
   ctx.restore();
 }
@@ -3558,11 +3567,14 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         if (socket && socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify(startMsg));
+          const isValidCoord = x >= 0 && x <= canvas.width && y >= 0 && y <= canvas.height;
           console.log("📤 PC描画開始データ送信:", {
             type: startMsg.type,
             writerId: startMsg.writerId,
-            x: startMsg.x,
-            y: startMsg.y
+            x: Math.round(x),
+            y: Math.round(y),
+            canvasSize: `${canvas.width}x${canvas.height}`,
+            座標妥当性: isValidCoord
           });
         }
       });
