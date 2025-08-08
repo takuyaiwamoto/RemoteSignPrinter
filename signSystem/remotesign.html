@@ -3492,6 +3492,21 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(x, y);
+        
+        // WebSocketで受信側に描画開始を送信
+        const startMsg = {
+          type: "start",
+          x: x,
+          y: y,
+          thickness: currentPenThickness,
+          color: currentPenColor,
+          writerId: myWriterId,
+          timestamp: Date.now()
+        };
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify(startMsg));
+          console.log("📤 PC描画開始データ送信:", startMsg);
+        }
       });
       
       canvasElement.addEventListener('pointermove', (e) => {
@@ -3519,6 +3534,21 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(x, y);
+        
+        // WebSocketで受信側に描画継続データを送信
+        const drawMsg = {
+          type: "draw",
+          x: x,
+          y: y,
+          thickness: currentPenThickness,
+          color: currentPenColor,
+          writerId: myWriterId,
+          timestamp: Date.now()
+        };
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify(drawMsg));
+          console.log("📤 PC描画継続データ送信:", x, y);
+        }
         
         lastPaintPos = { x, y };
       });
@@ -3562,6 +3592,21 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.beginPath();
         ctx.moveTo(x, y);
         
+        // WebSocketで受信側に描画開始を送信
+        const startMsg = {
+          type: "start",
+          x: x,
+          y: y,
+          thickness: currentPenThickness,
+          color: currentPenColor,
+          writerId: myWriterId,
+          timestamp: Date.now()
+        };
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify(startMsg));
+          console.log("📤 PC描画開始データ送信(mouse):", startMsg);
+        }
+        
         e.preventDefault();
       });
       
@@ -3590,6 +3635,21 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(x, y);
+        
+        // WebSocketで受信側に描画継続データを送信
+        const drawMsg = {
+          type: "draw",
+          x: x,
+          y: y,
+          thickness: currentPenThickness,
+          color: currentPenColor,
+          writerId: myWriterId,
+          timestamp: Date.now()
+        };
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify(drawMsg));
+          console.log("📤 PC描画継続データ送信(mouse):", x, y);
+        }
         
         lastPaintPos = { x, y };
       });
