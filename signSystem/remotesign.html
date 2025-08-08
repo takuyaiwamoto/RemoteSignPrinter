@@ -1680,7 +1680,12 @@ const senderWriterPathStates = {};
 
 // Writer別に独立した描画関数
 function drawWriterCommands(commands, writerId, isMyself = false) {
-  if (commands.length === 0) return;
+  if (commands.length === 0) {
+    console.log(`  📝 ${writerId}の描画コマンドが0件のためスキップ`);
+    return;
+  }
+  
+  console.log(`  📝 ${writerId}の描画開始: ${commands.length}件のコマンド`);
   
   // このWriterのパス状態を完全にリセット（他Writerとの混在防止）
   senderWriterPathStates[writerId] = {
@@ -1702,12 +1707,22 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
   ctx.globalCompositeOperation = 'source-over';
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  let startCount = 0;
+  let drawCount = 0;
+  
   commands.forEach((cmd, index) => {
     if (cmd.type === "start") {
+      startCount++;
       // startコマンド時にこのWriterのパス状態を完全にリセット
       ctx.beginPath(); // 前のパスをクリア
+      ctx.moveTo(cmd.x, cmd.y); // 開始点を設定
       writerState.prevCmd = cmd;
+      
+      if (index === 0) {
+        console.log(`    🎯 最初のstart: x=${cmd.x}, y=${cmd.y}`);
+      }
     } else if (cmd.type === "draw" && writerState.prevCmd) {
+      drawCount++;
       if (cmd.color === 'white-red-border') {
         // 白地赤縁の特別処理
         if (writerState.prevCmd) {
@@ -1760,6 +1775,8 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
       writerState.prevCmd = cmd;
     }
   });
+  
+  console.log(`    ✅ 描画完了: start=${startCount}件, draw=${drawCount}件`);
   
   ctx.restore();
 }
