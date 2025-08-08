@@ -827,7 +827,10 @@ canvas.style.left = "50%";
 canvas.style.transform = "translateX(-50%)"; // 180度回転を削除
 canvas.style.zIndex = "10"; // 動画背景より上に設定
 
-let backgroundImage = null;
+let backgroundImage = null; // 現在表示中の背景画像（後方互換性のため保持）
+// WriterID別の背景画像管理（複数Writer同時描画対応）
+const writerBackgroundImages = {};
+let activeBackgroundWriterId = null; // 現在表示中の背景画像のWriterID
 let drawingData = []; // 互換性のために残す（統合データ用）
 
 // ネオン描画パス管理用
@@ -2168,7 +2171,12 @@ function redrawCanvas(withBackground = true) {
   //console.log(`  キャンバスmargin: ${canvasStyle.margin}`);
   
   // 🔸 背景画像をシンプルに中央描画（アスペクト比保持） - 描画エリア計算の前に実行
-  if (withBackground && backgroundImage) {
+  // WriterID別の背景画像管理：現在アクティブなWriterの背景を使用
+  const currentBackgroundImage = activeBackgroundWriterId && writerBackgroundImages[activeBackgroundWriterId] 
+    ? writerBackgroundImages[activeBackgroundWriterId] 
+    : backgroundImage;
+  
+  if (withBackground && currentBackgroundImage) {
     //console.log('🖼️ 背景画像描画開始（シンプル版）');
     
     // 元画像のアスペクト比を保持したサイズ計算（書き手側のdevtoolスケール値を使用）
@@ -2178,7 +2186,7 @@ function redrawCanvas(withBackground = true) {
     //console.log(`🔧 背景画像サイズ計算: スケール=${UNIFIED_SETTINGS.canvasScale}x, max=${maxWidth.toFixed(1)}x${maxHeight.toFixed(1)}`);
     
     // アスペクト比を保持してサイズを計算
-    const imgAspect = backgroundImage.width / backgroundImage.height;
+    const imgAspect = currentBackgroundImage.width / currentBackgroundImage.height;
     
     let bgWidth, bgHeight;
     if (imgAspect > maxWidth / maxHeight) {
@@ -2199,7 +2207,7 @@ function redrawCanvas(withBackground = true) {
     drawY = canvas.height / 2 - bgHeight / 2;
     
     // 背景画像を描画
-    ctx.drawImage(backgroundImage, drawX, drawY, bgWidth, bgHeight);
+    ctx.drawImage(currentBackgroundImage, drawX, drawY, bgWidth, bgHeight);
     
     // 🔍 デバッグ: 背景画像の境界線を表示
     ctx.save();
@@ -2303,7 +2311,7 @@ function redrawCanvas(withBackground = true) {
   }
   
   // 🔸 背景画像をシンプルに中央描画（アスペクト比保持）
-  if (withBackground && backgroundImage) {
+  if (withBackground && currentBackgroundImage) {
     //console.log('🖼️ 背景画像描画開始（シンプル版）');
     
     // 元画像のアスペクト比を保持したサイズ計算（書き手側のdevtoolスケール値を使用）
@@ -2313,7 +2321,7 @@ function redrawCanvas(withBackground = true) {
     //console.log(`🔧 背景画像サイズ計算: スケール=${UNIFIED_SETTINGS.canvasScale}x, max=${maxWidth.toFixed(1)}x${maxHeight.toFixed(1)}`);
     
     // アスペクト比を保持してサイズを計算
-    const imgAspect = backgroundImage.width / backgroundImage.height;
+    const imgAspect = currentBackgroundImage.width / currentBackgroundImage.height;
     let bgWidth, bgHeight;
     
     if (imgAspect > maxWidth / maxHeight) {
@@ -2403,7 +2411,7 @@ function redrawCanvas(withBackground = true) {
     //console.log(`🎯 背景画像中央座標: (${(drawX + bgWidth/2).toFixed(1)}, ${(drawY + bgHeight/2).toFixed(1)})`);
     
     // 背景画像を描画
-    ctx.drawImage(backgroundImage, drawX, drawY, bgWidth, bgHeight);
+    ctx.drawImage(currentBackgroundImage, drawX, drawY, bgWidth, bgHeight);
     
     // 🔍 デバッグ: 背景画像の境界線を表示
     ctx.save();
@@ -2949,7 +2957,8 @@ function handleMessage(data) {
 
   if (data.type === "background") {
     // 背景変更メッセージを受信（180度回転で表示）
-    console.log(`📨 背景変更メッセージ受信: ${data.src}`);
+    const writerId = data.writerId || 'default';
+    console.log(`📨 背景変更メッセージ受信: ${data.src} (WriterID: ${writerId})`);
     console.log(`📨 背景メッセージ詳細:`, data);
     console.log(`📨 back6.png含まれているか:`, data.src ? data.src.includes('back6.png') : 'srcなし');
     console.log(`📨 isCanvasRotated状態:`, isCanvasRotated);
@@ -2961,6 +2970,12 @@ function handleMessage(data) {
       const img = new Image();
       img.onload = () => {
         //console.log(`✅ 背景画像読み込み成功: ${data.src}`);
+        
+        // WriterID別の背景画像を保存
+        writerBackgroundImages[writerId] = img;
+        activeBackgroundWriterId = writerId;
+        
+        // 後方互換性のため、グローバル変数も更新
         backgroundImage = img;
         lastBackgroundSrc = data.src;
         
@@ -3089,9 +3104,15 @@ function handleMessage(data) {
       //console.log(`🔧 送信側スケール値更新: ${UNIFIED_SETTINGS.canvasScale}x`);
     }
     
-    // 🔸 送信側のキャンバスサイズ情報を保存
+    // 🔸 送信側のキャンバスサイズ情報を保存（WriterID別管理）
     if (data.canvasSize) {
-      const oldSenderSize = { ...senderCanvasSize };
+      const writerId = data.writerId || 'default';
+      const oldSenderSize = writerCanvasSizes[writerId] || { ...senderCanvasSize };
+      
+      // WriterID別のキャンバスサイズを保存
+      writerCanvasSizes[writerId] = data.canvasSize;
+      
+      // 後方互換性のため、グローバル変数も更新
       senderCanvasSize = data.canvasSize;
       //console.log(`📐 送信側キャンバスサイズ: ${senderCanvasSize.width} x ${senderCanvasSize.height}`);
       
