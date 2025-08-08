@@ -3,7 +3,7 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://realtime-sign-server-1.onrender.com ws://localhost:* wss://localhost:*; img-src 'self' data: blob:; media-src 'self';">
-  <title>送信側2.7</title>
+  <title>送信側2.8</title>
   <style>
     /* タッチデバイスでのズーム防止 */
     * {
@@ -1242,6 +1242,205 @@ function drawBackgroundImage(ctx, image, canvas) {
 
 // 不要なコントロール表示機能を削除 - シンプルなUIに統一
 
+// デバイス検出と機能切り替えシステム
+const DeviceManager = {
+  // デバイスタイプを検出
+  detectDevice() {
+    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+    const touchSupport = 'ontouchstart' in window;
+    const screenWidth = window.screen.width;
+    const screenHeight = window.screen.height;
+    const maxTouchPoints = navigator.maxTouchPoints || 0;
+    
+    // タブレット判定
+    const isTablet = (
+      touchSupport &&
+      maxTouchPoints > 1 &&
+      (screenWidth >= 768 || screenHeight >= 768) &&
+      (screenWidth <= 1024 || screenHeight <= 1024)
+    ) || (
+      /iPad|Android(?!.*Mobile)|Tablet/i.test(userAgent)
+    );
+    
+    // スマートフォン判定
+    const isMobile = (
+      touchSupport &&
+      !isTablet &&
+      /Android|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
+    );
+    
+    // PC判定（デフォルト）
+    const isPC = !isTablet && !isMobile;
+    
+    return {
+      isPC,
+      isTablet,
+      isMobile,
+      touchSupport,
+      screenWidth,
+      screenHeight,
+      maxTouchPoints,
+      userAgent: userAgent.substring(0, 100) // ログ用に短縮
+    };
+  },
+  
+  // デバイス別設定を適用
+  applyDeviceSettings() {
+    const device = this.detectDevice();
+    console.log('🔍 デバイス検出結果:', device);
+    
+    if (device.isPC) {
+      this.applyPCSettings();
+    } else if (device.isTablet) {
+      this.applyTabletSettings();
+    } else if (device.isMobile) {
+      this.applyMobileSettings();
+    }
+    
+    return device;
+  },
+  
+  // PC用設定
+  applyPCSettings() {
+    console.log('💻 PC設定を適用');
+    
+    // PC用の特別な設定
+    const canvas = document.getElementById('drawCanvas');
+    if (canvas) {
+      // PCではマウス操作を最適化
+      canvas.style.cursor = 'crosshair';
+    }
+    
+    // PC用UIの調整
+    document.body.classList.add('device-pc');
+    document.body.classList.remove('device-tablet', 'device-mobile');
+    
+    // PC専用機能を有効化
+    this.enablePCFeatures();
+  },
+  
+  // タブレット用設定
+  applyTabletSettings() {
+    console.log('📱 タブレット設定を適用');
+    
+    // タブレット用の特別な設定
+    const canvas = document.getElementById('drawCanvas');
+    if (canvas) {
+      // タブレットではタッチ操作を最適化
+      canvas.style.cursor = 'none'; // カーソル非表示
+    }
+    
+    // タブレット用UIの調整
+    document.body.classList.add('device-tablet');
+    document.body.classList.remove('device-pc', 'device-mobile');
+    
+    // タブレット専用機能を有効化
+    this.enableTabletFeatures();
+  },
+  
+  // モバイル用設定
+  applyMobileSettings() {
+    console.log('📱 モバイル設定を適用');
+    
+    // モバイル用の特別な設定
+    const canvas = document.getElementById('drawCanvas');
+    if (canvas) {
+      canvas.style.cursor = 'none';
+    }
+    
+    // モバイル用UIの調整
+    document.body.classList.add('device-mobile');
+    document.body.classList.remove('device-pc', 'device-tablet');
+    
+    // モバイル専用機能を有効化
+    this.enableMobileFeatures();
+  },
+  
+  // PC専用機能
+  enablePCFeatures() {
+    // PC用の詳細なDevToolsを表示
+    const devButton = document.getElementById('devButton');
+    if (devButton) {
+      devButton.style.display = 'block';
+    }
+    
+    // PC用のキーボードショートカットを有効化
+    this.enableKeyboardShortcuts();
+  },
+  
+  // タブレット専用機能
+  enableTabletFeatures() {
+    // タブレット用の大きなボタン
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(btn => {
+      if (!btn.classList.contains('color-btn') && !btn.classList.contains('thickness-btn')) {
+        btn.style.minHeight = '50px';
+        btn.style.fontSize = '16px';
+      }
+    });
+    
+    // タブレット用のタッチ最適化
+    this.optimizeForTouch();
+  },
+  
+  // モバイル専用機能
+  enableMobileFeatures() {
+    // モバイル用の超大きなボタン
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(btn => {
+      if (!btn.classList.contains('color-btn') && !btn.classList.contains('thickness-btn')) {
+        btn.style.minHeight = '60px';
+        btn.style.fontSize = '18px';
+      }
+    });
+    
+    // DevToolsを非表示（画面が小さいため）
+    const devButton = document.getElementById('devButton');
+    if (devButton) {
+      devButton.style.display = 'none';
+    }
+  },
+  
+  // キーボードショートカット（PC専用）
+  enableKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        switch(e.key) {
+          case 'z':
+            e.preventDefault();
+            // Undo機能（将来実装）
+            console.log('⌨️ Undo shortcut (PC only)');
+            break;
+          case 's':
+            e.preventDefault();
+            // Save機能
+            console.log('⌨️ Save shortcut (PC only)');
+            break;
+        }
+      }
+    });
+  },
+  
+  // タッチ最適化（タブレット/モバイル専用）
+  optimizeForTouch() {
+    // タッチ遅延を削除
+    const style = document.createElement('style');
+    style.textContent = `
+      .device-tablet button, .device-mobile button {
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        touch-action: manipulation;
+      }
+      
+      .device-tablet .pen-controls, .device-mobile .pen-controls {
+        gap: 15px;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+};
+
 // セッションID生成関数
 function generateSessionId() {
   // より一意性の高いセッションIDを生成
@@ -1403,7 +1602,7 @@ function createWriterStatusDiv() {
   
   // Version情報を表示
   const versionSpan = document.createElement('span');
-  versionSpan.textContent = 'v2.7';
+  versionSpan.textContent = 'v2.8';
   versionSpan.style.cssText = `
     display: block;
     color: #FFD700;
@@ -1459,12 +1658,8 @@ function handleOtherWriterDrawing(data) {
   // console.log(`🔍 現在のotherWritersDataキー数: ${Object.keys(otherWritersData).length}`);
   // console.log(`🔍 現在のotherWritersData内容:`, Object.keys(otherWritersData).map(key => `${key}: ${otherWritersData[key].length}件`));
   
-  // 送信済みの場合は他のwriterのデータを受信しない
-  if (hasSentData) {
-    // console.log(`🔒 送信済みのため他のwriterデータを無視: ${writerId} (データ型: ${data.type})`);
-    // console.log(`🔒 otherWritersDataは空のまま維持: キー数=${Object.keys(otherWritersData).length}`);
-    return;
-  }
+  // 他のwriterのデータは常に受信する（送信状態に関係なく）
+  // ※ hasSentDataチェックを削除して、常に他writerの描画を表示可能にする
   
   if (!otherWritersData[writerId]) {
     otherWritersData[writerId] = [];
@@ -1606,24 +1801,22 @@ function redrawCanvasWithOthers() {
   drawWriterCommands(drawingCommands, myWriterId, true);
   ctx.restore();
   
-  // 他執筆者の描画データを描画（送信済みでない場合のみ）
-  if (!hasSentData) {
-    Object.keys(otherWritersData).forEach(writerId => {
-      // 各Writer描画前にcanvas状態を完全にリセット
-      ctx.save();
-      ctx.beginPath(); // 重要：前のWriterのパス状態を完全にクリア
-      ctx.setTransform(1, 0, 0, 1, 0, 0); // 変換行列をリセット
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1.0;
-      ctx.shadowBlur = 0;
-      ctx.shadowColor = 'transparent';
-      
-      drawWriterCommands(otherWritersData[writerId], writerId, false);
-      
-      // 各Writer描画後にcanvas状態を復元
-      ctx.restore();
-    });
-  }
+  // 他執筆者の描画データを描画（常に表示）
+  Object.keys(otherWritersData).forEach(writerId => {
+    // 各Writer描画前にcanvas状態を完全にリセット
+    ctx.save();
+    ctx.beginPath(); // 重要：前のWriterのパス状態を完全にクリア
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // 変換行列をリセット
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1.0;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    
+    drawWriterCommands(otherWritersData[writerId], writerId, false);
+    
+    // 各Writer描画後にcanvas状態を復元
+    ctx.restore();
+  });
   
   // 🔥 重要：現在描画中だった場合、描画状態を復元
   if (drawing && currentDrawingState) {
@@ -3100,11 +3293,7 @@ function drawContinuousLine(x, y) {
 // interpolatePoints関数を削除（パフォーマンス改善）
 
 canvas.addEventListener("mousedown", (e) => {
-  // 送信済みの場合は描画を無効化
-  if (hasSentData) {
-    // console.log('🔒 送信済みのため新しい描画を無効化 (mouse)');
-    return;
-  }
+  // 常に新しい描画を可能にする（hasSentDataチェックを削除）
   
   drawing = true;
   const x = e.offsetX;
@@ -3279,12 +3468,7 @@ canvas.addEventListener("mousemove", (e) => {
   const mouseMoveStart = performance.now();
   if (!drawing) return;
   
-  // 送信済みの場合は描画を無効化
-  if (hasSentData) {
-    // console.log('🔒 送信済みのため描画継続を無効化 (mouse move)');
-    drawing = false; // 描画状態もリセット
-    return;
-  }
+  // 常に描画継続を可能にする（hasSentDataチェックを削除）
   
   const x = e.offsetX;
   const y = e.offsetY;
@@ -3434,11 +3618,7 @@ canvas.addEventListener("mousemove", (e) => {
 canvas.addEventListener("touchstart", (e) => {
   e.preventDefault(); // スクロールを防止
   
-  // 送信済みの場合は描画を無効化
-  if (hasSentData) {
-    // console.log('🔒 送信済みのため新しい描画を無効化 (touch)');
-    return;
-  }
+  // 常に新しい描画を可能にする（hasSentDataチェックを削除）
   
   drawing = true;
   const touch = e.touches[0];
@@ -3617,12 +3797,7 @@ canvas.addEventListener("touchmove", (e) => {
   e.preventDefault(); // スクロールを防止
   if (!drawing) return;
   
-  // 送信済みの場合は描画を無効化
-  if (hasSentData) {
-    // console.log('🔒 送信済みのため描画継続を無効化 (touch move)');
-    drawing = false; // 描画状態もリセット
-    return;
-  }
+  // 常に描画継続を可能にする（hasSentDataチェックを削除）
   
   const touch = e.touches[0];
   const rect = canvas.getBoundingClientRect();
@@ -3867,24 +4042,24 @@ function saveDoubleRotatedImage() {
     // console.log('✅ 送信側印刷処理完了（描画データは保持）');
   }, 500); // 受信側の印刷処理が開始されるまで500ms待機
   
+  // 🔄 送信直後に新しい描画を可能にするため、hasSentDataフラグを即座にリセット
+  // 送信済みフラグをリセットして、すぐに新しい描画を可能にする
+  hasSentData = false;
+  console.log('🔓 送信直後: hasSentDataをリセット - 新しい描画と他writerデータ受信を再開');
+  
   // 🔄 受信側のアニメーション完了後に送信者側のデータクリアと自動Clear処理を実行
   const totalAnimationTime = (animationStartWaitTime + 1 + rotationWaitTime) * 1000; // アニメーション開始待機 + 回転1秒 + 回転後待機
   // console.log(`🔄 送信完了 → ${totalAnimationTime/1000}秒後（アニメーション完了後）に送信者データクリア + 自動Clear処理を実行`);
   setTimeout(() => {
     // 🔸 送信者側のデータクリア（アニメーション完了後）
-    hasSentData = true;
     otherWritersData = {};
     drawingCommands = []; // 🔥 アニメーション完了後に自分の描画コマンドをクリア
-    // console.log('🔒 送信済みフラグを設定 + 全描画データをクリア（アニメーション完了後）');
+    // console.log('🧹 アニメーション完了後: 全描画データをクリア');
     // console.log('🧹 otherWritersData遅延クリア:', Object.keys(otherWritersData).length);
     // console.log('🧹 drawingCommands遅延クリア:', drawingCommands.length);
     
     // キャンバスを再描画（空の状態）
     redrawCanvasWithOthers();
-    
-    // Clearボタンと同じ処理を実行
-    hasSentData = false; // 送信済みフラグをリセット
-    // console.log('🔓 自動Clear: 送信済みフラグをリセット - 他のwriterデータ受信を再開');
     
     // 全書き手同期のためのクリア命令を送信
     socket.send(JSON.stringify({ 
@@ -4503,6 +4678,9 @@ function updateBackgroundTransform() {
 // 初期化処理：起動時に背景2を設定
 window.addEventListener('DOMContentLoaded', () => {
   // console.log('🚀 初期化処理開始');
+  
+  // デバイス検出と設定適用
+  const deviceInfo = DeviceManager.applyDeviceSettings();
   
   // ダブルタップズーム防止用の変数
   let lastTouchEnd = 0;
