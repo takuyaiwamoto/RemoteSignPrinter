@@ -937,11 +937,11 @@
 
 <script>
 const canvas = document.getElementById("drawCanvas");
-console.log('🎯 canvas要素取得結果:', canvas);
-console.log('🎯 canvas要素のID:', canvas ? canvas.id : 'canvas要素が見つからない');
+// console.log('🎯 canvas要素取得結果:', canvas);
+// console.log('🎯 canvas要素のID:', canvas ? canvas.id : 'canvas要素が見つからない');
 
 const ctx = canvas.getContext("2d");
-console.log('🎯 2Dコンテキスト取得結果:', ctx);
+// console.log('🎯 2Dコンテキスト取得結果:', ctx);
 let drawing = false;
 let socket = new WebSocket("wss://realtime-sign-server-1.onrender.com");
 let myWriterId = null; // 自分のwriter ID
@@ -1084,15 +1084,13 @@ function processMessage(data) {
     
   } else if (data.type === "start" || data.type === "draw") {
     // 他の執筆者からの描画データを受信
-    // console.log(`🖊️ 描画データ受信: writerId=${data.writerId}, myWriterId=${myWriterId}, 他の書き手？${data.writerId !== myWriterId}`);
-    // console.log(`🖊️ 受信時のhasSentData状態: ${hasSentData}`);
-    // console.log(`🖊️ 受信時のotherWritersDataキー数: ${Object.keys(otherWritersData).length}`);
+    console.log(`🖊️ 描画データ受信: type=${data.type}, writerId=${data.writerId}, myWriterId=${myWriterId}, 他の書き手？${data.writerId !== myWriterId}`);
     
     if (data.writerId && data.writerId !== myWriterId) {
-      // console.log("✅ 他の書き手の描画として処理");
+      console.log("✅ 他の書き手の描画として処理");
       handleOtherWriterDrawing(data);
     } else {
-      // console.log("❌ 自分の描画のため無視");
+      console.log("❌ 自分の描画のため無視");
     }
   } else if (data.type === "clear") {
     // 受信側からの全体クリア
@@ -1658,24 +1656,22 @@ function createWriterStatusDiv() {
 function handleOtherWriterDrawing(data) {
   const writerId = data.writerId;
   
-  // console.log(`🖊️ handleOtherWriterDrawing: ${writerId}, hasSentData: ${hasSentData}, データ型: ${data.type}`);
-  // console.log(`🔍 現在のotherWritersDataキー数: ${Object.keys(otherWritersData).length}`);
-  // console.log(`🔍 現在のotherWritersData内容:`, Object.keys(otherWritersData).map(key => `${key}: ${otherWritersData[key].length}件`));
+  console.log(`🖊️ handleOtherWriterDrawing: ${writerId}, データ型: ${data.type}`);
+  console.log(`🔍 現在のotherWritersData内容:`, Object.keys(otherWritersData).map(key => `${key}: ${otherWritersData[key].length}件`));
   
   // 他のwriterのデータは常に受信する（送信状態に関係なく）
   // ※ hasSentDataチェックを削除して、常に他writerの描画を表示可能にする
   
   if (!otherWritersData[writerId]) {
     otherWritersData[writerId] = [];
-    // console.log(`🆕 ${writerId}の新しい配列を作成`);
+    console.log(`🆕 ${writerId}の新しい配列を作成`);
   }
   
   otherWritersData[writerId].push(data);
-  // console.log(`📝 ${writerId}のデータを追加: 合計${otherWritersData[writerId].length}件`);
-  // console.log(`📝 追加後のotherWritersData全体:`, Object.keys(otherWritersData).map(key => `${key}: ${otherWritersData[key].length}件`));
+  console.log(`📝 ${writerId}のデータを追加: 合計${otherWritersData[writerId].length}件`);
   
   // リアルタイムで他執筆者の描画を表示
-  // console.log(`🎨 redrawCanvasWithOthers呼び出し: hasSentData=${hasSentData}`);
+  console.log(`🎨 redrawCanvasWithOthers呼び出し`);
   redrawCanvasWithOthers();
 }
 
@@ -1771,7 +1767,8 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
 // 自分と他執筆者の描画を統合して再描画
 function redrawCanvasWithOthers() {
   const redrawStart = performance.now();
-  // console.log('🎨 redrawCanvasWithOthers 開始');
+  console.log('🎨 redrawCanvasWithOthers 開始');
+  console.log(`📊 描画前の状態: drawingCommands=${drawingCommands.length}件, otherWriters=${Object.keys(otherWritersData).length}人`);
   
   // 🔒 送信済みなのにdrawingCommandsにデータがある場合は強制クリア
   // ※ この処理は削除 - 他の書き手の描画を受信した時に自分の描画が消える原因
@@ -1794,19 +1791,23 @@ function redrawCanvasWithOthers() {
   
   // 背景をクリア
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  console.log('🧹 キャンバスをクリア');
   
   // 背景画像があれば描画
   if (backgroundImage) {
     drawBackgroundImage(ctx, backgroundImage, canvas);
+    console.log('🖼️ 背景画像を描画');
   }
   
   // 自分の描画コマンドを再実行
   ctx.save();
   ctx.beginPath(); // パス状態をリセット
+  console.log(`✏️ 自分の描画を再実行: ${drawingCommands.length}件`);
   drawWriterCommands(drawingCommands, myWriterId, true);
   ctx.restore();
   
   // 他執筆者の描画データを描画（常に表示）
+  console.log(`👥 他の書き手の描画を実行: ${Object.keys(otherWritersData).length}人`);
   Object.keys(otherWritersData).forEach(writerId => {
     // 各Writer描画前にcanvas状態を完全にリセット
     ctx.save();
@@ -1817,6 +1818,7 @@ function redrawCanvasWithOthers() {
     ctx.shadowBlur = 0;
     ctx.shadowColor = 'transparent';
     
+    console.log(`  👤 ${writerId}の描画: ${otherWritersData[writerId].length}件`);
     drawWriterCommands(otherWritersData[writerId], writerId, false);
     
     // 各Writer描画後にcanvas状態を復元
@@ -3300,22 +3302,22 @@ function drawContinuousLine(x, y) {
 
 // interpolatePoints関数を削除（パフォーマンス改善）
 
-console.log('🎯 mousedownイベントリスナーをcanvasに追加中...');
-console.log('🎯 canvas要素の状態:', canvas);
-console.log('🎯 canvas要素のタグ名:', canvas ? canvas.tagName : 'null');
+// console.log('🎯 mousedownイベントリスナーをcanvasに追加中...');
+// console.log('🎯 canvas要素の状態:', canvas);
+// console.log('🎯 canvas要素のタグ名:', canvas ? canvas.tagName : 'null');
 
 // 確実にイベントリスナーを追加するため、DOMが完全に読み込まれてから実行
 document.addEventListener('DOMContentLoaded', function() {
-  console.log('🎯 DOMContentLoaded - イベントリスナーを再度追加');
+  // console.log('🎯 DOMContentLoaded - イベントリスナーを再度追加');
   const canvasElement = document.getElementById('drawCanvas');
-  console.log('🎯 再取得したcanvas要素:', canvasElement);
+  // console.log('🎯 再取得したcanvas要素:', canvasElement);
   
   if (canvasElement) {
     // すべてのマウスイベントをテスト
     canvasElement.addEventListener("mousedown", (e) => {
-      console.log('🖱️ DOMContentLoaded後のmousedownイベント発生');
-      console.log('🖱️ マウス座標:', e.offsetX, e.offsetY);
-      console.log('🖱️ イベントターゲット:', e.target);
+      // console.log('🖱️ DOMContentLoaded後のmousedownイベント発生');
+      // console.log('🖱️ マウス座標:', e.offsetX, e.offsetY);
+      // console.log('🖱️ イベントターゲット:', e.target);
     });
     
     // イベントテストを拡張
@@ -3329,13 +3331,13 @@ document.addEventListener('DOMContentLoaded', function() {
       const isCurrentlyPressed = e.buttons === 1; // 左ボタンが押されている
       
       // デバッグ用：buttons値を詳しく表示
-      if (e.buttons !== 0) {
-        console.log(`🖱️ mousemove（ボタン押下中） - 座標: ${x}, ${y}, buttons: ${e.buttons}`);
-      }
+      // if (e.buttons !== 0) {
+      //   console.log(`🖱️ mousemove（ボタン押下中） - 座標: ${x}, ${y}, buttons: ${e.buttons}`);
+      // }
       
       // マウスボタンが押された瞬間（描画開始）
       if (isCurrentlyPressed && !isMousePressed) {
-        console.log('🖱️ マウスボタン押下検出 - 描画開始');
+        // console.log('🖱️ マウスボタン押下検出 - 描画開始');
         isMousePressed = true;
         drawing = true;
         lastPos = { x, y };
@@ -3358,18 +3360,18 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.beginPath();
         ctx.moveTo(x, y);
         
-        console.log('🖱️ 描画開始点設定:', x, y);
+        // console.log('🖱️ 描画開始点設定:', x, y);
       }
       // マウスボタンが離された瞬間（描画終了）
       else if (!isCurrentlyPressed && isMousePressed) {
-        console.log('🖱️ マウスボタン離脱検出 - 描画終了');
+        // console.log('🖱️ マウスボタン離脱検出 - 描画終了');
         isMousePressed = false;
         drawing = false;
         lastPos = null;
       }
       // マウスボタンが押されている間（描画継続）
       else if (isCurrentlyPressed && isMousePressed && drawing) {
-        console.log('🖱️ 描画継続中:', x, y);
+        // console.log('🖱️ 描画継続中:', x, y);
         
         if (lastPos) {
           // 前の点から現在の点まで線を描画
@@ -3471,10 +3473,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // PointerEventsを使用（より確実なイベント処理）
     if ('PointerEvent' in window) {
-      console.log('🖱️ PointerEventsを使用');
+      // console.log('🖱️ PointerEventsを使用');
       
       canvasElement.addEventListener('pointerdown', (e) => {
-        console.log('🖱️ pointerdown - 描画開始');
+        // console.log('🖱️ pointerdown - 描画開始');
         
         // 正確な座標を取得（canvas内の相対座標）
         const rect = canvasElement.getBoundingClientRect();
@@ -3483,16 +3485,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
         
-        console.log('🖱️ 座標詳細:', {
-          clientX: e.clientX,
-          clientY: e.clientY,
-          rectLeft: rect.left,
-          rectTop: rect.top,
-          scaleX: scaleX,
-          scaleY: scaleY,
-          finalX: x,
-          finalY: y
-        });
+        // console.log('🖱️ 座標詳細:', {
+        //   clientX: e.clientX,
+        //   clientY: e.clientY,
+        //   rectLeft: rect.left,
+        //   rectTop: rect.top,
+        //   scaleX: scaleX,
+        //   scaleY: scaleY,
+        //   finalX: x,
+        //   finalY: y
+        // });
         
         // 背景画像の範囲内かチェック
         if (!isWithinBackgroundArea(x, y)) {
@@ -3531,7 +3533,12 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         if (socket && socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify(startMsg));
-          console.log("📤 PC描画開始データ送信:", startMsg);
+          console.log("📤 PC描画開始データ送信:", {
+            type: startMsg.type,
+            writerId: startMsg.writerId,
+            x: startMsg.x,
+            y: startMsg.y
+          });
         }
       });
       
@@ -3573,7 +3580,14 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         if (socket && socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify(drawMsg));
-          console.log("📤 PC描画継続データ送信:", x, y);
+          // 頻度を減らしてログ出力（10回に1回）
+          if (Math.random() < 0.1) {
+            console.log("📤 PC描画継続データ送信:", {
+              writerId: drawMsg.writerId,
+              x: Math.round(x),
+              y: Math.round(y)
+            });
+          }
         }
         
         lastPaintPos = { x, y };
