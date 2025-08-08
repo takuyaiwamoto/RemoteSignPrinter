@@ -2310,23 +2310,32 @@ function redrawCanvas(withBackground = true) {
     console.log(`📐 描画エリアを背景画像サイズに調整: ${drawingAreaSize.width}x${drawingAreaSize.height}`);
     
     // 📍 描画エリア位置を背景画像位置に合わせる
-    // 背景画像の中心位置
+    // 背景画像の実際の位置（左上角）を基準に描画エリアを配置
+    // 描画エリアの左上角を背景画像の左上角に一致させる
+    const bgLeft = drawX;
+    const bgTop = drawY;
+    
+    // 描画エリアの中心位置を計算: エリア中心 = 左上 + サイズ/2
+    const targetAreaCenterX = bgLeft + drawingAreaSize.width / 2;
+    const targetAreaCenterY = bgTop + drawingAreaSize.height / 2;
+    
+    // キャンバス中央からのoffsetを計算
+    // areaCenterX = canvas.width/2 + drawingAreaOffset.x = targetAreaCenterX
+    // よって: drawingAreaOffset.x = targetAreaCenterX - canvas.width/2
+    drawingAreaOffset.x = Math.round(targetAreaCenterX - canvas.width / 2);
+    drawingAreaOffset.y = Math.round(targetAreaCenterY - canvas.height / 2);
+    
+    // 検証用：背景画像の中心位置
     const bgCenterX = drawX + bgWidth / 2;
     const bgCenterY = drawY + bgHeight / 2;
     
-    // 描画エリアの中心を背景画像の中心に直接設定
-    // 通常の計算: areaCenterY = canvas.height / 2 + drawingAreaOffset.y
-    // 目標: areaCenterY = bgCenterY
-    // よって: drawingAreaOffset.y = bgCenterY - canvas.height / 2
-    drawingAreaOffset.x = Math.round(bgCenterX - canvas.width / 2);
-    drawingAreaOffset.y = Math.round(bgCenterY - canvas.height / 2);
-    
     console.log(`📍 描画エリア位置を背景画像に合わせて調整: offset(${drawingAreaOffset.x}, ${drawingAreaOffset.y})`);
+    console.log(`  背景画像左上: (${bgLeft.toFixed(1)}, ${bgTop.toFixed(1)})`);
     console.log(`  背景画像中心: (${bgCenterX.toFixed(1)}, ${bgCenterY.toFixed(1)})`);
-    console.log(`  キャンバス中心: (${(canvas.width/2).toFixed(1)}, ${(canvas.height/2).toFixed(1)})`);
+    console.log(`  目標描画エリア中心: (${targetAreaCenterX.toFixed(1)}, ${targetAreaCenterY.toFixed(1)})`);
+    console.log(`  キャンバス中央: (${(canvas.width/2).toFixed(1)}, ${(canvas.height/2).toFixed(1)})`);
     console.log(`  計算結果の描画エリア中心: (${(canvas.width/2 + drawingAreaOffset.x).toFixed(1)}, ${(canvas.height/2 + drawingAreaOffset.y).toFixed(1)})`);
-    console.log(`  背景画像位置: x=${drawX.toFixed(1)}, y=${drawY.toFixed(1)}, サイズ: ${bgWidth.toFixed(1)}x${bgHeight.toFixed(1)}`);
-    console.log(`  描画エリアと背景画像の中心は一致しているか: ${Math.abs(bgCenterX - (canvas.width/2 + drawingAreaOffset.x)) < 1 && Math.abs(bgCenterY - (canvas.height/2 + drawingAreaOffset.y)) < 1 ? 'YES' : 'NO'}`);
+    console.log(`  背景画像と描画エリアの中心は一致しているか: ${Math.abs(targetAreaCenterX - (canvas.width/2 + drawingAreaOffset.x)) < 1 && Math.abs(targetAreaCenterY - (canvas.height/2 + drawingAreaOffset.y)) < 1 ? 'YES' : 'NO'}`);
     
     // デバッグパネルの値も更新
     const centerXInput = document.getElementById('centerX');
