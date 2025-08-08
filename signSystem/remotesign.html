@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://realtime-sign-server-1.onrender.com ws://localhost:* wss://localhost:*; img-src 'self' data: blob:; media-src 'self';">
-  <title>送信側1.9</title>
+  <title>送信側2.0</title>
   <style>
     /* クラシックスタイル（デフォルト） */
     body.classic .main-container {
@@ -31,6 +31,7 @@
       display: block;
       margin-bottom: 10px;
       max-width: 100%;
+      width: 100%; /* より大きく表示 */
       height: auto;
       aspect-ratio: 859 / 607; /* 元のアスペクト比を固定 */
     }
@@ -143,6 +144,7 @@
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
       background: white;
       max-width: 100%;
+      width: 100%; /* より大きく表示 */
       height: auto;
       aspect-ratio: 859 / 607; /* 元のアスペクト比を固定 */
     }
@@ -656,7 +658,7 @@
       #drawCanvas {
         width: 100% !important;
         height: auto !important;
-        max-height: 60vh;
+        max-height: 75vh; /* より大きく表示 */
         aspect-ratio: 859 / 607; /* 元のキャンバスアスペクト比に統一 */
         margin: 0 auto;
       }
@@ -791,16 +793,7 @@
   </div>
 </div>
 
-<!-- 背景コントロール: 最下段 -->
-<div class="background-controls">
-  <label>背景:</label>
-  <button onclick="setBackground('./back3.png')">背景1</button>
-  <button onclick="setBackground('./back2.png')">背景2</button>
-  <button onclick="setBackground('./back4.png')">背景3</button>
-  <button onclick="setBackground('./back6.png')">背景4</button>
-  <button onclick="setBackground(null)">白</button>
-  <button onclick="setSpecialBackgroundToggle()" style="background: linear-gradient(45deg, #ff1493, #00ffff); color: white;">🎬 動画背景</button>
-</div>
+<!-- 背景選択はDevToolに移動 -->
 
 
 
@@ -832,6 +825,16 @@
   
   <div class="button-group">
     <button onclick="sendDevSettings()">設定を受信側に送信</button>
+  </div>
+  
+  <div class="button-group">
+    <label>背景選択:</label>
+    <button onclick="setBackground('./back3.png')">背景1</button>
+    <button onclick="setBackground('./back2.png')">背景2</button>
+    <button onclick="setBackground('./back4.png')">背景3</button>
+    <button onclick="setBackground('./back6.png')">背景4</button>
+    <button onclick="setBackground(null)">白</button>
+    <button onclick="setSpecialBackgroundToggle()" style="background: linear-gradient(45deg, #ff1493, #00ffff); color: white;">🎬 動画背景</button>
   </div>
   
   <hr style="margin: 15px 0;">
