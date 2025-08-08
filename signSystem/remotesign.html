@@ -1,9 +1,45 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://realtime-sign-server-1.onrender.com ws://localhost:* wss://localhost:*; img-src 'self' data: blob:; media-src 'self';">
-  <title>送信側2.4</title>
+  <title>送信側2.6</title>
   <style>
+    /* タッチデバイスでのズーム防止 */
+    * {
+      touch-action: manipulation; /* ダブルタップズーム無効 */
+    }
+    
+    html {
+      -ms-touch-action: manipulation;
+      touch-action: manipulation;
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+    }
+    
+    body {
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    canvas {
+      touch-action: none !important; /* キャンバスでのピンチズーム完全無効 */
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      /* ペン入力専用の追加対策 */
+      pointer-events: auto;
+      -ms-touch-action: none;
+      -webkit-user-drag: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
     /* クラシックスタイル（デフォルト） */
     body.classic .main-container {
       display: flex;
@@ -1367,7 +1403,7 @@ function createWriterStatusDiv() {
   
   // Version情報を表示
   const versionSpan = document.createElement('span');
-  versionSpan.textContent = 'v2.4';
+  versionSpan.textContent = 'v2.6';
   versionSpan.style.cssText = `
     display: block;
     color: #FFD700;
@@ -4445,6 +4481,60 @@ function updateBackgroundTransform() {
 // 初期化処理：起動時に背景2を設定
 window.addEventListener('DOMContentLoaded', () => {
   // console.log('🚀 初期化処理開始');
+  
+  // ダブルタップズーム防止用の変数
+  let lastTouchEnd = 0;
+  
+  // タブレットでのピンチズーム防止（ペン描画時も含む）
+  document.addEventListener('touchstart', function(e) {
+    // キャンバス上のタッチは全て描画として扱い、ズーム無効
+    if (e.target.tagName === 'CANVAS' || e.target.id === 'drawCanvas') {
+      e.preventDefault();
+      return false;
+    }
+    if (e.touches.length > 1) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+  
+  document.addEventListener('touchend', function(e) {
+    const now = new Date().getTime();
+    if (now - lastTouchEnd <= 300) {
+      e.preventDefault();
+    }
+    lastTouchEnd = now;
+  }, { passive: false });
+  
+  document.addEventListener('touchmove', function(e) {
+    // キャンバス上での全てのタッチムーブをズーム無効に
+    if (e.target.tagName === 'CANVAS' || e.target.id === 'drawCanvas') {
+      e.preventDefault();
+      return false;
+    }
+    if (e.touches.length > 1) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+  
+  // Pointer Events APIでペン入力も制御
+  document.addEventListener('pointerdown', function(e) {
+    if (e.target.tagName === 'CANVAS' || e.target.id === 'drawCanvas') {
+      e.preventDefault();
+    }
+  }, { passive: false });
+  
+  // Gestureイベント（Safari）も無効化
+  document.addEventListener('gesturestart', function(e) {
+    e.preventDefault();
+  }, false);
+  
+  document.addEventListener('gesturechange', function(e) {
+    e.preventDefault();
+  }, false);
+  
+  document.addEventListener('gestureend', function(e) {
+    e.preventDefault();
+  }, false);
   
   // キャンバススケール0.7を適用
   updateCanvasScale(0.7);
