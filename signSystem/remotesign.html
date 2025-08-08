@@ -1049,10 +1049,9 @@ function processMessage(data) {
   
   if (data.type === "assignWriterId") {
     // writer ID の割り当てを受信
-    console.log("📨 Writer ID割り当てメッセージ受信:", data);
-    
-    // セッションIDが一致する場合のみ受け入れる
+    // セッションIDが一致する場合のみログ出力と処理
     if (data.sessionId && data.sessionId === mySessionId) {
+      console.log("📨 Writer ID割り当てメッセージ受信:", data);
       // 既に同じWriterIDを持っている他のブラウザがいないかチェック
       if (data.conflictDetected) {
         console.warn("⚠️ WriterID重複検出！再割り当てを要求します");
@@ -1079,7 +1078,8 @@ function processMessage(data) {
         timestamp: Date.now()
       }));
     } else {
-      console.log("❌ セッションID不一致のため無視:", data.sessionId, "vs", mySessionId);
+      // 他のクライアント向けのメッセージなので静かに無視（エラーではない）
+      // console.log("🔇 他のクライアント向けのWriterID割り当てメッセージを無視");
     }
     
   } else if (data.type === "start" || data.type === "draw") {
