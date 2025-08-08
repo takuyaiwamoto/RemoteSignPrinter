@@ -130,8 +130,12 @@ function transformCoordinatesWithAspectRatio(x, y, senderSize, drawingAreaSize) 
     offsetX = (drawingAreaSize.width - actualDrawingWidth) / 2;
   }
   
+  // 座標変換: 送信側の座標を実際の描画サイズに変換してからオフセットを追加
   const scaledX = (x / senderSize.width) * actualDrawingWidth + offsetX;
   const scaledY = (y / senderSize.height) * actualDrawingHeight + offsetY;
+  
+  // デバッグ: 変換結果が範囲内にあるかチェック
+  console.log(`  座標変換詳細: 送信(${x.toFixed(1)}, ${y.toFixed(1)}) → 実際サイズでスケール(${((x / senderSize.width) * actualDrawingWidth).toFixed(1)}, ${((y / senderSize.height) * actualDrawingHeight).toFixed(1)}) → オフセット後(${scaledX.toFixed(1)}, ${scaledY.toFixed(1)})`);
   
   return { x: scaledX, y: scaledY, actualWidth: actualDrawingWidth, actualHeight: actualDrawingHeight };
 }
@@ -2161,6 +2165,100 @@ function redrawCanvas(withBackground = true) {
   //console.log(`  キャンバス位置: (${canvasRect.left}, ${canvasRect.top})`);
   //console.log(`  キャンバスmargin: ${canvasStyle.margin}`);
   
+  // 🔸 背景画像をシンプルに中央描画（アスペクト比保持） - 描画エリア計算の前に実行
+  if (withBackground && backgroundImage) {
+    //console.log('🖼️ 背景画像描画開始（シンプル版）');
+    
+    // 元画像のアスペクト比を保持したサイズ計算（書き手側のdevtoolスケール値を使用）
+    const maxWidth = canvas.width * UNIFIED_SETTINGS.canvasScale;  // 書き手側のスケール値を使用
+    const maxHeight = canvas.height * UNIFIED_SETTINGS.canvasScale; // 書き手側のスケール値を使用
+    
+    //console.log(`🔧 背景画像サイズ計算: スケール=${UNIFIED_SETTINGS.canvasScale}x, max=${maxWidth.toFixed(1)}x${maxHeight.toFixed(1)}`);
+    
+    // アスペクト比を保持してサイズを計算
+    const imgAspect = backgroundImage.width / backgroundImage.height;
+    
+    let bgWidth, bgHeight;
+    if (imgAspect > maxWidth / maxHeight) {
+      // 横長：幅を基準に
+      bgWidth = maxWidth;
+      bgHeight = maxWidth / imgAspect;
+    } else {
+      // 縦長：高さを基準に
+      bgHeight = maxHeight;
+      bgWidth = maxHeight * imgAspect;
+    }
+    
+    // 全ての背景画像を180度回転で表示
+    let drawX, drawY;
+    
+    // 全ての背景画像を統一した位置計算で中央揃え  
+    drawX = canvas.width / 2 - bgWidth / 2;
+    drawY = canvas.height / 2 - bgHeight / 2;
+    
+    // 背景画像を描画
+    ctx.drawImage(backgroundImage, drawX, drawY, bgWidth, bgHeight);
+    
+    // 🔍 デバッグ: 背景画像の境界線を表示
+    ctx.save();
+    ctx.strokeStyle = 'lime';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(drawX, drawY, bgWidth, bgHeight);
+    ctx.fillStyle = 'lime';
+    ctx.font = '16px Arial';
+    ctx.fillText(`背景画像 ${bgWidth.toFixed(0)}x${bgHeight.toFixed(0)}`, drawX + 10, drawY + 25);
+    ctx.restore();
+    
+    // 🎯 ズレ確認ログ: 背景画像の位置・サイズ
+    console.log(`🟢 背景画像: 位置(${drawX.toFixed(1)}, ${drawY.toFixed(1)}) サイズ${Math.round(bgWidth)}x${Math.round(bgHeight)}`);
+    
+    // 背景画像の位置・サイズを記録（描画エリアとの比較用）
+    window.lastBgX = drawX;
+    window.lastBgY = drawY;
+    window.lastBgWidth = Math.round(bgWidth);
+    window.lastBgHeight = Math.round(bgHeight);
+    
+    // 📐 描画エリアサイズを背景画像サイズに合わせる（最優先）
+    // 書き手側と受信側の背景画像が同じ比率なので、描画エリアも背景画像と同じサイズにする
+    drawingAreaSize.width = Math.round(bgWidth);
+    drawingAreaSize.height = Math.round(bgHeight);
+    
+    // 🔒 背景画像サイズ設定を強制適用（他の処理による上書きを防ぐ）
+    window.backgroundImageBasedDrawingAreaSize = { 
+      width: drawingAreaSize.width, 
+      height: drawingAreaSize.height,
+      isActive: true 
+    };
+    
+    // 📍 描画エリア位置を背景画像位置に合わせる
+    // 背景画像の実際の位置（左上角）を基準に描画エリアを配置
+    // 描画エリアの左上角を背景画像の左上角に一致させる
+    const bgLeft = drawX;
+    const bgTop = drawY;
+    
+    // 描画エリアの中心位置を計算: エリア中心 = 左上 + サイズ/2
+    const targetAreaCenterX = bgLeft + drawingAreaSize.width / 2;
+    const targetAreaCenterY = bgTop + drawingAreaSize.height / 2;
+    
+    // キャンバス中央からのoffsetを計算
+    // areaCenterX = canvas.width/2 + drawingAreaOffset.x = targetAreaCenterX
+    // よって: drawingAreaOffset.x = targetAreaCenterX - canvas.width/2
+    drawingAreaOffset.x = Math.round(targetAreaCenterX - canvas.width / 2);
+    drawingAreaOffset.y = Math.round(targetAreaCenterY - canvas.height / 2);
+    
+    // デバッグパネルの値も更新
+    const centerXInput = document.getElementById('centerX');
+    const centerYInput = document.getElementById('centerY');
+    const areaWidthInput = document.getElementById('areaWidth');
+    const areaHeightInput = document.getElementById('areaHeight');
+    if (centerXInput) centerXInput.value = drawingAreaOffset.x;
+    if (centerYInput) centerYInput.value = drawingAreaOffset.y;
+    if (areaWidthInput) areaWidthInput.value = drawingAreaSize.width;
+    if (areaHeightInput) areaHeightInput.value = drawingAreaSize.height;
+    
+    //console.log('🖼️ 背景画像描画完了');
+  }
+  
   // 🔸 描画エリアの枠表示（デバッグ用に常時表示）
   if (true) { // showDrawingAreaFrame
     ctx.save();
@@ -2183,6 +2281,21 @@ function redrawCanvas(withBackground = true) {
     ctx.fillStyle = "blue";
     ctx.font = "16px Arial";
     ctx.fillText(`描画エリア ${drawingAreaSize.width}x${drawingAreaSize.height}`, areaLeft + 10, areaTop + 50);
+    
+    // 🎯 ズレ確認ログ: 描画エリアの位置・サイズ
+    console.log(`🔵 描画エリア: 位置(${areaLeft.toFixed(1)}, ${areaTop.toFixed(1)}) サイズ${drawingAreaSize.width}x${drawingAreaSize.height}`);
+    
+    // 🎯 ズレ確認: 背景画像と描画エリアの差分
+    const positionDiffX = areaLeft - (window.lastBgX || 0);
+    const positionDiffY = areaTop - (window.lastBgY || 0);
+    const sizeDiffW = drawingAreaSize.width - (window.lastBgWidth || 0);
+    const sizeDiffH = drawingAreaSize.height - (window.lastBgHeight || 0);
+    
+    if (Math.abs(positionDiffX) > 1 || Math.abs(positionDiffY) > 1 || Math.abs(sizeDiffW) > 1 || Math.abs(sizeDiffH) > 1) {
+      console.log(`❌ ズレ検出: 位置差(${positionDiffX.toFixed(1)}, ${positionDiffY.toFixed(1)}) サイズ差${sizeDiffW}x${sizeDiffH}`);
+    } else {
+      console.log(`✅ 位置・サイズ一致: 差分は許容範囲内`);
+    }
     
     ctx.restore();
   }
@@ -2285,8 +2398,6 @@ function redrawCanvas(withBackground = true) {
     } else {
       //console.log(`📍 通常背景: 中央揃え、上端150px基準`);
     }
-    console.log(`📍 背景画像描画位置: (${drawX.toFixed(1)}, ${drawY.toFixed(1)}) サイズ: ${bgWidth.toFixed(1)}x${bgHeight.toFixed(1)}`);
-    console.log(`📍 背景画像Y位置: ${(drawY).toFixed(1)}px (キャンバス中央: ${(canvas.height / 2).toFixed(1)}px)`);
     //console.log(`🎯 背景画像中央座標: (${(drawX + bgWidth/2).toFixed(1)}, ${(drawY + bgHeight/2).toFixed(1)})`);
     
     // 背景画像を描画
@@ -2302,6 +2413,15 @@ function redrawCanvas(withBackground = true) {
     ctx.fillText(`背景画像 ${bgWidth.toFixed(0)}x${bgHeight.toFixed(0)}`, drawX + 10, drawY + 25);
     ctx.restore();
     
+    // 🎯 ズレ確認ログ: 背景画像の位置・サイズ
+    console.log(`🟢 背景画像: 位置(${drawX.toFixed(1)}, ${drawY.toFixed(1)}) サイズ${Math.round(bgWidth)}x${Math.round(bgHeight)}`);
+    
+    // 背景画像の位置・サイズを記録（描画エリアとの比較用）
+    window.lastBgX = drawX;
+    window.lastBgY = drawY;
+    window.lastBgWidth = Math.round(bgWidth);
+    window.lastBgHeight = Math.round(bgHeight);
+    
     
     // 📐 描画エリアサイズを背景画像サイズに合わせる（最優先）
     // 書き手側と受信側の背景画像が同じ比率なので、描画エリアも背景画像と同じサイズにする
@@ -2309,12 +2429,12 @@ function redrawCanvas(withBackground = true) {
     drawingAreaSize.height = Math.round(bgHeight);
     
     // 🔒 背景画像サイズ設定を強制適用（他の処理による上書きを防ぐ）
-    Object.defineProperty(window, 'backgroundImageBasedDrawingAreaSize', {
-      value: { width: drawingAreaSize.width, height: drawingAreaSize.height },
-      writable: false
-    });
+    window.backgroundImageBasedDrawingAreaSize = { 
+      width: drawingAreaSize.width, 
+      height: drawingAreaSize.height,
+      isActive: true 
+    };
     
-    console.log(`📐 描画エリアを背景画像サイズに調整: ${drawingAreaSize.width}x${drawingAreaSize.height}`);
     
     // 📍 描画エリア位置を背景画像位置に合わせる
     // 背景画像の実際の位置（左上角）を基準に描画エリアを配置
@@ -2336,13 +2456,6 @@ function redrawCanvas(withBackground = true) {
     const bgCenterX = drawX + bgWidth / 2;
     const bgCenterY = drawY + bgHeight / 2;
     
-    console.log(`📍 描画エリア位置を背景画像に合わせて調整: offset(${drawingAreaOffset.x}, ${drawingAreaOffset.y})`);
-    console.log(`  背景画像左上: (${bgLeft.toFixed(1)}, ${bgTop.toFixed(1)})`);
-    console.log(`  背景画像中心: (${bgCenterX.toFixed(1)}, ${bgCenterY.toFixed(1)})`);
-    console.log(`  目標描画エリア中心: (${targetAreaCenterX.toFixed(1)}, ${targetAreaCenterY.toFixed(1)})`);
-    console.log(`  キャンバス中央: (${(canvas.width/2).toFixed(1)}, ${(canvas.height/2).toFixed(1)})`);
-    console.log(`  計算結果の描画エリア中心: (${(canvas.width/2 + drawingAreaOffset.x).toFixed(1)}, ${(canvas.height/2 + drawingAreaOffset.y).toFixed(1)})`);
-    console.log(`  背景画像と描画エリアの中心は一致しているか: ${Math.abs(targetAreaCenterX - (canvas.width/2 + drawingAreaOffset.x)) < 1 && Math.abs(targetAreaCenterY - (canvas.height/2 + drawingAreaOffset.y)) < 1 ? 'YES' : 'NO'}`);
     
     // デバッグパネルの値も更新
     const centerXInput = document.getElementById('centerX');
@@ -2992,7 +3105,7 @@ function handleMessage(data) {
         const scaleY = senderCanvasSize.height / oldSenderSize.height;
         
         // 描画エリアサイズを連動してスケール
-        if (backgroundImage && window.backgroundImageBasedDrawingAreaSize) {
+        if (backgroundImage && window.backgroundImageBasedDrawingAreaSize && window.backgroundImageBasedDrawingAreaSize.isActive) {
           // 🔒 背景画像サイズを優先（スケールは無視）
           drawingAreaSize.width = window.backgroundImageBasedDrawingAreaSize.width;
           drawingAreaSize.height = window.backgroundImageBasedDrawingAreaSize.height;
@@ -3228,34 +3341,65 @@ function handleMessage(data) {
     // 🚪 描画開始時は扉タイマーをスケジュールしない（送信ボタン時のみ）
     
     // 🔸 リアルタイム描画（描画エリア調整を適用して180度回転）
-    // 描画エリアの位置とサイズを計算
+    // 描画エリアの位置とサイズを計算（redrawCanvasと同じ計算方法を使用）
     const areaCenterX = canvas.width / 2 + drawingAreaOffset.x;
     const areaCenterY = canvas.height / 2 + drawingAreaOffset.y;
     const areaLeft = areaCenterX - drawingAreaSize.width / 2;
     const areaTop = areaCenterY - drawingAreaSize.height / 2;
     
-    // 🔸 アスペクト比を保持した座標変換
-    const coords = transformCoordinatesWithAspectRatio(data.x, data.y, senderCanvasSize, drawingAreaSize);
+    // 🔸 書き手側と受信側の比率統一のための描画エリアサイズ調整
+    // 書き手側のキャンバス比率と同じになるよう受信側描画エリアを調整
+    const senderAspectRatio = senderCanvasSize.width / senderCanvasSize.height;
+    const adjustedDrawingAreaSize = {
+      width: drawingAreaSize.width,
+      height: Math.round(drawingAreaSize.width / senderAspectRatio)
+    };
+    
+    console.log('  書き手側比率:', senderAspectRatio.toFixed(2), '調整前:', drawingAreaSize.width, 'x', drawingAreaSize.height, '調整後:', adjustedDrawingAreaSize.width, 'x', adjustedDrawingAreaSize.height);
+    
+    // 🔸 アスペクト比を保持した座標変換（調整後のサイズを使用）
+    const coords = transformCoordinatesWithAspectRatio(data.x, data.y, senderCanvasSize, adjustedDrawingAreaSize);
     let scaledX = coords.x;
     let scaledY = coords.y;
     
     console.log(`🎯 START描画デバッグ: 送信側(${data.x}, ${data.y}) → スケール後(${scaledX.toFixed(1)}, ${scaledY.toFixed(1)})`);
+    console.log('  送信側キャンバスサイズ:', senderCanvasSize.width, 'x', senderCanvasSize.height);
     console.log('  描画エリアサイズ:', drawingAreaSize.width, 'x', drawingAreaSize.height);
     console.log('  実際の描画サイズ:', coords.actualWidth, 'x', coords.actualHeight);
     console.log('  描画エリア左上:', areaLeft.toFixed(1), areaTop.toFixed(1));
+    console.log('  drawingAreaOffset:', drawingAreaOffset.x, drawingAreaOffset.y);
+    console.log('  計算されたareaLeft/Top:', areaLeft.toFixed(1), areaTop.toFixed(1));
     
-    // 180度回転座標変換を適用
+    // 180度回転座標変換を適用（実際の描画範囲内で回転）
     const beforeRotationX = scaledX;
     const beforeRotationY = scaledY;
-    scaledX = drawingAreaSize.width - scaledX;
-    scaledY = drawingAreaSize.height - scaledY;
+    
+    // オフセットを除いた実際の描画範囲内での相対座標に変換（調整後サイズを使用）
+    const offsetX = (adjustedDrawingAreaSize.width - coords.actualWidth) / 2;
+    const offsetY = (adjustedDrawingAreaSize.height - coords.actualHeight) / 2;
+    const relativeX = scaledX - offsetX;
+    const relativeY = scaledY - offsetY;
+    
+    // 実際の描画範囲内で180度回転
+    const rotatedRelativeX = coords.actualWidth - relativeX;
+    const rotatedRelativeY = coords.actualHeight - relativeY;
+    
+    // オフセットを加えて最終座標を計算
+    scaledX = rotatedRelativeX + offsetX;
+    scaledY = rotatedRelativeY + offsetY;
     
     console.log(`  180度回転変換: (${beforeRotationX.toFixed(1)}, ${beforeRotationY.toFixed(1)}) → (${scaledX.toFixed(1)}, ${scaledY.toFixed(1)})`);
     
     const finalX = areaLeft + scaledX;
     const finalY = areaTop + scaledY;
     
-    //console.log('最終描画位置:', finalX.toFixed(1), finalY.toFixed(1));
+    console.log('  最終描画位置:', finalX.toFixed(1), finalY.toFixed(1));
+    
+    // 🎯 描画エリア内判定
+    const isInDrawingArea = (finalX >= areaLeft && finalX <= areaLeft + drawingAreaSize.width &&
+                            finalY >= areaTop && finalY <= areaTop + drawingAreaSize.height);
+    const areaStatus = isInDrawingArea ? '✅ エリア内' : '❌ エリア外';
+    console.log(`  描画位置判定: ${areaStatus} (エリア範囲: ${areaLeft.toFixed(1)}-${(areaLeft + drawingAreaSize.width).toFixed(1)}, ${areaTop.toFixed(1)}-${(areaTop + drawingAreaSize.height).toFixed(1)})`);
     
     // リアルタイム描画はredrawCanvasに任せる
     redrawCanvas();
@@ -3350,14 +3494,22 @@ function handleMessage(data) {
     // 🚪 描画データ受信時は扉タイマーをスケジュールしない（送信ボタン時のみ）
     
     // 🔸 リアルタイム描画（描画エリア調整を適用して180度回転）
-    // 描画エリアの位置とサイズを計算
+    // 描画エリアの位置とサイズを計算（redrawCanvasと同じ計算方法を使用）
     const areaCenterX = canvas.width / 2 + drawingAreaOffset.x;
     const areaCenterY = canvas.height / 2 + drawingAreaOffset.y;
     const areaLeft = areaCenterX - drawingAreaSize.width / 2;
     const areaTop = areaCenterY - drawingAreaSize.height / 2;
     
-    // 🔸 アスペクト比を保持した座標変換
-    const coords = transformCoordinatesWithAspectRatio(data.x, data.y, senderCanvasSize, drawingAreaSize);
+    // 🔸 書き手側と受信側の比率統一のための描画エリアサイズ調整
+    // 書き手側のキャンバス比率と同じになるよう受信側描画エリアを調整
+    const senderAspectRatio = senderCanvasSize.width / senderCanvasSize.height;
+    const adjustedDrawingAreaSize = {
+      width: drawingAreaSize.width,
+      height: Math.round(drawingAreaSize.width / senderAspectRatio)
+    };
+    
+    // 🔸 アスペクト比を保持した座標変換（調整後のサイズを使用）
+    const coords = transformCoordinatesWithAspectRatio(data.x, data.y, senderCanvasSize, adjustedDrawingAreaSize);
     let scaledX = coords.x;
     let scaledY = coords.y;
     
@@ -3366,9 +3518,20 @@ function handleMessage(data) {
     //console.log('スケール後座標:', scaledX.toFixed(1), scaledY.toFixed(1));
     //console.log('描画エリア中心:', areaCenterX.toFixed(1), areaCenterY.toFixed(1));
     
-    // 180度回転座標変換を適用
-    scaledX = drawingAreaSize.width - scaledX;
-    scaledY = drawingAreaSize.height - scaledY;
+    // 180度回転座標変換を適用（実際の描画範囲内で回転）
+    // オフセットを除いた実際の描画範囲内での相対座標に変換（調整後サイズを使用）
+    const offsetX = (adjustedDrawingAreaSize.width - coords.actualWidth) / 2;
+    const offsetY = (adjustedDrawingAreaSize.height - coords.actualHeight) / 2;
+    const relativeX = scaledX - offsetX;
+    const relativeY = scaledY - offsetY;
+    
+    // 実際の描画範囲内で180度回転
+    const rotatedRelativeX = coords.actualWidth - relativeX;
+    const rotatedRelativeY = coords.actualHeight - relativeY;
+    
+    // オフセットを加えて最終座標を計算
+    scaledX = rotatedRelativeX + offsetX;
+    scaledY = rotatedRelativeY + offsetY;
     
     //console.log('180度回転座標変換適用済み:', scaledX.toFixed(1), scaledY.toFixed(1));
     
@@ -3477,6 +3640,14 @@ function handleMessage(data) {
         finishNormalPath(writerId);
       }, 500);
     }
+    
+    // 🎯 move描画での描画エリア内判定
+    const finalX = areaLeft + scaledX;
+    const finalY = areaTop + scaledY;
+    const isInDrawingArea = (finalX >= areaLeft && finalX <= areaLeft + drawingAreaSize.width &&
+                            finalY >= areaTop && finalY <= areaTop + drawingAreaSize.height);
+    const areaStatus = isInDrawingArea ? '✅ エリア内' : '❌ エリア外';
+    console.log(`🎯 MOVE描画位置判定: ${areaStatus} 位置(${finalX.toFixed(1)}, ${finalY.toFixed(1)}) エリア範囲: ${areaLeft.toFixed(1)}-${(areaLeft + drawingAreaSize.width).toFixed(1)}, ${areaTop.toFixed(1)}-${(areaTop + drawingAreaSize.height).toFixed(1)}`);
     
     // 星エフェクトが有効で受信側に星を表示（2回に1回の頻度）
     if (data.starEffect && Math.random() < 0.5) {
@@ -3614,7 +3785,7 @@ function handleMessage(data) {
       const scaleRatio = devCanvasScale / oldCanvasScale;
       
       // 描画エリアサイズを連動してスケール
-      if (backgroundImage && window.backgroundImageBasedDrawingAreaSize) {
+      if (backgroundImage && window.backgroundImageBasedDrawingAreaSize && window.backgroundImageBasedDrawingAreaSize.isActive) {
         // 🔒 背景画像サイズを優先（スケールは無視）
         drawingAreaSize.width = window.backgroundImageBasedDrawingAreaSize.width;
         drawingAreaSize.height = window.backgroundImageBasedDrawingAreaSize.height;
@@ -4022,6 +4193,7 @@ if (typeof ipcRenderer !== 'undefined') {
 
 // 🔸 受信側キャンバスサイズ設定関数
 function setReceiverCanvasSize() {
+  
   // Dev Tool設定を適用したサイズを計算
   const newWidth = Math.floor(senderCanvasSize.width * SCALE_FACTOR * devCanvasScale);
   const newHeight = Math.floor(senderCanvasSize.height * SCALE_FACTOR * devCanvasScale);
@@ -4044,14 +4216,12 @@ function setReceiverCanvasSize() {
   const oldDrawingAreaSize = { ...drawingAreaSize };
   
   // 🔒 背景画像が設定されている場合は背景画像サイズを優先
-  if (backgroundImage && window.backgroundImageBasedDrawingAreaSize) {
+  if (backgroundImage && window.backgroundImageBasedDrawingAreaSize && window.backgroundImageBasedDrawingAreaSize.isActive) {
     drawingAreaSize.width = window.backgroundImageBasedDrawingAreaSize.width;
     drawingAreaSize.height = window.backgroundImageBasedDrawingAreaSize.height;
-    console.log(`🔒 背景画像サイズを優先適用: ${drawingAreaSize.width}x${drawingAreaSize.height}`);
   } else {
     drawingAreaSize.width = Math.floor(newWidth * 0.8); // キャンバスの80%
     drawingAreaSize.height = Math.floor(newHeight * 0.8);
-    console.log(`📐 キャンバス80%サイズを適用: ${drawingAreaSize.width}x${drawingAreaSize.height}`);
   }
   
   // 受信側のキャンバスサイズを記録
