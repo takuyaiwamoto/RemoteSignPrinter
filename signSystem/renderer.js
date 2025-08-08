@@ -2280,8 +2280,8 @@ function redrawCanvas(withBackground = true) {
     } else {
       //console.log(`📍 通常背景: 中央揃え、上端150px基準`);
     }
-    //console.log(`📍 背景画像描画位置: (${drawX.toFixed(1)}, ${drawY.toFixed(1)}) サイズ: ${bgWidth.toFixed(1)}x${bgHeight.toFixed(1)}`);
-    //console.log(`📍 中央位置: ${(drawY).toFixed(1)}px (キャンバス中央: ${(canvas.height / 2).toFixed(1)}px)`);
+    console.log(`📍 背景画像描画位置: (${drawX.toFixed(1)}, ${drawY.toFixed(1)}) サイズ: ${bgWidth.toFixed(1)}x${bgHeight.toFixed(1)}`);
+    console.log(`📍 中央位置: ${(drawY).toFixed(1)}px (キャンバス中央: ${(canvas.height / 2).toFixed(1)}px)`);
     //console.log(`🎯 背景画像中央座標: (${(drawX + bgWidth/2).toFixed(1)}, ${(drawY + bgHeight/2).toFixed(1)})`);
     
     // 背景画像を描画
@@ -2292,7 +2292,7 @@ function redrawCanvas(withBackground = true) {
     // 書き手側と受信側の背景画像が同じ比率なので、描画エリアも背景画像と同じサイズにする
     drawingAreaSize.width = Math.round(bgWidth);
     drawingAreaSize.height = Math.round(bgHeight);
-    //console.log(`📐 描画エリアを背景画像サイズに調整: ${drawingAreaSize.width}x${drawingAreaSize.height}`);
+    console.log(`📐 描画エリアを背景画像サイズに調整: ${drawingAreaSize.width}x${drawingAreaSize.height}`);
     
     // 📍 描画エリア位置を背景画像位置に合わせる
     // 背景画像の中心位置
@@ -2306,12 +2306,12 @@ function redrawCanvas(withBackground = true) {
     drawingAreaOffset.x = Math.round(bgCenterX - canvas.width / 2);
     drawingAreaOffset.y = Math.round(bgCenterY - canvas.height / 2);
     
-    //console.log(`📍 描画エリア位置を背景画像に合わせて調整: offset(${drawingAreaOffset.x}, ${drawingAreaOffset.y})`);
-    //console.log(`  背景画像中心: (${bgCenterX.toFixed(1)}, ${bgCenterY.toFixed(1)})`);
-    //console.log(`  キャンバス中心: (${(canvas.width/2).toFixed(1)}, ${(canvas.height/2).toFixed(1)})`);
-    //console.log(`  計算結果の描画エリア中心: (${(canvas.width/2 + drawingAreaOffset.x).toFixed(1)}, ${(canvas.height/2 + drawingAreaOffset.y).toFixed(1)})`);
-    //console.log(`  背景画像位置: x=${drawX.toFixed(1)}, y=${drawY.toFixed(1)}, サイズ: ${bgWidth.toFixed(1)}x${bgHeight.toFixed(1)}`);
-    //console.log(`  描画エリアと背景画像の中心は一致しているか: ${Math.abs(bgCenterX - (canvas.width/2 + drawingAreaOffset.x)) < 1 && Math.abs(bgCenterY - (canvas.height/2 + drawingAreaOffset.y)) < 1 ? 'YES' : 'NO'}`);
+    console.log(`📍 描画エリア位置を背景画像に合わせて調整: offset(${drawingAreaOffset.x}, ${drawingAreaOffset.y})`);
+    console.log(`  背景画像中心: (${bgCenterX.toFixed(1)}, ${bgCenterY.toFixed(1)})`);
+    console.log(`  キャンバス中心: (${(canvas.width/2).toFixed(1)}, ${(canvas.height/2).toFixed(1)})`);
+    console.log(`  計算結果の描画エリア中心: (${(canvas.width/2 + drawingAreaOffset.x).toFixed(1)}, ${(canvas.height/2 + drawingAreaOffset.y).toFixed(1)})`);
+    console.log(`  背景画像位置: x=${drawX.toFixed(1)}, y=${drawY.toFixed(1)}, サイズ: ${bgWidth.toFixed(1)}x${bgHeight.toFixed(1)}`);
+    console.log(`  描画エリアと背景画像の中心は一致しているか: ${Math.abs(bgCenterX - (canvas.width/2 + drawingAreaOffset.x)) < 1 && Math.abs(bgCenterY - (canvas.height/2 + drawingAreaOffset.y)) < 1 ? 'YES' : 'NO'}`);
     
     // デバッグパネルの値も更新
     const centerXInput = document.getElementById('centerX');

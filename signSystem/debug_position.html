@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>描画位置デバッグ確認</title>
+    <style>
+        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+        .debug-info { 
+            position: fixed; 
+            top: 10px; 
+            left: 10px; 
+            background: rgba(0,0,0,0.8); 
+            color: white; 
+            padding: 10px; 
+            font-size: 12px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+        canvas {
+            border: 2px solid red;
+            display: block;
+            margin: 20px auto;
+            max-width: 90vw;
+            max-height: 75vh;
+            object-fit: contain;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-info" id="debugInfo">
+        デバッグ情報を読み込み中...
+    </div>
+    
+    <h1>受信側描画位置デバッグ確認</h1>
+    <p>現在のウェブサイトを開いて、以下を確認してください：</p>
+    <ol>
+        <li>背景画像を選択</li>
+        <li>ブラウザの開発者ツール（F12）でConsoleタブを開く</li>
+        <li>描画を開始</li>
+        <li>コンソールログで以下の値を確認：</li>
+    </ol>
+    
+    <h2>確認すべきポイント</h2>
+    <ul>
+        <li><strong>📍 背景画像描画位置</strong>: 背景画像がキャンバスのどこに配置されているか</li>
+        <li><strong>📐 描画エリアサイズ</strong>: 描画エリアが背景画像サイズと一致しているか</li>
+        <li><strong>📍 描画エリア位置</strong>: 描画エリアの中心が背景画像の中心と一致しているか</li>
+        <li><strong>🎯 START描画デバッグ</strong>: タブレットの座標が正しく変換されているか</li>
+    </ul>
+
+    <h2>期待される結果</h2>
+    <ul>
+        <li>背景画像の中心 = 描画エリアの中心</li>
+        <li>「描画エリアと背景画像の中心は一致しているか: YES」と表示される</li>
+        <li>タブレットで背景画像の特定の位置をタップした時、受信側の同じ位置に描画される</li>
+    </ul>
+
+    <h2>デバッグ手順</h2>
+    <ol>
+        <li><a href="https://takuyaiwamoto.github.io/RemoteSignPrinter/signSystem/" target="_blank">受信側を開く</a></li>
+        <li><a href="https://takuyaiwamoto.github.io/RemoteSignPrinter/signSystem/remotesign.html" target="_blank">書き手側を開く</a></li>
+        <li>書き手側で背景画像を選択（例：back1.png）</li>
+        <li>受信側のコンソールログを確認</li>
+        <li>書き手側で描画を開始して座標変換を確認</li>
+    </ol>
+
+    <script>
+        // デバッグ情報を更新
+        function updateDebugInfo() {
+            const info = document.getElementById('debugInfo');
+            const now = new Date().toLocaleTimeString();
+            info.innerHTML = `
+                <strong>デバッグ確認ページ</strong><br>
+                最終更新: ${now}<br>
+                Version: v3.0<br>
+                <br>
+                <strong>重要:</strong><br>
+                - 受信側のConsoleログを確認してください<br>
+                - 背景画像と描画位置の一致を確認<br>
+                - 座標変換が正しく動作しているか確認
+            `;
+        }
+
+        updateDebugInfo();
+        setInterval(updateDebugInfo, 5000);
+    </script>
+</body>
+</html>
