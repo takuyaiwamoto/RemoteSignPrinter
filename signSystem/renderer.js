@@ -2161,8 +2161,8 @@ function redrawCanvas(withBackground = true) {
   //console.log(`  キャンバス位置: (${canvasRect.left}, ${canvasRect.top})`);
   //console.log(`  キャンバスmargin: ${canvasStyle.margin}`);
   
-  // 🔸 描画エリアの枠表示（dev機能がオンの場合のみ、キャンバス上に描画）
-  if (showDrawingAreaFrame) {
+  // 🔸 描画エリアの枠表示（デバッグ用に常時表示）
+  if (true) { // showDrawingAreaFrame
     ctx.save();
     ctx.fillStyle = "rgba(255, 0, 0, 0.05)"; // 非常に薄い赤色
     
@@ -2174,10 +2174,15 @@ function redrawCanvas(withBackground = true) {
     
     ctx.fillRect(areaLeft, areaTop, drawingAreaSize.width, drawingAreaSize.height);
     
-    // 描画エリアの境界線を描画
-    ctx.strokeStyle = "rgba(255, 0, 0, 0.3)";
-    ctx.lineWidth = 1;
+    // 描画エリアの境界線を描画（青色で明確に表示）
+    ctx.strokeStyle = "blue";
+    ctx.lineWidth = 3;
     ctx.strokeRect(areaLeft, areaTop, drawingAreaSize.width, drawingAreaSize.height);
+    
+    // 描画エリア情報をテキスト表示
+    ctx.fillStyle = "blue";
+    ctx.font = "16px Arial";
+    ctx.fillText(`描画エリア ${drawingAreaSize.width}x${drawingAreaSize.height}`, areaLeft + 10, areaTop + 50);
     
     ctx.restore();
   }
@@ -2219,7 +2224,7 @@ function redrawCanvas(withBackground = true) {
     // 全ての背景画像を180度回転で表示
     let drawX, drawY;
     
-    // 全ての背景画像を統一した位置計算で中央揃え
+    // 全ての背景画像を統一した位置計算で中央揃え  
     drawX = canvas.width / 2 - bgWidth / 2;
     drawY = canvas.height / 2 - bgHeight / 2;
     
@@ -2281,11 +2286,21 @@ function redrawCanvas(withBackground = true) {
       //console.log(`📍 通常背景: 中央揃え、上端150px基準`);
     }
     console.log(`📍 背景画像描画位置: (${drawX.toFixed(1)}, ${drawY.toFixed(1)}) サイズ: ${bgWidth.toFixed(1)}x${bgHeight.toFixed(1)}`);
-    console.log(`📍 中央位置: ${(drawY).toFixed(1)}px (キャンバス中央: ${(canvas.height / 2).toFixed(1)}px)`);
+    console.log(`📍 背景画像Y位置: ${(drawY).toFixed(1)}px (キャンバス中央: ${(canvas.height / 2).toFixed(1)}px)`);
     //console.log(`🎯 背景画像中央座標: (${(drawX + bgWidth/2).toFixed(1)}, ${(drawY + bgHeight/2).toFixed(1)})`);
     
     // 背景画像を描画
     ctx.drawImage(backgroundImage, drawX, drawY, bgWidth, bgHeight);
+    
+    // 🔍 デバッグ: 背景画像の境界線を表示
+    ctx.save();
+    ctx.strokeStyle = 'lime';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(drawX, drawY, bgWidth, bgHeight);
+    ctx.fillStyle = 'lime';
+    ctx.font = '16px Arial';
+    ctx.fillText(`背景画像 ${bgWidth.toFixed(0)}x${bgHeight.toFixed(0)}`, drawX + 10, drawY + 25);
+    ctx.restore();
     
     
     // 📐 描画エリアサイズを背景画像サイズに合わせる
