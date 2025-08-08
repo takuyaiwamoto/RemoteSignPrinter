@@ -787,13 +787,13 @@
 
 <div class="main-container">
 <div class="canvas-container">
-<canvas id="drawCanvas" width="859" height="607" style="position: relative; z-index: 100; background: transparent;"></canvas>
+<canvas id="drawCanvas" width="859" height="607" style="position: relative; z-index: 100000; background: transparent; cursor: crosshair; pointer-events: auto;"></canvas>
 
 <!-- メインコントロール: Clear、自分だけ削除、送信 -->
 <div class="main-controls">
   <button onclick="clearCanvas()">Clear</button>
   <button onclick="clearMyDrawing()" style="background-color: #FF6B6B; color: white;">自分だけ消去</button>
-  <button onclick="saveDoubleRotatedImage()" style="background-color: #4CAF50; color: white; font-size: 18px; padding: 12px 24px; font-weight: bold;">送信</button>
+  <button onclick="saveDoubleRotatedImage()" style="background-color: #4CAF50; color: white; font-size: 18px; padding: 12px 24px; font-weight: bold;">渡す</button>
 </div>
 
 <!-- ペンの色と太さ: 同じ列に -->
@@ -937,7 +937,11 @@
 
 <script>
 const canvas = document.getElementById("drawCanvas");
+console.log('🎯 canvas要素取得結果:', canvas);
+console.log('🎯 canvas要素のID:', canvas ? canvas.id : 'canvas要素が見つからない');
+
 const ctx = canvas.getContext("2d");
+console.log('🎯 2Dコンテキスト取得結果:', ctx);
 let drawing = false;
 let socket = new WebSocket("wss://realtime-sign-server-1.onrender.com");
 let myWriterId = null; // 自分のwriter ID
@@ -3292,14 +3296,350 @@ function drawContinuousLine(x, y) {
 
 // interpolatePoints関数を削除（パフォーマンス改善）
 
+console.log('🎯 mousedownイベントリスナーをcanvasに追加中...');
+console.log('🎯 canvas要素の状態:', canvas);
+console.log('🎯 canvas要素のタグ名:', canvas ? canvas.tagName : 'null');
+
+// 確実にイベントリスナーを追加するため、DOMが完全に読み込まれてから実行
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('🎯 DOMContentLoaded - イベントリスナーを再度追加');
+  const canvasElement = document.getElementById('drawCanvas');
+  console.log('🎯 再取得したcanvas要素:', canvasElement);
+  
+  if (canvasElement) {
+    // すべてのマウスイベントをテスト
+    canvasElement.addEventListener("mousedown", (e) => {
+      console.log('🖱️ DOMContentLoaded後のmousedownイベント発生');
+      console.log('🖱️ マウス座標:', e.offsetX, e.offsetY);
+      console.log('🖱️ イベントターゲット:', e.target);
+    });
+    
+    // イベントテストを拡張
+    let isMousePressed = false;
+    let lastPos = null;
+    
+    // mousemoveイベントでマウスボタンの状態を判定する方式
+    canvasElement.addEventListener('mousemove', (e) => {
+      const x = e.offsetX;
+      const y = e.offsetY;
+      const isCurrentlyPressed = e.buttons === 1; // 左ボタンが押されている
+      
+      // デバッグ用：buttons値を詳しく表示
+      if (e.buttons !== 0) {
+        console.log(`🖱️ mousemove（ボタン押下中） - 座標: ${x}, ${y}, buttons: ${e.buttons}`);
+      }
+      
+      // マウスボタンが押された瞬間（描画開始）
+      if (isCurrentlyPressed && !isMousePressed) {
+        console.log('🖱️ マウスボタン押下検出 - 描画開始');
+        isMousePressed = true;
+        drawing = true;
+        lastPos = { x, y };
+        
+        // 描画設定を初期化
+        ctx.strokeStyle = currentPenColor || 'black';
+        ctx.lineWidth = currentPenThickness || 8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+        ctx.globalAlpha = 1.0;
+        
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        
+        // 描画開始時に点を描画
+        ctx.lineTo(x + 1, y + 1);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        
+        console.log('🖱️ 描画開始点設定:', x, y);
+      }
+      // マウスボタンが離された瞬間（描画終了）
+      else if (!isCurrentlyPressed && isMousePressed) {
+        console.log('🖱️ マウスボタン離脱検出 - 描画終了');
+        isMousePressed = false;
+        drawing = false;
+        lastPos = null;
+      }
+      // マウスボタンが押されている間（描画継続）
+      else if (isCurrentlyPressed && isMousePressed && drawing) {
+        console.log('🖱️ 描画継続中:', x, y);
+        
+        if (lastPos) {
+          // 前の点から現在の点まで線を描画
+          ctx.beginPath();
+          ctx.moveTo(lastPos.x, lastPos.y);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+        }
+        
+        lastPos = { x, y };
+      }
+    });
+    
+    // 標準的なペイントツール方式の描画システム
+    let isPaintDrawing = false;
+    let lastPaintPos = null;
+    
+    // 背景画像の範囲を計算する関数
+    function getBackgroundArea() {
+      if (!backgroundImage) {
+        // 背景画像がない場合は全範囲を許可
+        return {
+          x: 0,
+          y: 0,
+          width: canvas.width,
+          height: canvas.height
+        };
+      }
+      
+      // renderer.jsのredrawCanvas関数と同じ計算ロジック
+      const maxWidth = canvas.width * (UNIFIED_SETTINGS ? UNIFIED_SETTINGS.canvasScale : 1);
+      const maxHeight = canvas.height * (UNIFIED_SETTINGS ? UNIFIED_SETTINGS.canvasScale : 1);
+      
+      const imgAspect = backgroundImage.width / backgroundImage.height;
+      
+      let bgWidth, bgHeight;
+      if (imgAspect > maxWidth / maxHeight) {
+        bgWidth = maxWidth;
+        bgHeight = maxWidth / imgAspect;
+      } else {
+        bgHeight = maxHeight;
+        bgWidth = maxHeight * imgAspect;
+      }
+      
+      const drawX = canvas.width / 2 - bgWidth / 2;
+      const drawY = canvas.height / 2 - bgHeight / 2;
+      
+      return {
+        x: drawX,
+        y: drawY,
+        width: bgWidth,
+        height: bgHeight
+      };
+    }
+    
+    // 座標が背景画像の範囲内かチェックする関数
+    function isWithinBackgroundArea(x, y) {
+      const bgArea = getBackgroundArea();
+      
+      console.log('🖼️ 背景画像範囲チェック:', {
+        clickX: x,
+        clickY: y,
+        bgX: bgArea.x,
+        bgY: bgArea.y,
+        bgWidth: bgArea.width,
+        bgHeight: bgArea.height,
+        withinX: x >= bgArea.x && x <= bgArea.x + bgArea.width,
+        withinY: y >= bgArea.y && y <= bgArea.y + bgArea.height
+      });
+      
+      return x >= bgArea.x && 
+             x <= bgArea.x + bgArea.width && 
+             y >= bgArea.y && 
+             y <= bgArea.y + bgArea.height;
+    }
+    
+    // PointerEventsを使用（より確実なイベント処理）
+    if ('PointerEvent' in window) {
+      console.log('🖱️ PointerEventsを使用');
+      
+      canvasElement.addEventListener('pointerdown', (e) => {
+        console.log('🖱️ pointerdown - 描画開始');
+        
+        // 正確な座標を取得（canvas内の相対座標）
+        const rect = canvasElement.getBoundingClientRect();
+        const scaleX = canvasElement.width / rect.width;
+        const scaleY = canvasElement.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+        
+        console.log('🖱️ 座標詳細:', {
+          clientX: e.clientX,
+          clientY: e.clientY,
+          rectLeft: rect.left,
+          rectTop: rect.top,
+          scaleX: scaleX,
+          scaleY: scaleY,
+          finalX: x,
+          finalY: y
+        });
+        
+        // 背景画像の範囲内かチェック
+        if (!isWithinBackgroundArea(x, y)) {
+          console.log('🖱️ 背景画像範囲外のためスキップ');
+          return;
+        }
+        
+        isPaintDrawing = true;
+        lastPaintPos = { x, y };
+        
+        // 描画設定
+        ctx.strokeStyle = currentPenColor || 'black';
+        ctx.lineWidth = currentPenThickness || 8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        // 描画開始点
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        
+        // 開始点に小さな点を描画
+        ctx.lineTo(x + 0.1, y + 0.1);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      });
+      
+      canvasElement.addEventListener('pointermove', (e) => {
+        if (!isPaintDrawing || !lastPaintPos) return;
+        
+        // 正確な座標を取得
+        const rect = canvasElement.getBoundingClientRect();
+        const scaleX = canvasElement.width / rect.width;
+        const scaleY = canvasElement.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+        
+        console.log('🖱️ pointermove - 描画中:', x, y);
+        
+        // 背景画像の範囲内かチェック
+        if (!isWithinBackgroundArea(x, y)) {
+          console.log('🖱️ 背景画像範囲外 - 描画中断');
+          isPaintDrawing = false;
+          lastPaintPos = null;
+          return;
+        }
+        
+        // 線を描画
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        
+        lastPaintPos = { x, y };
+      });
+      
+      canvasElement.addEventListener('pointerup', (e) => {
+        console.log('🖱️ pointerup - 描画終了');
+        isPaintDrawing = false;
+        lastPaintPos = null;
+      });
+      
+    } else {
+      console.log('🖱️ 従来のマウスイベントを使用');
+      
+      // 従来のマウスイベント（フォールバック）
+      canvasElement.addEventListener('mousedown', (e) => {
+        console.log('🖱️ mousedown - 描画開始');
+        
+        // 正確な座標を取得
+        const rect = canvasElement.getBoundingClientRect();
+        const scaleX = canvasElement.width / rect.width;
+        const scaleY = canvasElement.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+        
+        // 背景画像の範囲内かチェック
+        if (!isWithinBackgroundArea(x, y)) {
+          console.log('🖱️ 背景画像範囲外のためスキップ');
+          return;
+        }
+        
+        isPaintDrawing = true;
+        lastPaintPos = { x, y };
+        
+        // 描画設定
+        ctx.strokeStyle = currentPenColor || 'black';
+        ctx.lineWidth = currentPenThickness || 8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        // 描画開始点
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        
+        e.preventDefault();
+      });
+      
+      canvasElement.addEventListener('mousemove', (e) => {
+        if (!isPaintDrawing || !lastPaintPos) return;
+        
+        // 正確な座標を取得
+        const rect = canvasElement.getBoundingClientRect();
+        const scaleX = canvasElement.width / rect.width;
+        const scaleY = canvasElement.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+        
+        console.log('🖱️ mousemove - 描画中:', x, y);
+        
+        // 背景画像の範囲内かチェック
+        if (!isWithinBackgroundArea(x, y)) {
+          console.log('🖱️ 背景画像範囲外 - 描画中断');
+          isPaintDrawing = false;
+          lastPaintPos = null;
+          return;
+        }
+        
+        // 線を描画
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        
+        lastPaintPos = { x, y };
+      });
+      
+      canvasElement.addEventListener('mouseup', (e) => {
+        console.log('🖱️ mouseup - 描画終了');
+        isPaintDrawing = false;
+        lastPaintPos = null;
+      });
+    }
+    
+    // mouseleaveで描画を終了（一般的なペイントツールの動作）
+    canvasElement.addEventListener("mouseleave", (e) => {
+      console.log('🖱️ mouseleave - 描画終了');
+      if (isPaintDrawing) {
+        isPaintDrawing = false;
+        lastPaintPos = null;
+      }
+    });
+    
+    // 右クリックで描画を中断
+    canvasElement.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      console.log('🖱️ 右クリック - 描画中断');
+      if (isPaintDrawing) {
+        isPaintDrawing = false;
+        lastPaintPos = null;
+      }
+    });
+    
+    
+    // タッチイベントもテスト（PCでも発生する場合がある）
+    canvasElement.addEventListener("touchstart", (e) => {
+      console.log('📱 touchstartイベント発生');
+      e.preventDefault();
+    });
+  }
+});
+
 canvas.addEventListener("mousedown", (e) => {
+  console.log('🖱️ mousedownイベント発生');
+  console.log('🎯 canvas要素:', canvas);
+  console.log('🎯 ctx:', ctx);
+  console.log('🎯 drawing変数:', drawing);
   // 常に新しい描画を可能にする（hasSentDataチェックを削除）
   
   drawing = true;
   const x = e.offsetX;
   const y = e.offsetY;
   
-  // console.log(`🖱️ マウス開始座標: offsetX=${x}, offsetY=${y}`);
+  console.log(`🖱️ マウス開始座標: offsetX=${x}, offsetY=${y}`);
   
   // 描画設定を初期化（前の描画設定をクリア）
   ctx.shadowBlur = 0;
