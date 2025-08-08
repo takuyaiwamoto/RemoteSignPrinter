@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://realtime-sign-server-1.onrender.com ws://localhost:* wss://localhost:*; img-src 'self' data: blob:; media-src 'self';">
-  <title>送信側2.3</title>
+  <title>送信側2.4</title>
   <style>
     /* クラシックスタイル（デフォルト） */
     body.classic .main-container {
@@ -1149,7 +1149,7 @@ function processMessage(data) {
   }
 }
 
-// 背景画像をアスペクト比を保持して描画する関数（2倍サイズ）
+// 背景画像をアスペクト比を保持して描画する関数（2倍サイズ・キャンバス自動調整）
 function drawBackgroundImage(ctx, image, canvas) {
   if (!image) return;
   
@@ -1173,6 +1173,24 @@ function drawBackgroundImage(ctx, image, canvas) {
   const scale = 2.0;
   const drawWidth = baseWidth * scale;
   const drawHeight = baseHeight * scale;
+  
+  // 背景画像が収まるようにキャンバスサイズを自動調整
+  const requiredWidth = Math.max(canvas.width, drawWidth);
+  const requiredHeight = Math.max(canvas.height, drawHeight);
+  
+  // キャンバスサイズを必要に応じて拡大
+  if (canvas.width < requiredWidth || canvas.height < requiredHeight) {
+    canvas.width = requiredWidth;
+    canvas.height = requiredHeight;
+    
+    // CSSサイズも調整（アスペクト比維持）
+    const canvasElement = document.getElementById('drawCanvas');
+    if (canvasElement) {
+      canvasElement.style.width = '100%';
+      canvasElement.style.height = 'auto';
+      canvasElement.style.aspectRatio = `${requiredWidth} / ${requiredHeight}`;
+    }
+  }
   
   // 中央配置の座標を計算
   const offsetX = (canvas.width - drawWidth) / 2;
@@ -1349,7 +1367,7 @@ function createWriterStatusDiv() {
   
   // Version情報を表示
   const versionSpan = document.createElement('span');
-  versionSpan.textContent = 'v2.3';
+  versionSpan.textContent = 'v2.4';
   versionSpan.style.cssText = `
     display: block;
     color: #FFD700;
