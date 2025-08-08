@@ -3,7 +3,7 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://realtime-sign-server-1.onrender.com ws://localhost:* wss://localhost:*; img-src 'self' data: blob:; media-src 'self';">
-  <title>送信側2.6</title>
+  <title>送信側2.7</title>
   <style>
     /* タッチデバイスでのズーム防止 */
     * {
@@ -1403,7 +1403,7 @@ function createWriterStatusDiv() {
   
   // Version情報を表示
   const versionSpan = document.createElement('span');
-  versionSpan.textContent = 'v2.6';
+  versionSpan.textContent = 'v2.7';
   versionSpan.style.cssText = `
     display: block;
     color: #FFD700;
@@ -3050,12 +3050,41 @@ function drawContinuousLineForWriter(x, y, writerId = 'self') {
     ctx.beginPath(); // 重要：他のWriterの未完了パスをクリア
     ctx.moveTo(x, y);
     writerState.lastPosition = { x, y };
+    writerState.currentPath = [{ x, y }];
     return;
   }
   
-  // 前の点から現在の点まで線を引く
-  ctx.lineTo(x, y);
-  ctx.stroke();
+  // 距離が近すぎる場合はスキップ（パフォーマンス向上）
+  const lastPos = writerState.lastPosition;
+  const distance = Math.sqrt(Math.pow(x - lastPos.x, 2) + Math.pow(y - lastPos.y, 2));
+  if (distance < 1) {
+    return; // 1ピクセル以下の移動は無視
+  }
+  
+  // スムージング: quadratic curve で滑らかな曲線を描画
+  if (writerState.currentPath && writerState.currentPath.length >= 2) {
+    const prev2 = writerState.currentPath[writerState.currentPath.length - 2];
+    const prev1 = writerState.currentPath[writerState.currentPath.length - 1];
+    
+    // 中点を制御点として使用
+    const midX = (prev1.x + x) / 2;
+    const midY = (prev1.y + y) / 2;
+    
+    ctx.quadraticCurveTo(prev1.x, prev1.y, midX, midY);
+    ctx.stroke();
+  } else {
+    // 最初の数点は直線
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  }
+  
+  // 現在の点をパスに追加
+  writerState.currentPath.push({ x, y });
+  
+  // パスの長さを制限（メモリ効率化）
+  if (writerState.currentPath.length > 3) {
+    writerState.currentPath.shift();
+  }
   
   writerState.lastPosition = { x, y };
 }
@@ -3580,6 +3609,10 @@ canvas.addEventListener("touchend", (e) => {
   currentPath = [];
 });
 
+// タッチ描画のスムージング用変数
+let touchAnimationFrame = null;
+let pendingTouchData = null;
+
 canvas.addEventListener("touchmove", (e) => {
   e.preventDefault(); // スクロールを防止
   if (!drawing) return;
@@ -3600,78 +3633,67 @@ canvas.addEventListener("touchmove", (e) => {
   const x = (touch.clientX - rect.left) * scaleX;
   const y = (touch.clientY - rect.top) * scaleY;
   
-  // 音楽制御は送信側では無効化（受信側のみで音楽再生）
+  // requestAnimationFrameでスムーズな描画
+  pendingTouchData = { x, y };
   
-  let actualColor;
-  
-  actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : (currentPenColor === 'green' ? '#008000' : (currentPenColor === 'pink' ? '#ff69b4' : currentPenColor)));
-  ctx.lineWidth = currentPenThickness;
-  ctx.strokeStyle = actualColor;
-  ctx.shadowBlur = 0; // 通常の色では影なし
-  ctx.shadowColor = 'transparent'; // 影の色をクリア
-  ctx.globalAlpha = 1.0; // 透明度をリセット
-  drawContinuousLine(x, y);
-  
-  // 描画コマンドを記録
-  const drawCmd = {
-    type: "draw",
-    x: x,
-    y: y,
-    thickness: currentPenThickness,
-    color: actualColor
-  };
-  drawingCommands.push(drawCmd);
-  
-  // 現在の位置を記録
-  lastPosition = { x, y };
-  
-  // Writer IDが未設定の場合は送信しない
-  if (!myWriterId) {
-    return;
-  }
-  
-  const touchDrawMsg = { 
-    type: "draw", 
-    writerId: myWriterId, // Writer ID を追加
-    x, 
-    y,
-    thickness: currentPenThickness,
-    color: currentPenColor,
-    starEffect: starEffectEnabled
-  };
-  socket.send(JSON.stringify(touchDrawMsg));
-  // console.log("📤 送信 touch draw:", touchDrawMsg);
-  
-  // 星エフェクトが有効な場合は星を生成（10回に1回の頻度に減らし）
-  if (starEffectEnabled && Math.random() < 0.1) {
-    const effectStart = performance.now();
-    const rect = canvas.getBoundingClientRect();
-    createStar(x + rect.left, y + rect.top);
-    const effectEnd = performance.now();
-    console.log(`⭐ createStar: ${(effectEnd - effectStart).toFixed(2)}ms`);
-  }
-  
-  // 妖精の粉エフェクトが有効な場合は妖精の粉を生成（15回に1回の頻度に減らし）
-  if (fairyDustEffectEnabled && Math.random() < 0.067) {
-    const effectStart = performance.now();
-    const rect = canvas.getBoundingClientRect();
-    createFairyDust(x + rect.left, y + rect.top);
-    const effectEnd = performance.now();
-    console.log(`✨ createFairyDust: ${(effectEnd - effectStart).toFixed(2)}ms`);
-  }
-  
-  // ハートエフェクトが有効な場合はハートを生成（20回に1回の頻度に減らし）
-  if (heartEffectEnabled && Math.random() < 0.05) {
-    const effectStart = performance.now();
-    const rect = canvas.getBoundingClientRect();
-    createDrawingHeart(x + rect.left, y + rect.top);
-    const effectEnd = performance.now();
-    console.log(`❤️ createDrawingHeart: ${(effectEnd - effectStart).toFixed(2)}ms`);
-  }
-  
-  const mouseMoveEnd = performance.now();
-  if (mouseMoveEnd - mouseMoveStart > 10) {
-    console.log(`🖱️ mousemove slow: ${(mouseMoveEnd - mouseMoveStart).toFixed(2)}ms`);
+  if (!touchAnimationFrame) {
+    touchAnimationFrame = requestAnimationFrame(() => {
+      if (pendingTouchData && drawing) {
+        const { x: pendingX, y: pendingY } = pendingTouchData;
+        
+        // 音楽制御は送信側では無効化（受信側のみで音楽再生）
+        
+        let actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : (currentPenColor === 'green' ? '#008000' : (currentPenColor === 'pink' ? '#ff69b4' : currentPenColor)));
+        ctx.lineWidth = currentPenThickness;
+        ctx.strokeStyle = actualColor;
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+        ctx.globalAlpha = 1.0;
+        
+        drawContinuousLine(pendingX, pendingY);
+        
+        // 描画コマンドを記録
+        const drawCmd = {
+          type: "draw",
+          x: pendingX,
+          y: pendingY,
+          thickness: currentPenThickness,
+          color: actualColor
+        };
+        drawingCommands.push(drawCmd);
+        
+        // 現在の位置を記録
+        lastPosition = { x: pendingX, y: pendingY };
+        
+        // WebSocket送信（Writer IDが設定されている場合）
+        if (myWriterId && socket && socket.readyState === WebSocket.OPEN) {
+          const touchDrawMsg = { 
+            type: "draw", 
+            x: pendingX, 
+            y: pendingY, 
+            thickness: currentPenThickness, 
+            color: actualColor,
+            writerId: myWriterId,
+            timestamp: Date.now()
+          };
+          socket.send(JSON.stringify(touchDrawMsg));
+        }
+        
+        // エフェクト処理（必要に応じて）
+        if (starEffectEnabled) {
+          createStar(pendingX, pendingY);
+        }
+        if (fairyDustEffectEnabled) {
+          createFairyDust(pendingX, pendingY);
+        }
+        if (heartEffectEnabled) {
+          createDrawingHeart(pendingX, pendingY);
+        }
+      }
+      
+      touchAnimationFrame = null;
+      pendingTouchData = null;
+    });
   }
 });
 
