@@ -994,6 +994,34 @@ function drawWriterCommandsReceiver(commands, writerId) {
       // パス情報を更新
       writerState.currentPath.commands.push(cmd);
       
+      // 滑らかな描画: 前の点と現在の点で補間
+      const prevCoords = transformCoordinatesWithAspectRatio(writerState.prevCmd.x, writerState.prevCmd.y, senderCanvasSize, drawingAreaSize);
+      const prevX = areaLeft + prevCoords.x;
+      const prevY = areaTop + prevCoords.y;
+      const currX = areaLeft + scaledX;
+      const currY = areaTop + scaledY;
+      
+      // quadraticCurveTo で滑らかな曲線を描画
+      const commands = writerState.currentPath.commands;
+      if (commands.length >= 3) {
+        // 3点以上ある場合は quadratic curve
+        const prev2Coords = transformCoordinatesWithAspectRatio(commands[commands.length - 3].x, commands[commands.length - 3].y, senderCanvasSize, drawingAreaSize);
+        const prev2X = areaLeft + prev2Coords.x;
+        const prev2Y = areaTop + prev2Coords.y;
+        
+        // 制御点を前の点に設定
+        const controlX = prevX;
+        const controlY = prevY;
+        // 中間点を終点に設定
+        const endX = (prevX + currX) / 2;
+        const endY = (prevY + currY) / 2;
+        
+        ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+      } else {
+        // 最初の数点は直線
+        ctx.lineTo(currX, currY);
+      }
+      
       if (cmd.color === 'white-red-border') {
         // 白地赤縁の特別処理
         if (writerState.isInPath) {
@@ -1188,6 +1216,79 @@ function drawWriterCommandsForPrint(commands, writerId, printCtx) {
   }
   
   printCtx.restore();
+}
+
+// 🖨️ WriterID別ダウンロード用描画関数（Canvas状態完全分離）
+function drawWriterCommandsForDownload(commands, writerId, downloadCtx) {
+  if (commands.length === 0) return;
+  
+  // 🔥 ダウンロード用WriterID別Canvas状態完全分離
+  downloadCtx.save();
+  downloadCtx.beginPath(); // 重要：他のWriterのパス状態を完全にクリア
+  downloadCtx.setTransform(1, 0, 0, 1, 0, 0); // 変換行列をリセット
+  
+  // デフォルト描画設定をリセット
+  downloadCtx.globalAlpha = 1.0;
+  downloadCtx.shadowBlur = 0;
+  downloadCtx.shadowColor = 'transparent';
+  downloadCtx.globalCompositeOperation = 'source-over';
+  downloadCtx.lineCap = 'round';
+  downloadCtx.lineJoin = 'round';
+  
+  console.log(`🖨️ ダウンロード: Writer ${writerId} 独立描画開始`);
+  
+  let currentPath = [];
+  let pathStarted = false;
+  
+  commands.forEach((cmd, index) => {
+    if (cmd.type === "start") {
+      // 前のパスがあれば描画完了
+      if (pathStarted && currentPath.length > 0) {
+        drawSinglePath(currentPath, downloadCtx);
+      }
+      
+      // 新しいパスを開始
+      currentPath = [cmd];
+      pathStarted = true;
+      
+    } else if (cmd.type === "draw" && pathStarted) {
+      currentPath.push(cmd);
+    }
+  });
+  
+  // 最後のパスを描画
+  if (pathStarted && currentPath.length > 0) {
+    drawSinglePath(currentPath, downloadCtx);
+  }
+  
+  downloadCtx.restore();
+  console.log(`🖨️ ダウンロード: Writer ${writerId} 描画完了`);
+}
+
+// 単一パスを描画する補助関数
+function drawSinglePath(pathCommands, ctx) {
+  if (pathCommands.length === 0) return;
+  
+  ctx.beginPath();
+  
+  pathCommands.forEach((cmd, index) => {
+    const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+    const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+    
+    if (cmd.type === "start" || index === 0) {
+      ctx.moveTo(scaledX, scaledY);
+    } else if (cmd.type === "draw") {
+      const thickness = cmd.thickness || 4;
+      ctx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
+      ctx.strokeStyle = cmd.color === 'black' ? '#000' : 
+                       (cmd.color === 'white' ? '#fff' : 
+                       (cmd.color === 'green' ? '#008000' : 
+                       (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
+      ctx.lineTo(scaledX, scaledY);
+    }
+  });
+  
+  ctx.stroke();
 }
 
 // 全執筆者のデータを統合する関数（旧バージョン - 廃止予定）
@@ -1517,7 +1618,7 @@ function prepareVideoBackground(videoSrc) {
   const canvasRect = canvas.getBoundingClientRect();
   const videoDrawXRelativeToCanvas = canvas.width / 2 - videoWidth / 2;
   const videoAbsoluteX = canvasRect.left + videoDrawXRelativeToCanvas;
-  const videoAbsoluteY = canvasRect.top + 150;
+  const videoAbsoluteY = canvasRect.top + canvas.height / 2 - videoHeight / 2;
   
   // 動画サイズをキャンバススケールに合わせて縮小（書き手側キャンバス内に収める）
   const scaledVideoWidth = videoWidth;
@@ -1547,7 +1648,7 @@ function prepareVideoBackground(videoSrc) {
   //console.log('🎬 PNG配置時にこのサイズを使用予定');
   
   // 動画の中心Y座標（ボール位置用）
-  const staticBgCenterY = 150 + videoHeight / 2;
+  const staticBgCenterY = canvas.height / 2;
   
   //console.log(`🎬 動画配置: PNG背景画像と完全同位置、left=${videoAbsoluteX}px, top=${videoAbsoluteY}px`);
   
@@ -2120,7 +2221,7 @@ function redrawCanvas(withBackground = true) {
     
     // 全ての背景画像を統一した位置計算で中央揃え
     drawX = canvas.width / 2 - bgWidth / 2;
-    drawY = 150;
+    drawY = canvas.height / 2 - bgHeight / 2;
     
     // 全ての背景画像に180度回転を適用
     if (true) {
@@ -2180,7 +2281,7 @@ function redrawCanvas(withBackground = true) {
       //console.log(`📍 通常背景: 中央揃え、上端150px基準`);
     }
     //console.log(`📍 背景画像描画位置: (${drawX.toFixed(1)}, ${drawY.toFixed(1)}) サイズ: ${bgWidth.toFixed(1)}x${bgHeight.toFixed(1)}`);
-    //console.log(`📍 上端からの位置: ${(drawY).toFixed(1)}px (目標: 150px)`);
+    //console.log(`📍 中央位置: ${(drawY).toFixed(1)}px (キャンバス中央: ${(canvas.height / 2).toFixed(1)}px)`);
     //console.log(`🎯 背景画像中央座標: (${(drawX + bgWidth/2).toFixed(1)}, ${(drawY + bgHeight/2).toFixed(1)})`);
     
     // 背景画像を描画
@@ -2989,6 +3090,34 @@ function handleMessage(data) {
     
     console.log('🧹 受信側：globalClear全執筆者データを完全クリア');
     redrawCanvas();
+  } else if (data.type === "clearWriter") {
+    // 特定の書き手の描画だけをクリア
+    const writerId = data.writerId;
+    console.log(`🧹 書き手(${writerId})の描画だけクリア指示受信`);
+    
+    // 該当WriterIDのデータのみクリア
+    if (multiWriterData[writerId]) {
+      multiWriterData[writerId] = [];
+      console.log(`🧹 Writer ${writerId} のデータをクリア`);
+    }
+    
+    // drawingDataからも該当WriterIDのデータを削除
+    drawingData = drawingData.filter(cmd => cmd.writerId !== writerId);
+    console.log(`🧹 統合データから Writer ${writerId} のデータを削除`);
+    
+    // WriterID別状態管理もクリア
+    if (writerPathStates[writerId]) {
+      writerPathStates[writerId] = {
+        isInPath: false,
+        lastPosition: null,
+        currentPath: []
+      };
+      console.log(`🧹 Writer ${writerId} のパス状態をリセット`);
+    }
+    
+    // キャンバスを再描画
+    redrawCanvas();
+    console.log(`✅ Writer ${writerId} の描画クリア完了`);
   } else if (data.type === "globalSend") {
     // 書き手からの送信指示
     console.log(`📤 書き手(${data.writerId})から送信指示受信`);
@@ -3027,12 +3156,21 @@ function handleMessage(data) {
     
     
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
-    // Writer IDが存在しない場合は配列を初期化
+    // Writer IDが存在しない場合は配列を初期化（WriterID別状態完全分離）
     if (!multiWriterData[writerId]) {
       multiWriterData[writerId] = [];
       console.log(`🆕 新しいWriter ID ${writerId} の配列を初期化`);
     }
     
+    // WriterID別パス状態も確実に初期化
+    if (!writerPathStates[writerId]) {
+      writerPathStates[writerId] = {
+        isInPath: false,
+        lastPosition: null,
+        currentPath: []
+      };
+      console.log(`🔄 Writer ID ${writerId} のパス状態を初期化`);
+    }
     
     multiWriterData[writerId].push(startData);
     drawingData.push(startData); // 互換性のために統合データにも追加
@@ -3143,12 +3281,21 @@ function handleMessage(data) {
     
     
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
-    // Writer IDが存在しない場合は配列を初期化
+    // Writer IDが存在しない場合は配列を初期化（WriterID別状態完全分離）
     if (!multiWriterData[writerId]) {
       multiWriterData[writerId] = [];
       console.log(`🆕 新しいWriter ID ${writerId} の配列を初期化`);
     }
     
+    // WriterID別パス状態も確実に初期化
+    if (!writerPathStates[writerId]) {
+      writerPathStates[writerId] = {
+        isInPath: false,
+        lastPosition: null,
+        currentPath: []
+      };
+      console.log(`🔄 Writer ID ${writerId} のパス状態を初期化`);
+    }
     
     multiWriterData[writerId].push(drawData);
     drawingData.push(drawData); // 互換性のために統合データにも追加
@@ -3278,7 +3425,10 @@ function handleMessage(data) {
       const allWriterData = multiWriterData[writerId] || [];
       const prevCmd = allWriterData[allWriterData.length - 2]; // 最新は現在のコマンド
       if (prevCmd && (prevCmd.type === 'start' || prevCmd.type === 'draw')) {
+        // 🔥 WriterID別状態を確実に分離してリアルタイム描画
+        ctx.save(); // Canvas状態を保存
         drawRealtimeWriterPath(writerId, data, prevCmd);
+        ctx.restore(); // Canvas状態を復元
       }
       
       // パス完了タイマーを設定（500ms後に完了とみなす）
@@ -3548,125 +3698,51 @@ function sendCanvasToMainProcess() {
   printCtx.save();
   console.log('🖨️ 送信ボタン印刷用Canvas設定完了（回転なし）');
   
-  // 全執筆者データを統合して印刷
-  const consolidatedData = consolidateDrawingData();
-  console.log('🖨️ 送信ボタン描画開始 (統合描画データ数:', consolidatedData.length, ')');
-  consolidatedData.forEach((cmd, index) => {
-    if (cmd.type === "start") {
-      printCtx.beginPath();
-      // 送信側の元座標を直接スケールして使用
-      const scaledX = (cmd.x / senderCanvasSize.width) * printCanvas.width;
-      const scaledY = (cmd.y / senderCanvasSize.height) * printCanvas.height;
-      printCtx.moveTo(scaledX, scaledY);
-      if (index < 3) console.log('🖨️ 送信座標[' + index + ']:', cmd.x, cmd.y, '->', scaledX, scaledY);
-    } else if (cmd.type === "draw") {
-      // 送信側の元座標を直接スケールして使用
-      const scaledX = (cmd.x / senderCanvasSize.width) * printCanvas.width;
-      const scaledY = (cmd.y / senderCanvasSize.height) * printCanvas.height;
-      
-      // ペンの太さと色を適用
-      const thickness = cmd.thickness || 4;
-      printCtx.lineWidth = thickness * (printCanvas.width / senderCanvasSize.width);
-      
-      // ネオン効果と白赤枠の処理（印刷時も適用）
-      if (cmd.color === 'neon' && typeof cmd.neonIndex === 'number') {
-        // 印刷時もグラデーション効果を適用
-        const prevCmd = drawingData[drawingData.indexOf(cmd) - 1];
-        if (prevCmd && (prevCmd.type === 'start' || prevCmd.type === 'draw')) {
-          const prevScaledX = (prevCmd.x / senderCanvasSize.width) * printCanvas.width;
-          const prevScaledY = (prevCmd.y / senderCanvasSize.height) * printCanvas.height;
-          
-          // 線分の長さを計算
-          const distance = Math.sqrt(Math.pow(scaledX - prevScaledX, 2) + Math.pow(scaledY - prevScaledY, 2));
-          
-          // 短い線分に分割してグラデーション効果を作成
-          const segments = Math.max(1, Math.ceil(distance / 3));
-          
-          for (let i = 0; i < segments; i++) {
-            const t = i / segments;
-            const nextT = (i + 1) / segments;
-            
-            const startX = prevScaledX + (scaledX - prevScaledX) * t;
-            const startY = prevScaledY + (scaledY - prevScaledY) * t;
-            const endX = prevScaledX + (scaledX - prevScaledX) * nextT;
-            const endY = prevScaledY + (scaledY - prevScaledY) * nextT;
-            
-            const segmentNeonIndex = cmd.neonIndex + (distance * t / 100);
-            const interpolatedColor = getNeonColorFromIndex(segmentNeonIndex);
-            
-            printCtx.beginPath();
-            printCtx.moveTo(startX, startY);
-            printCtx.lineWidth = thickness * (printCanvas.width / senderCanvasSize.width);
-            printCtx.strokeStyle = interpolatedColor;
-            printCtx.shadowBlur = 5;
-            printCtx.shadowColor = interpolatedColor;
-            printCtx.lineCap = 'round';
-            printCtx.lineJoin = 'round';
-            printCtx.lineTo(endX, endY);
-            printCtx.stroke();
-            
-          }
-        } else {
-          // startコマンドの場合は単一点
-          const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
-          printCtx.beginPath();
-          printCtx.arc(scaledX, scaledY, thickness * (printCanvas.width / senderCanvasSize.width) / 2, 0, 2 * Math.PI);
-          printCtx.fillStyle = interpolatedColor;
-          printCtx.shadowBlur = 5;
-          printCtx.shadowColor = interpolatedColor;
-          printCtx.fill();
-        }
-      } else if (cmd.color === 'white-red-border') {
-        // 白赤枠の印刷処理（3層グラデーション効果）
-        const currentThickness = cmd.thickness || 4;
-        const scaledThickness = currentThickness * (printCanvas.width / senderCanvasSize.width);
-        
-        // 外側の薄い赤
-        printCtx.save();
-        printCtx.globalAlpha = 0.2;
-        printCtx.lineWidth = scaledThickness + 10;
-        printCtx.strokeStyle = '#ffccdd';
-        printCtx.lineTo(scaledX, scaledY);
-        printCtx.stroke();
-        printCtx.restore();
-        
-        // 中間の赤
-        printCtx.save();
-        printCtx.globalAlpha = 0.5;
-        printCtx.lineWidth = scaledThickness + 8;
-        printCtx.strokeStyle = '#ffaacc';
-        printCtx.lineTo(scaledX, scaledY);
-        printCtx.stroke();
-        printCtx.restore();
-        
-        // 内側の濃い赤
-        printCtx.save();
-        printCtx.globalAlpha = 0.8;
-        printCtx.lineWidth = scaledThickness + 6;
-        printCtx.strokeStyle = '#ff88bb';
-        printCtx.lineTo(scaledX, scaledY);
-        printCtx.stroke();
-        printCtx.restore();
-        
-        // 白い中心
-        printCtx.save();
-        printCtx.globalAlpha = 0.9;
-        printCtx.lineWidth = Math.max(1, scaledThickness - 3);
-        printCtx.strokeStyle = '#ffffff';
-        printCtx.lineTo(scaledX, scaledY);
-        printCtx.stroke();
-        printCtx.restore();
-        
-        // 次の処理をスキップするため return
-        return;
-      } else {
-        printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
-      }
-      printCtx.lineTo(scaledX, scaledY);
-      printCtx.stroke();
-      if (index < 3) console.log('🖨️ 送信座標[' + index + ']:', cmd.x, cmd.y, '->', scaledX, scaledY);
+  // 🔥 WriterID別に独立して描画（線接続防止）
+  Object.keys(multiWriterData).forEach(writerId => {
+    if (multiWriterData[writerId].length > 0) {
+      console.log(`🖨️ 送信ボタン Writer ${writerId} の描画開始: ${multiWriterData[writerId].length}コマンド`);
+      drawWriterCommandsForPrint(multiWriterData[writerId], writerId, printCtx);
     }
   });
+  
+  // 旧方式フォールバック（互換性）
+  if (Object.keys(multiWriterData).length === 0 && drawingData.length > 0) {
+    console.log('🖨️ 送信ボタンフォールバック: 統合データで印刷');
+    let lastWriterId = null;
+    drawingData.forEach((cmd, index) => {
+      if (cmd.type === "start") {
+        // WriterIDが変わった場合は新しいパスを開始
+        if (cmd.writerId !== lastWriterId) {
+          printCtx.beginPath();
+          lastWriterId = cmd.writerId;
+        }
+        const scaledX = (cmd.x / senderCanvasSize.width) * printCanvas.width;
+        const scaledY = (cmd.y / senderCanvasSize.height) * printCanvas.height;
+        printCtx.moveTo(scaledX, scaledY);
+        if (index < 3) console.log('🖨️ 送信座標[' + index + ']:', cmd.x, cmd.y, '->', scaledX, scaledY);
+      } else if (cmd.type === "draw") {
+        // WriterIDが変わった場合は新しいパスを開始
+        if (cmd.writerId !== lastWriterId) {
+          printCtx.beginPath();
+          lastWriterId = cmd.writerId;
+          const scaledX = (cmd.x / senderCanvasSize.width) * printCanvas.width;
+          const scaledY = (cmd.y / senderCanvasSize.height) * printCanvas.height;
+          printCtx.moveTo(scaledX, scaledY);
+          return;
+        }
+        
+        const scaledX = (cmd.x / senderCanvasSize.width) * printCanvas.width;
+        const scaledY = (cmd.y / senderCanvasSize.height) * printCanvas.height;
+        const thickness = cmd.thickness || 4;
+        printCtx.lineWidth = thickness * (printCanvas.width / senderCanvasSize.width);
+        printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
+        printCtx.lineTo(scaledX, scaledY);
+        printCtx.stroke();
+        if (index < 3) console.log('🖨️ 送信座標[' + index + ']:', cmd.x, cmd.y, '->', scaledX, scaledY);
+      }
+    });
+  }
   
   printCtx.restore();
   console.log('🖨️ 送信ボタン描画完了 (180度回転)');
@@ -4002,7 +4078,7 @@ function runAnimationSequence(waitTime = null, fireworksEnabled = true, confetti
   
   // 背景画像の中心を軸とした回転の準備
   let backgroundCenterX = canvas.width / 2;
-  let backgroundCenterY = 150; // 背景画像のY位置（上端）
+  let backgroundCenterY = canvas.height / 2; // 背景画像のY位置（中央）
   let bgWidth = 0;
   let bgHeight = 0;
   
@@ -4022,8 +4098,8 @@ function runAnimationSequence(waitTime = null, fireworksEnabled = true, confetti
       bgWidth = maxHeight * imgAspect;
     }
     
-    // 背景画像の中心Y座標 = 上端位置(150px) + 高さの半分
-    backgroundCenterY = 150 + bgHeight / 2;
+    // 背景画像の中心Y座標 = 中央位置
+    backgroundCenterY = canvas.height / 2;
     
     //console.log(`🎯 背景画像サイズ計算結果: ${bgWidth.toFixed(1)}x${bgHeight.toFixed(1)}`);
     //console.log(`🎯 背景画像中心座標: (${backgroundCenterX.toFixed(1)}, ${backgroundCenterY.toFixed(1)})`);
@@ -4079,7 +4155,7 @@ function runAnimationSequence(waitTime = null, fireworksEnabled = true, confetti
     if (isCanvasRotated) {
       // キャンバスの座標系での背景画像中心を計算（キャンバス相対座標）
       const canvasBackgroundCenterX = backgroundCenterX;
-      const canvasBackgroundCenterY = backgroundCenterY - 60; // キャンバスのtop: 60pxを考慮
+      const canvasBackgroundCenterY = backgroundCenterY; // 中央位置
       
       // キャンバスの回転軸も背景画像の中心に設定（キャンバス座標系）
       canvas.style.transformOrigin = `${canvasBackgroundCenterX}px ${canvasBackgroundCenterY}px`;
@@ -5544,7 +5620,7 @@ function updateInputValues() {
   drawingAreaSize.height = height;
 }
 
-// 🔸 印刷物プレビュー機能
+// 🔸 印刷物プレビュー機能（受信側Canvas内容を直接使用）
 function showPrintPreview() {
   const modal = document.getElementById('printPreviewModal');
   const previewCanvas = document.getElementById('printPreviewCanvas');
@@ -5554,103 +5630,25 @@ function showPrintPreview() {
   previewCanvas.width = drawingAreaSize.width;
   previewCanvas.height = drawingAreaSize.height;
   
-  // プレビュー用キャンバスを初期化
-  previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+  // 🔥 重要: 受信側Canvasの描画エリア部分を直接コピーしてプレビュー表示
+  // 描画エリアの範囲を計算
+  const canvasRect = canvas.getBoundingClientRect();
+  const centerX = canvas.width / 2 + drawingAreaOffset.x;
+  const centerY = canvas.height / 2 + drawingAreaOffset.y;
+  const areaLeft = centerX - drawingAreaSize.width / 2;
+  const areaTop = centerY - drawingAreaSize.height / 2;
   
-  // 背景を白で塗りつぶし
-  previewCtx.fillStyle = '#ffffff';
-  previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+  // 受信側Canvasの指定エリアをプレビューCanvasにコピー
+  previewCtx.drawImage(
+    canvas,
+    areaLeft, areaTop, drawingAreaSize.width, drawingAreaSize.height,  // 受信側Canvas内の範囲
+    0, 0, previewCanvas.width, previewCanvas.height  // プレビューCanvas全体
+  );
   
-  // 背景画像があれば描画
-  if (backgroundImage) {
-    previewCtx.drawImage(backgroundImage, 0, 0, previewCanvas.width, previewCanvas.height);
-  }
-  
-  // 筆跡を描画（印刷用のため回転なし）
-  drawingData.forEach(cmd => {
-    if (cmd.type === "start") {
-      previewCtx.beginPath();
-      // 送信側から印刷用への座標変換（回転なし）
-      let scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
-      let scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
-      
-      previewCtx.moveTo(scaledX, scaledY);
-    } else if (cmd.type === "draw") {
-      // ペンの太さと色を適用
-      const thickness = cmd.thickness || 4;
-      previewCtx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
-      
-      // ネオン効果と白赤枠の処理（プレビューでも表示）
-      if (cmd.color === 'neon' && typeof cmd.neonIndex === 'number') {
-        const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
-        previewCtx.strokeStyle = interpolatedColor;
-        previewCtx.shadowBlur = 5;
-        previewCtx.shadowColor = interpolatedColor;
-        previewCtx.lineCap = 'round';
-        previewCtx.lineJoin = 'round';
-      } else if (cmd.color === 'white-red-border') {
-        // 白赤枠のプレビュー処理（3層グラデーション効果）
-        const currentThickness = cmd.thickness || 4;
-        const scaledThickness = currentThickness * (drawingAreaSize.width / senderCanvasSize.width);
-        
-        let scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
-        let scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
-        
-        // 外側の薄い赤
-        previewCtx.save();
-        previewCtx.globalAlpha = 0.2;
-        previewCtx.lineWidth = scaledThickness + 10;
-        previewCtx.strokeStyle = '#ffccdd';
-        previewCtx.lineTo(scaledX, scaledY);
-        previewCtx.stroke();
-        previewCtx.restore();
-        
-        // 中間の赤
-        previewCtx.save();
-        previewCtx.globalAlpha = 0.5;
-        previewCtx.lineWidth = scaledThickness + 8;
-        previewCtx.strokeStyle = '#ffaacc';
-        previewCtx.lineTo(scaledX, scaledY);
-        previewCtx.stroke();
-        previewCtx.restore();
-        
-        // 内側の濃い赤
-        previewCtx.save();
-        previewCtx.globalAlpha = 0.8;
-        previewCtx.lineWidth = scaledThickness + 6;
-        previewCtx.strokeStyle = '#ff88bb';
-        previewCtx.lineTo(scaledX, scaledY);
-        previewCtx.stroke();
-        previewCtx.restore();
-        
-        // 白い中心
-        previewCtx.save();
-        previewCtx.globalAlpha = 0.9;
-        previewCtx.lineWidth = Math.max(1, scaledThickness - 3);
-        previewCtx.strokeStyle = '#ffffff';
-        previewCtx.lineTo(scaledX, scaledY);
-        previewCtx.stroke();
-        previewCtx.restore();
-        
-        return; // 通常の描画処理をスキップ
-      } else {
-        previewCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
-        previewCtx.shadowBlur = 0;
-      }
-      
-      // 送信側から印刷用への座標変換（回転なし）
-      let scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
-      let scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
-      
-      previewCtx.lineTo(scaledX, scaledY);
-      previewCtx.stroke();
-    }
-  });
+  console.log('📋 プレビュー: 受信側Canvas描画エリアを直接コピー完了');
   
   // モーダルを表示
   modal.style.display = 'flex';
-  
-  //console.log('📋 印刷物プレビューを表示');
 }
 
 function closePrintPreview() {
@@ -5661,9 +5659,9 @@ function closePrintPreview() {
 
 // 🔸 印刷フル機能（背景込み）
 function printFull() {
-  console.log('🖨️ === フル印刷開始: 受信側キャンバスをそのまま印刷 ===');
+  console.log('🖨️ === フル印刷開始: 受信側Canvas内容をそのまま印刷 ===');
   
-  // 受信側の現在のキャンバス内容をそのまま印刷用に使用
+  // 受信側の現在のCanvas内容をそのまま印刷用に使用
   const printCanvas = document.createElement('canvas');
   const printCtx = printCanvas.getContext('2d');
   
@@ -5672,112 +5670,9 @@ function printFull() {
   printCanvas.height = canvas.height;
   console.log('🖨️ 印刷キャンバスサイズ:', printCanvas.width, 'x', printCanvas.height);
   
-  // 白背景を描画
-  printCtx.fillStyle = '#ffffff';
-  printCtx.fillRect(0, 0, printCanvas.width, printCanvas.height);
-  
-  // 印刷用（回転なし）
-  console.log('🖨️ 印刷用Canvas設定開始');
-  printCtx.save();
-  console.log('🖨️ 印刷用Canvas設定完了（回転なし）');
-  
-  console.log('🖨️ 描画開始（WriterID別、回転なし）');
-  
-  // WriterID別に独立して印刷描画（線の混在を防ぐ）
-  Object.keys(multiWriterData).forEach(writerId => {
-    if (multiWriterData[writerId].length > 0) {
-      console.log(`🖨️ Writer ${writerId} の描画開始: ${multiWriterData[writerId].length}コマンド`);
-      drawWriterCommandsForPrint(multiWriterData[writerId], writerId, printCtx);
-    }
-  });
-  
-  // 旧方式（統合データ）のフォールバック（互換性のため）
-  if (Object.keys(multiWriterData).length === 0 && drawingData.length > 0) {
-    console.log('🖨️ フォールバック: 統合データで印刷');
-    let lastWriterId = null;
-    drawingData.forEach((cmd, index) => {
-      if (cmd.type === "start") {
-        // WriterIDが変わった場合は新しいパスを開始
-        if (cmd.writerId !== lastWriterId) {
-          printCtx.beginPath();
-          lastWriterId = cmd.writerId;
-        }
-        printCtx.moveTo(cmd.x, cmd.y);
-        if (index < 3) console.log('🖨️ 印刷start[' + index + ']:', cmd.x, cmd.y);
-      } else if (cmd.type === "draw") {
-        // WriterIDが変わった場合は新しいパスを開始
-        if (cmd.writerId !== lastWriterId) {
-          printCtx.beginPath();
-          lastWriterId = cmd.writerId;
-          printCtx.moveTo(cmd.x, cmd.y);
-          return;
-        }
-      const thickness = cmd.thickness || 4;
-      printCtx.lineWidth = thickness;
-      
-      // ネオン効果と白赤枠の処理
-      if (cmd.color === 'neon' && typeof cmd.neonIndex === 'number') {
-        const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
-        printCtx.strokeStyle = interpolatedColor;
-        printCtx.shadowBlur = 10;
-        printCtx.shadowColor = interpolatedColor;
-        printCtx.lineCap = 'round';
-        printCtx.lineJoin = 'round';
-      } else if (cmd.color === 'white-red-border') {
-        // 白赤枠の印刷処理（3層グラデーション効果）
-        const currentThickness = cmd.thickness || 4;
-        
-        // 外側の薄い赤
-        printCtx.save();
-        printCtx.globalAlpha = 0.2;
-        printCtx.lineWidth = currentThickness + 10;
-        printCtx.strokeStyle = '#ffccdd';
-        printCtx.lineTo(cmd.x, cmd.y);
-        printCtx.stroke();
-        printCtx.restore();
-        
-        // 中間の赤
-        printCtx.save();
-        printCtx.globalAlpha = 0.5;
-        printCtx.lineWidth = currentThickness + 8;
-        printCtx.strokeStyle = '#ffaacc';
-        printCtx.lineTo(cmd.x, cmd.y);
-        printCtx.stroke();
-        printCtx.restore();
-        
-        // 内側の濃い赤
-        printCtx.save();
-        printCtx.globalAlpha = 0.8;
-        printCtx.lineWidth = currentThickness + 6;
-        printCtx.strokeStyle = '#ff88bb';
-        printCtx.lineTo(cmd.x, cmd.y);
-        printCtx.stroke();
-        printCtx.restore();
-        
-        // 白い中心
-        printCtx.save();
-        printCtx.globalAlpha = 0.9;
-        printCtx.lineWidth = Math.max(1, currentThickness - 3);
-        printCtx.strokeStyle = '#ffffff';
-        printCtx.lineTo(cmd.x, cmd.y);
-        printCtx.stroke();
-        printCtx.restore();
-        
-        // 次の処理をスキップ
-        if (index < 3) console.log('🖨️ 印刷draw[' + index + '] white-red-border:', cmd.x, cmd.y);
-        return;
-      } else {
-        printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
-      }
-      
-        printCtx.lineTo(cmd.x, cmd.y);
-        printCtx.stroke();
-        if (index < 3) console.log('🖨️ 印刷draw[' + index + ']:', cmd.x, cmd.y);
-      }
-    });
-  }
-  
-  printCtx.restore();
+  // 🔥 重要: 受信側Canvasの内容をそのまま印刷Canvasにコピー
+  printCtx.drawImage(canvas, 0, 0);
+  console.log('🖨️ 受信側Canvas内容を印刷Canvasに直接コピー完了');
   console.log('🖨️ 印刷描画完了 (180度回転)');
   
   // 印刷用データを作成
@@ -5816,109 +5711,49 @@ function printPen() {
   printCanvas.height = canvas.height;
   console.log('🖨️ 印刷キャンバスサイズ:', printCanvas.width, 'x', printCanvas.height);
   
-  // 背景は透明のまま（描画データのみ）
-  console.log('🖨️ 背景は透明 (ペンデータのみ)');
+  // 🔥 重要: 受信側Canvasから描画部分のみを抽出して印刷Canvasにコピー
+  // 一時的なCanvas作成して背景を除去
+  const tempCanvas = document.createElement('canvas');
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCanvas.width = canvas.width;
+  tempCanvas.height = canvas.height;
   
-  // ペン印刷用（回転なし）
-  console.log('🖨️ ペン印刷用Canvas設定開始');
-  printCtx.save();
-  console.log('🖨️ ペン印刷用Canvas設定完了（回転なし）');
+  // 受信側Canvas内容を一時Canvasにコピー
+  tempCtx.drawImage(canvas, 0, 0);
   
-  console.log('🖨️ ペン印刷：描画開始（WriterID別、回転なし）');
+  // 白い背景部分を透明にする処理（背景除去）
+  const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+  const data = imageData.data;
   
-  // WriterID別に独立してペン印刷描画（線の混在を防ぐ）
-  Object.keys(multiWriterData).forEach(writerId => {
-    if (multiWriterData[writerId].length > 0) {
-      console.log(`🖨️ ペン印刷 Writer ${writerId} の描画開始: ${multiWriterData[writerId].length}コマンド`);
-      drawWriterCommandsForPrint(multiWriterData[writerId], writerId, printCtx);
+  // 背景部分（白色+背景画像）を透明にする
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const alpha = data[i + 3];
+    
+    // 白に近い色（背景）を透明化
+    if (r > 240 && g > 240 && b > 240 && alpha > 200) {
+      data[i + 3] = 0; // アルファ値を0（透明）にする
     }
-  });
-  
-  // 旧方式（統合データ）のフォールバック（互換性のため）
-  if (Object.keys(multiWriterData).length === 0 && drawingData.length > 0) {
-    console.log('🖨️ ペン印刷フォールバック: 統合データで印刷');
-    let lastWriterId = null;
-    drawingData.forEach((cmd, index) => {
-      if (cmd.type === "start") {
-        // WriterIDが変わった場合は新しいパスを開始
-        if (cmd.writerId !== lastWriterId) {
-          printCtx.beginPath();
-          lastWriterId = cmd.writerId;
-        }
-        printCtx.moveTo(cmd.x, cmd.y);
-        if (index < 3) console.log('🖨️ ペン印刷start[' + index + ']:', cmd.x, cmd.y);
-      } else if (cmd.type === "draw") {
-        // WriterIDが変わった場合は新しいパスを開始  
-        if (cmd.writerId !== lastWriterId) {
-          printCtx.beginPath();
-          lastWriterId = cmd.writerId;
-          printCtx.moveTo(cmd.x, cmd.y);
-          return;
-        }
-      const thickness = cmd.thickness || 4;
-      printCtx.lineWidth = thickness;
-      
-      // ネオン効果と白赤枠の処理
-      if (cmd.color === 'neon' && typeof cmd.neonIndex === 'number') {
-        const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
-        printCtx.strokeStyle = interpolatedColor;
-        printCtx.shadowBlur = 10;
-        printCtx.shadowColor = interpolatedColor;
-        printCtx.lineCap = 'round';
-        printCtx.lineJoin = 'round';
-      } else if (cmd.color === 'white-red-border') {
-        // 白赤枠の印刷処理（3層グラデーション効果）
-        const currentThickness = cmd.thickness || 4;
-        
-        // 外側の薄い赤
-        printCtx.save();
-        printCtx.globalAlpha = 0.2;
-        printCtx.lineWidth = currentThickness + 10;
-        printCtx.strokeStyle = '#ffccdd';
-        printCtx.lineTo(cmd.x, cmd.y);
-        printCtx.stroke();
-        printCtx.restore();
-        
-        // 中間の赤
-        printCtx.save();
-        printCtx.globalAlpha = 0.5;
-        printCtx.lineWidth = currentThickness + 8;
-        printCtx.strokeStyle = '#ffaacc';
-        printCtx.lineTo(cmd.x, cmd.y);
-        printCtx.stroke();
-        printCtx.restore();
-        
-        // 内側の濃い赤
-        printCtx.save();
-        printCtx.globalAlpha = 0.8;
-        printCtx.lineWidth = currentThickness + 6;
-        printCtx.strokeStyle = '#ff88bb';
-        printCtx.lineTo(cmd.x, cmd.y);
-        printCtx.stroke();
-        printCtx.restore();
-        
-        // 白い中心
-        printCtx.save();
-        printCtx.globalAlpha = 0.9;
-        printCtx.lineWidth = Math.max(1, currentThickness - 3);
-        printCtx.strokeStyle = '#ffffff';
-        printCtx.lineTo(cmd.x, cmd.y);
-        printCtx.stroke();
-        printCtx.restore();
-        
-        // 次の処理をスキップ
-        if (index < 3) console.log('🖨️ 印刷draw[' + index + '] white-red-border:', cmd.x, cmd.y);
-        return;
-      } else {
-        printCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
-      }
-      
-        printCtx.lineTo(cmd.x, cmd.y);
-        printCtx.stroke();
-        if (index < 3) console.log('🖨️ ペン印刷draw[' + index + ']:', cmd.x, cmd.y);
-      }
-    });
+    // 背景画像の色パターンも透明化（薄い色調）
+    else if (r > 200 && g > 200 && b > 200 && alpha > 150) {
+      // 薄いグレー、ベージュ、薄いピンクなど背景色を透明化
+      data[i + 3] = 0;
+    }
+    // 非常に薄い色も背景として扱う
+    else if (r > 180 && g > 180 && b > 180 && alpha > 100 && 
+             Math.abs(r - g) < 30 && Math.abs(g - b) < 30 && Math.abs(r - b) < 30) {
+      // 薄くて色差の少ない（ほぼ無彩色の）部分を背景として透明化
+      data[i + 3] = 0;
+    }
   }
+  
+  // 処理済みデータを印刷Canvasに適用
+  printCtx.putImageData(imageData, 0, 0);
+  console.log('🖨️ 受信側Canvas描画部分のみを印刷Canvasにコピー完了（背景除去済み）');
+  
+  console.log('🖨️ ペン印刷完了：受信側Canvas内容を直接コピー');
   
   printCtx.restore();
   console.log('🖨️ ペン印刷描画完了 (180度回転)');
@@ -6009,82 +5844,51 @@ function generatePrintImageData() {
     downloadCtx.fillRect(0, 0, downloadCanvas.width, downloadCanvas.height);
   }
   
-  // 筆跡を描画（両モード共通）- 送信側の元の向きで描画（回転なし）
+  // 筆跡を描画（両モード共通）- WriterID別に独立描画（線接続防止）
   
-  drawingData.forEach(cmd => {
-    if (cmd.type === "start") {
-      downloadCtx.beginPath();
-      const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
-      const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
-      downloadCtx.moveTo(scaledX, scaledY);
-    } else if (cmd.type === "draw") {
-      // ペンの太さと色を適用
-      const thickness = cmd.thickness || 4;
-      downloadCtx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
-      
-      // ネオン効果と白赤枠の処理
-      if (cmd.color === 'neon' && typeof cmd.neonIndex === 'number') {
-        const interpolatedColor = getNeonColorFromIndex(cmd.neonIndex);
-        downloadCtx.strokeStyle = interpolatedColor;
-        downloadCtx.shadowBlur = 5;
-        downloadCtx.shadowColor = interpolatedColor;
-        downloadCtx.lineCap = 'round';
-        downloadCtx.lineJoin = 'round';
-      } else if (cmd.color === 'white-red-border') {
-        // 白赤枠の印刷処理（3層グラデーション効果）
-        const currentThickness = cmd.thickness || 4;
-        const scaledThickness = currentThickness * (drawingAreaSize.width / senderCanvasSize.width);
+  // 🔥 WriterID別に独立して描画（線接続防止）
+  Object.keys(multiWriterData).forEach(writerId => {
+    if (multiWriterData[writerId].length > 0) {
+      console.log(`🖨️ ダウンロード Writer ${writerId} の描画開始: ${multiWriterData[writerId].length}コマンド`);
+      drawWriterCommandsForDownload(multiWriterData[writerId], writerId, downloadCtx);
+    }
+  });
+  
+  // 旧方式フォールバック（互換性）
+  if (Object.keys(multiWriterData).length === 0 && drawingData.length > 0) {
+    console.log('🖨️ ダウンロードフォールバック: 統合データで描画');
+    let lastWriterId = null;
+    drawingData.forEach(cmd => {
+      if (cmd.type === "start") {
+        // WriterIDが変わった場合は新しいパスを開始
+        if (cmd.writerId !== lastWriterId) {
+          downloadCtx.beginPath();
+          lastWriterId = cmd.writerId;
+        }
+        const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+        const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+        downloadCtx.moveTo(scaledX, scaledY);
+      } else if (cmd.type === "draw") {
+        // WriterIDが変わった場合は新しいパスを開始
+        if (cmd.writerId !== lastWriterId) {
+          downloadCtx.beginPath();
+          lastWriterId = cmd.writerId;
+          const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
+          const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
+          downloadCtx.moveTo(scaledX, scaledY);
+          return;
+        }
         
         const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
         const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
-        
-        // 外側の薄い赤
-        downloadCtx.save();
-        downloadCtx.globalAlpha = 0.2;
-        downloadCtx.lineWidth = scaledThickness + 10;
-        downloadCtx.strokeStyle = '#ffccdd';
-        downloadCtx.lineTo(scaledX, scaledY);
-        downloadCtx.stroke();
-        downloadCtx.restore();
-        
-        // 中間の赤
-        downloadCtx.save();
-        downloadCtx.globalAlpha = 0.5;
-        downloadCtx.lineWidth = scaledThickness + 8;
-        downloadCtx.strokeStyle = '#ffaacc';
-        downloadCtx.lineTo(scaledX, scaledY);
-        downloadCtx.stroke();
-        downloadCtx.restore();
-        
-        // 内側の濃い赤
-        downloadCtx.save();
-        downloadCtx.globalAlpha = 0.8;
-        downloadCtx.lineWidth = scaledThickness + 6;
-        downloadCtx.strokeStyle = '#ff88bb';
-        downloadCtx.lineTo(scaledX, scaledY);
-        downloadCtx.stroke();
-        downloadCtx.restore();
-        
-        // 白い中心
-        downloadCtx.save();
-        downloadCtx.globalAlpha = 0.9;
-        downloadCtx.lineWidth = Math.max(1, scaledThickness - 3);
-        downloadCtx.strokeStyle = '#ffffff';
-        downloadCtx.lineTo(scaledX, scaledY);
-        downloadCtx.stroke();
-        downloadCtx.restore();
-        
-        return; // 通常の描画処理をスキップ
-      } else {
+        const thickness = cmd.thickness || 4;
+        downloadCtx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
         downloadCtx.strokeStyle = cmd.color === 'black' ? '#000' : (cmd.color === 'white' ? '#fff' : (cmd.color === 'green' ? '#008000' : (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
+        downloadCtx.lineTo(scaledX, scaledY);
+        downloadCtx.stroke();
       }
-      
-      const scaledX = (cmd.x / senderCanvasSize.width) * drawingAreaSize.width;
-      const scaledY = (cmd.y / senderCanvasSize.height) * drawingAreaSize.height;
-      downloadCtx.lineTo(scaledX, scaledY);
-      downloadCtx.stroke();
-    }
-  });
+    });
+  }
   
   // 🔸 印刷用画像を送信側の元の向きで生成
   //console.log('🔄 印刷用画像を送信側の元の向きで生成完了');
