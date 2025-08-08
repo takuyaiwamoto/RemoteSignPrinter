@@ -1218,23 +1218,23 @@ function drawBackgroundImage(ctx, image, canvas) {
   const drawWidth = baseWidth * scale;
   const drawHeight = baseHeight * scale;
   
-  // 背景画像が収まるようにキャンバスサイズを自動調整
-  const requiredWidth = Math.max(canvas.width, drawWidth);
-  const requiredHeight = Math.max(canvas.height, drawHeight);
+  // キャンバスサイズの自動調整を無効化（サイズ破損の原因）
+  // const requiredWidth = Math.max(canvas.width, drawWidth);
+  // const requiredHeight = Math.max(canvas.height, drawHeight);
   
   // キャンバスサイズを必要に応じて拡大
-  if (canvas.width < requiredWidth || canvas.height < requiredHeight) {
-    canvas.width = requiredWidth;
-    canvas.height = requiredHeight;
-    
-    // CSSサイズも調整（アスペクト比維持）
-    const canvasElement = document.getElementById('drawCanvas');
-    if (canvasElement) {
-      canvasElement.style.width = '100%';
-      canvasElement.style.height = 'auto';
-      canvasElement.style.aspectRatio = `${requiredWidth} / ${requiredHeight}`;
-    }
-  }
+  // if (canvas.width < requiredWidth || canvas.height < requiredHeight) {
+  //   canvas.width = requiredWidth;
+  //   canvas.height = requiredHeight;
+  //   
+  //   // CSSサイズも調整（アスペクト比維持）
+  //   const canvasElement = document.getElementById('drawCanvas');
+  //   if (canvasElement) {
+  //     canvasElement.style.width = '100%';
+  //     canvasElement.style.height = 'auto';
+  //     canvasElement.style.aspectRatio = `${requiredWidth} / ${requiredHeight}`;
+  //   }
+  // }
   
   // 中央配置の座標を計算
   const offsetX = (canvas.width - drawWidth) / 2;
@@ -1801,6 +1801,7 @@ function redrawCanvasWithOthers() {
   const redrawStart = performance.now();
   console.log('🎨 redrawCanvasWithOthers 開始');
   console.log(`📊 描画前の状態: drawingCommands=${drawingCommands.length}件, otherWriters=${Object.keys(otherWritersData).length}人`);
+  console.log(`📏 キャンバスサイズ: ${canvas.width}x${canvas.height}`);
   
   // 🔒 送信済みなのにdrawingCommandsにデータがある場合は強制クリア
   // ※ この処理は削除 - 他の書き手の描画を受信した時に自分の描画が消える原因
