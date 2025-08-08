@@ -1213,8 +1213,8 @@ function drawBackgroundImage(ctx, image, canvas) {
     baseWidth = canvas.height * imageRatio;
   }
   
-  // 2倍に拡大
-  const scale = 2.0;
+  // スケール調整：全体を表示するため1.0に変更（トリミング防止）
+  const scale = 1.0;
   const drawWidth = baseWidth * scale;
   const drawHeight = baseHeight * scale;
   
