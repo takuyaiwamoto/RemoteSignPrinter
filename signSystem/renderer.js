@@ -1414,6 +1414,8 @@ let sendAnimationTimer = null; // 送信アニメーション後の扉タイマ�
 
 // 🔸 送信側と受信側のキャンバスサイズ情報
 let senderCanvasSize = { width: 859, height: 607 }; // 送信側のキャンバスサイズ（デフォルト: 横長）
+// WriterID別のキャンバスサイズ管理（複数Writer同時描画対応）
+const writerCanvasSizes = {};
 let receiverCanvasSize = { width: 1202, height: 849 }; // 受信側のキャンバスサイズ（デフォルト: 横長 859*1.4=1202, 607*1.4=849）
 
 // 🔧 書き手側のdevtool設定値（UNIFIED_SETTINGSで管理）
@@ -2240,13 +2242,13 @@ function redrawCanvas(withBackground = true) {
     const targetAreaCenterX = bgLeft + drawingAreaSize.width / 2;
     const targetAreaCenterY = bgTop + drawingAreaSize.height / 2;
     
-    // キャンバス中央からのoffsetを計算
+    // キャンバス中央からのoffsetを計算 + 130px下に移動
     // areaCenterX = canvas.width/2 + drawingAreaOffset.x = targetAreaCenterX
     // よって: drawingAreaOffset.x = targetAreaCenterX - canvas.width/2
     drawingAreaOffset.x = Math.round(targetAreaCenterX - canvas.width / 2);
-    drawingAreaOffset.y = Math.round(targetAreaCenterY - canvas.height / 2);
+    drawingAreaOffset.y = Math.round(targetAreaCenterY - canvas.height / 2 + 130); // 130px下に移動
     
-    // デバッグパネルの値も更新
+    // デバッグパネルの値も更新（130px下に移動済み）
     const centerXInput = document.getElementById('centerX');
     const centerYInput = document.getElementById('centerY');
     const areaWidthInput = document.getElementById('areaWidth');
@@ -2446,18 +2448,18 @@ function redrawCanvas(withBackground = true) {
     const targetAreaCenterX = bgLeft + drawingAreaSize.width / 2;
     const targetAreaCenterY = bgTop + drawingAreaSize.height / 2;
     
-    // キャンバス中央からのoffsetを計算
+    // キャンバス中央からのoffsetを計算 + 130px下に移動
     // areaCenterX = canvas.width/2 + drawingAreaOffset.x = targetAreaCenterX
     // よって: drawingAreaOffset.x = targetAreaCenterX - canvas.width/2
     drawingAreaOffset.x = Math.round(targetAreaCenterX - canvas.width / 2);
-    drawingAreaOffset.y = Math.round(targetAreaCenterY - canvas.height / 2);
+    drawingAreaOffset.y = Math.round(targetAreaCenterY - canvas.height / 2 + 130); // 130px下に移動
     
     // 検証用：背景画像の中心位置
     const bgCenterX = drawX + bgWidth / 2;
     const bgCenterY = drawY + bgHeight / 2;
     
     
-    // デバッグパネルの値も更新
+    // デバッグパネルの値も更新（130px下に移動済み）
     const centerXInput = document.getElementById('centerX');
     const centerYInput = document.getElementById('centerY');
     const areaWidthInput = document.getElementById('areaWidth');
@@ -3327,13 +3329,17 @@ function handleMessage(data) {
     drawingData.push(startData); // 互換性のために統合データにも追加
     
     
-    // 🔸 キャンバスサイズ情報を更新
+    // 🔸 WriterID別キャンバスサイズ情報を更新
     if (data.canvasSize) {
-      const oldSize = { ...senderCanvasSize };
-      senderCanvasSize = data.canvasSize;
-      //console.log(`📐 手動描画時キャンバスサイズ更新: ${oldSize.width}x${oldSize.height} → ${senderCanvasSize.width}x${senderCanvasSize.height}`);
+      const oldSize = writerCanvasSizes[writerId] ? { ...writerCanvasSizes[writerId] } : { ...senderCanvasSize };
+      writerCanvasSizes[writerId] = data.canvasSize;
+      //console.log(`📐 Writer ${writerId} キャンバスサイズ更新: ${oldSize.width}x${oldSize.height} → ${writerCanvasSizes[writerId].width}x${writerCanvasSizes[writerId].height}`);
     } else {
-      //console.log(`⚠️ 手動描画メッセージにcanvasSizeが含まれていません`);
+      // キャンバスサイズ情報がない場合はデフォルト値を使用
+      if (!writerCanvasSizes[writerId]) {
+        writerCanvasSizes[writerId] = { ...senderCanvasSize };
+      }
+      //console.log(`⚠️ Writer ${writerId} 描画メッセージにcanvasSizeが含まれていません - デフォルト使用`);
     }
     
     //console.log(`🖊️ 手動描画開始: 送信側(${data.x}, ${data.y}) canvas:${senderCanvasSize.width}x${senderCanvasSize.height}`);
@@ -3348,8 +3354,9 @@ function handleMessage(data) {
     const areaTop = areaCenterY - drawingAreaSize.height / 2;
     
     // 🔸 書き手側と受信側の比率統一のための描画エリアサイズ調整
-    // 書き手側のキャンバス比率と同じになるよう受信側描画エリアを調整
-    const senderAspectRatio = senderCanvasSize.width / senderCanvasSize.height;
+    // このWriterのキャンバス比率と同じになるよう受信側描画エリアを調整
+    const currentWriterCanvasSize = writerCanvasSizes[writerId] || senderCanvasSize;
+    const senderAspectRatio = currentWriterCanvasSize.width / currentWriterCanvasSize.height;
     const adjustedDrawingAreaSize = {
       width: drawingAreaSize.width,
       height: Math.round(drawingAreaSize.width / senderAspectRatio)
@@ -3357,8 +3364,8 @@ function handleMessage(data) {
     
     console.log('  書き手側比率:', senderAspectRatio.toFixed(2), '調整前:', drawingAreaSize.width, 'x', drawingAreaSize.height, '調整後:', adjustedDrawingAreaSize.width, 'x', adjustedDrawingAreaSize.height);
     
-    // 🔸 アスペクト比を保持した座標変換（調整後のサイズを使用）
-    const coords = transformCoordinatesWithAspectRatio(data.x, data.y, senderCanvasSize, adjustedDrawingAreaSize);
+    // 🔸 アスペクト比を保持した座標変換（このWriterのキャンバスサイズと調整後のサイズを使用）
+    const coords = transformCoordinatesWithAspectRatio(data.x, data.y, currentWriterCanvasSize, adjustedDrawingAreaSize);
     let scaledX = coords.x;
     let scaledY = coords.y;
     
@@ -3482,11 +3489,15 @@ function handleMessage(data) {
     multiWriterData[writerId].push(drawData);
     drawingData.push(drawData); // 互換性のために統合データにも追加
     
-    // 🔸 キャンバスサイズ情報を更新
+    // 🔸 WriterID別キャンバスサイズ情報を更新
     if (data.canvasSize) {
-      senderCanvasSize = data.canvasSize;
+      writerCanvasSizes[writerId] = data.canvasSize;
     } else {
-      //console.log(`⚠️ draw メッセージにcanvasSizeが含まれていません`);
+      // キャンバスサイズ情報がない場合はデフォルト値を使用
+      if (!writerCanvasSizes[writerId]) {
+        writerCanvasSizes[writerId] = { ...senderCanvasSize };
+      }
+      //console.log(`⚠️ Writer ${writerId} move描画メッセージにcanvasSizeが含まれていません - デフォルト使用`);
     }
     
     //console.log(`🖊️ 手動描画継続: 送信側(${data.x}, ${data.y})`);
@@ -3501,15 +3512,16 @@ function handleMessage(data) {
     const areaTop = areaCenterY - drawingAreaSize.height / 2;
     
     // 🔸 書き手側と受信側の比率統一のための描画エリアサイズ調整
-    // 書き手側のキャンバス比率と同じになるよう受信側描画エリアを調整
-    const senderAspectRatio = senderCanvasSize.width / senderCanvasSize.height;
+    // このWriterのキャンバス比率と同じになるよう受信側描画エリアを調整
+    const currentWriterCanvasSize = writerCanvasSizes[writerId] || senderCanvasSize;
+    const senderAspectRatio = currentWriterCanvasSize.width / currentWriterCanvasSize.height;
     const adjustedDrawingAreaSize = {
       width: drawingAreaSize.width,
       height: Math.round(drawingAreaSize.width / senderAspectRatio)
     };
     
-    // 🔸 アスペクト比を保持した座標変換（調整後のサイズを使用）
-    const coords = transformCoordinatesWithAspectRatio(data.x, data.y, senderCanvasSize, adjustedDrawingAreaSize);
+    // 🔸 アスペクト比を保持した座標変換（このWriterのキャンバスサイズと調整後のサイズを使用）
+    const coords = transformCoordinatesWithAspectRatio(data.x, data.y, currentWriterCanvasSize, adjustedDrawingAreaSize);
     let scaledX = coords.x;
     let scaledY = coords.y;
     
