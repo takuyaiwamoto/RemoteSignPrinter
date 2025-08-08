@@ -3395,9 +3395,10 @@ document.addEventListener('DOMContentLoaded', function() {
         };
       }
       
-      // renderer.jsのredrawCanvas関数と同じ計算ロジック
-      const maxWidth = canvas.width * (UNIFIED_SETTINGS ? UNIFIED_SETTINGS.canvasScale : 1);
-      const maxHeight = canvas.height * (UNIFIED_SETTINGS ? UNIFIED_SETTINGS.canvasScale : 1);
+      // canvasScaleを使用（書き手側の設定）
+      const currentScale = typeof canvasScale !== 'undefined' ? canvasScale : 0.7;
+      const maxWidth = canvas.width * currentScale;
+      const maxHeight = canvas.height * currentScale;
       
       const imgAspect = backgroundImage.width / backgroundImage.height;
       
