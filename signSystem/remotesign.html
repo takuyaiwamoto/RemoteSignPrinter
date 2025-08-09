@@ -267,7 +267,7 @@
     #themeToggle {
       position: fixed;
       top: 20px;
-      right: 20px;
+      left: 20px;
       z-index: 1000;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
@@ -1760,6 +1760,7 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
           ctx.lineJoin = 'round';
           ctx.lineTo(cmd.x, cmd.y);
           ctx.stroke();
+          ctx.closePath(); // パス終了
           
           // 内側の濃い赤を描画
           ctx.beginPath();
@@ -1772,6 +1773,7 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
           ctx.lineJoin = 'round';
           ctx.lineTo(cmd.x, cmd.y);
           ctx.stroke();
+          ctx.closePath(); // パス終了
           
           // 白い中心を描画（グロー効果付き）
           ctx.beginPath();
@@ -1782,11 +1784,12 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
           ctx.shadowColor = '#ffffff';
           ctx.lineTo(cmd.x, cmd.y);
           ctx.stroke();
+          ctx.closePath(); // パス終了
           ctx.globalAlpha = isMyself ? 1.0 : 0.7; // 透明度をリセット
         }
       } else {
-        // 通常の色の描画（各線分を独立して描画）
-        ctx.beginPath();
+        // 通常の色の描画（各線分を完全独立して描画）
+        ctx.beginPath(); // 必須：新しいパスを開始
         ctx.moveTo(writerState.prevCmd.x, writerState.prevCmd.y);
         ctx.lineWidth = cmd.thickness || (isMyself ? currentPenThickness : 4);
         ctx.strokeStyle = cmd.color || (isMyself ? currentPenColor : 'black');
@@ -1794,6 +1797,7 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
         ctx.lineJoin = 'round';
         ctx.lineTo(cmd.x, cmd.y);
         ctx.stroke(); // 各線分を即座に描画
+        ctx.closePath(); // 重要：パスを完全に終了してWriter間の混在を防止
       }
       writerState.prevCmd = cmd;
     }
@@ -1811,6 +1815,8 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
     console.log(`📋 DEBUG: 自分の描画完了 - start=${startCount}件, draw=${drawCount}件`);
   }
   
+  // Canvas状態を完全にクリア（次のWriter描画との混在防止）
+  ctx.beginPath(); // 重要：このWriterのパスを完全終了
   ctx.restore();
 }
 
@@ -1859,9 +1865,11 @@ function redrawCanvasWithOthers() {
   drawWriterCommands(drawingCommands, myWriterId, true);
   ctx.restore();
   
-  // 他執筆者の描画データを描画
+  // 他執筆者の描画データを描画（完全分離）
   Object.keys(otherWritersData).forEach(writerId => {
     ctx.save();
+    
+    // Canvas状態を完全にリセット（Writer間の干渉を防止）
     ctx.beginPath();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
@@ -1869,8 +1877,13 @@ function redrawCanvasWithOthers() {
     ctx.shadowBlur = 0;
     ctx.shadowColor = 'transparent';
     
+    console.log(`📋 DEBUG: 他Writer[${writerId}]描画開始`);
     drawWriterCommands(otherWritersData[writerId], writerId, false);
+    
+    // Writer描画完了後、状態を完全クリア
+    ctx.beginPath(); // 重要：このWriterのパスを完全終了
     ctx.restore();
+    console.log(`📋 DEBUG: 他Writer[${writerId}]描画完了`);
   });
   
   // 現在描画中だった場合、描画状態を復元
