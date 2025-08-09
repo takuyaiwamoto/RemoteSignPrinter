@@ -1545,8 +1545,8 @@ function consolidateDrawingData() {
   // 時系列順に並べるため、全データを収集してタイムスタンプでソート
   const allData = [];
   
-  Object.keys({}).forEach(writerId => {
-    {}[writerId].forEach(cmd => {
+  Object.keys(writerDrawingData).forEach(writerId => {
+    writerDrawingData[writerId].forEach(cmd => {
       allData.push({
         ...cmd,
         writerId: writerId,
@@ -1558,7 +1558,7 @@ function consolidateDrawingData() {
   // タイムスタンプでソート
   allData.sort((a, b) => a.timestamp - b.timestamp);
   
-  const writerCounts = Object.keys({}).map(id => `${id}: ${{}[id].length}`).join(', ');
+  const writerCounts = Object.keys(writerDrawingData).map(id => `${id}: ${writerDrawingData[id].length}`).join(', ');
   console.log(`📊 統合描画データ: ${allData.length}個のコマンド（${writerCounts}）`);
   
   return allData;
@@ -1664,7 +1664,7 @@ let sendAnimationTimer = null; // 送信アニメーション後の扉タイマ�
 // 🔸 送信側と受信側のキャンバスサイズ情報
 let senderCanvasSize = { width: 859, height: 607 }; // 送信側のキャンバスサイズ（デフォルト: 横長）
 // WriterID別のキャンバスサイズ管理（複数Writer同時描画対応）
-const {} = {};
+const writerCanvasSizesData = {};
 let receiverCanvasSize = { width: 1202, height: 849 }; // 受信側のキャンバスサイズ（デフォルト: 横長 859*1.4=1202, 607*1.4=849）
 
 // 🔧 書き手側のdevtool設定値（UNIFIED_SETTINGSで管理）
@@ -2804,9 +2804,9 @@ function removeRedrawCanvas(withBackground = true) {
   const areaTop = areaCenterY - drawingAreaSize.height / 2;
   
   // WriterID別に独立して描画（線の混在を防ぐ）
-  Object.keys({}).forEach(writerId => {
-    if ({}[writerId].length > 0) {
-      drawWriterCommandsReceiver({}[writerId], writerId);
+  Object.keys(writerDrawingData).forEach(writerId => {
+    if (writerDrawingData[writerId].length > 0) {
+      drawWriterCommandsReceiver(writerDrawingData[writerId], writerId);
     }
   });
   
@@ -3441,10 +3441,10 @@ function handleMessage(data) {
     // 🔸 送信側のキャンバスサイズ情報を保存（WriterID別管理）
     if (data.canvasSize) {
       const writerId = data.writerId || 'default';
-      const oldSenderSize = {}[writerId] || { ...senderCanvasSize };
+      const oldSenderSize = writerCanvasSizesData[writerId] || { ...senderCanvasSize };
       
       // WriterID別のキャンバスサイズを保存
-      {}[writerId] = data.canvasSize;
+      writerCanvasSizesData[writerId] = data.canvasSize;
       
       // 後方互換性のため、グローバル変数も更新
       senderCanvasSize = data.canvasSize;
@@ -3786,9 +3786,9 @@ function handleMessage(data) {
     
     // 🔸 WriterID別キャンバスサイズ情報を更新
     if (data.canvasSize) {
-      const oldSize = {}[writerId] ? { ...{}[writerId] } : { ...senderCanvasSize };
-      {}[writerId] = data.canvasSize;
-      //console.log(`📐 Writer ${writerId} キャンバスサイズ更新: ${oldSize.width}x${oldSize.height} → ${{}[writerId].width}x${{}[writerId].height}`);
+      const oldSize = writerCanvasSizesData[writerId] ? { ...writerCanvasSizesData[writerId] } : { ...senderCanvasSize };
+      writerCanvasSizesData[writerId] = data.canvasSize;
+      //console.log(`📐 Writer ${writerId} キャンバスサイズ更新: ${oldSize.width}x${oldSize.height} → ${writerCanvasSizesData[writerId].width}x${writerCanvasSizesData[writerId].height}`);
       
       // back2.pngが表示中でスケール情報があればサイズ更新
       if (back2Wrapper && data.canvasSize.scale && data.canvasSize.scale !== currentScale) {
@@ -3990,7 +3990,7 @@ function handleMessage(data) {
     
     // 🔸 WriterID別キャンバスサイズ情報を更新
     if (data.canvasSize) {
-      {}[writerId] = data.canvasSize;
+      writerCanvasSizesData[writerId] = data.canvasSize;
       
       // back2.pngが表示中でスケール情報があればサイズ更新
       if (back2Wrapper && data.canvasSize.scale && data.canvasSize.scale !== currentScale) {
@@ -4060,7 +4060,7 @@ function handleMessage(data) {
       const writerId = data.writerId || 'writer1';
       
       // 前の描画データから前の位置を取得
-      const allWriterData = {}[writerId] || [];
+      const allWriterData = writerDrawingData[writerId] || [];
       const prevCmd = allWriterData[allWriterData.length - 2]; // 最新は現在のコマンド
       
       if (prevCmd && (prevCmd.type === 'start' || prevCmd.type === 'draw')) {
@@ -4140,7 +4140,7 @@ function handleMessage(data) {
       }
     } else {
       // 通常の色の場合 - リアルタイム描画は独立したWriter描画で実行（混在防止）
-      const allWriterData = {}[writerId] || [];
+      const allWriterData = writerDrawingData[writerId] || [];
       const prevCmd = allWriterData[allWriterData.length - 2]; // 最新は現在のコマンド
       if (prevCmd && (prevCmd.type === 'start' || prevCmd.type === 'draw')) {
         // 🔥 WriterID別状態を確実に分離してリアルタイム描画
@@ -4443,10 +4443,10 @@ function sendCanvasToMainProcess() {
   console.log('🖨️ 送信ボタン印刷用Canvas設定完了（回転なし）');
   
   // 🔥 WriterID別に独立して描画（線接続防止）
-  Object.keys({}).forEach(writerId => {
-    if ({}[writerId].length > 0) {
-      console.log(`🖨️ 送信ボタン Writer ${writerId} の描画開始: ${{}[writerId].length}コマンド`);
-      drawWriterCommandsForPrint({}[writerId], writerId, printCtx);
+  Object.keys(writerDrawingData).forEach(writerId => {
+    if (writerDrawingData[writerId].length > 0) {
+      console.log(`🖨️ 送信ボタン Writer ${writerId} の描画開始: ${writerDrawingData[writerId].length}コマンド`);
+      drawWriterCommandsForPrint(writerDrawingData[writerId], writerId, printCtx);
     }
   });
   
@@ -6974,10 +6974,10 @@ function generatePrintImageData() {
   // 筆跡を描画（両モード共通）- WriterID別に独立描画（線接続防止）
   
   // 🔥 WriterID別に独立して描画（線接続防止）
-  Object.keys({}).forEach(writerId => {
-    if ({}[writerId].length > 0) {
-      console.log(`🖨️ ダウンロード Writer ${writerId} の描画開始: ${{}[writerId].length}コマンド`);
-      drawWriterCommandsForDownload({}[writerId], writerId, downloadCtx);
+  Object.keys(writerDrawingData).forEach(writerId => {
+    if (writerDrawingData[writerId].length > 0) {
+      console.log(`🖨️ ダウンロード Writer ${writerId} の描画開始: ${writerDrawingData[writerId].length}コマンド`);
+      drawWriterCommandsForDownload(writerDrawingData[writerId], writerId, downloadCtx);
     }
   });
   
