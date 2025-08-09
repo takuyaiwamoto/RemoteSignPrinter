@@ -7126,21 +7126,51 @@ if (typeof ipcRenderer !== 'undefined') {
 function startRotationAnimation(rotationWaitTime) {
   console.log('🎬 アニメーションシーケンス開始');
   
-  const canvas = document.getElementById('canvas');
-  const back2Wrapper = document.getElementById('back2Wrapper');
+  // 実際に使用されている要素IDを使用
+  const drawCanvasElement = document.getElementById('drawCanvas') || document.getElementById('drawCanvas-temp');
+  const back2WrapperElement = document.getElementById('back2-wrapper'); // 正しいIDに修正
+  const containerElement = document.getElementById('container');
   
-  if (!canvas && !back2Wrapper) {
+  // 複数の候補から適切な要素を選択
+  let animationTarget = null;
+  
+  if (back2WrapperElement) {
+    animationTarget = back2WrapperElement;
+    console.log('🎯 アニメーション対象: back2Wrapper要素');
+  } else if (drawCanvasElement) {
+    animationTarget = drawCanvasElement;
+    console.log('🎯 アニメーション対象: drawCanvas要素');
+  } else if (containerElement) {
+    animationTarget = containerElement;
+    console.log('🎯 アニメーション対象: container要素');
+  } else {
     console.log('❌ アニメーション対象が見つかりません');
+    console.log('🔍 利用可能な要素を検索...');
+    
+    // すべての主要要素の存在を確認
+    const elements = ['drawCanvas', 'drawCanvas-temp', 'back2-wrapper', 'container', 'draw-canvas'];
+    elements.forEach(id => {
+      const elem = document.getElementById(id);
+      console.log(`🔍 ${id}: ${elem ? 'EXISTS' : 'NOT FOUND'}`);
+    });
+    
     return;
   }
   
-  // アニメーション対象要素を取得
-  const animationTarget = back2Wrapper || canvas;
-  
   // Step 1: 180度回転アニメーション (2秒)
-  console.log('🔄 Step 1: 180度回転アニメーション開始');
+  // back2-wrapperは既に180度回転しているので、さらに180度回転させて0度にする
+  console.log('🔄 Step 1: 180度回転アニメーション開始（180度→360度=0度）');
   animationTarget.style.transition = 'transform 2s ease-in-out';
-  animationTarget.style.transform = 'translateX(-50%) rotate(180deg)';
+  
+  if (animationTarget.id === 'back2-wrapper') {
+    // back2-wrapperの場合：既に180度回転済みなので360度（0度）に回転
+    animationTarget.style.transform = 'rotate(360deg)';
+    console.log('🔄 back2-wrapper: 180度→360度（0度）に回転');
+  } else {
+    // その他の要素の場合：通常の180度回転
+    animationTarget.style.transform = 'translateX(-50%) rotate(180deg)';
+    console.log('🔄 その他要素: 0度→180度に回転');
+  }
   
   setTimeout(() => {
     console.log('✅ Step 1完了: 180度回転アニメーション完了');
@@ -7160,7 +7190,16 @@ function startRotationAnimation(rotationWaitTime) {
       const slideDistance = windowHeight + targetHeight + 100; // 完全に画面外まで
       
       animationTarget.style.transition = 'transform 3s ease-in-out';
-      animationTarget.style.transform = 'translateX(-50%) rotate(180deg) translateY(' + slideDistance + 'px)';
+      
+      if (animationTarget.id === 'back2-wrapper') {
+        // back2-wrapperの場合：回転なしでスライド
+        animationTarget.style.transform = 'rotate(360deg) translateY(' + slideDistance + 'px)';
+        console.log(`🔄 back2-wrapper: ${slideDistance}px下にスライド`);
+      } else {
+        // その他の要素の場合：回転付きでスライド
+        animationTarget.style.transform = 'translateX(-50%) rotate(180deg) translateY(' + slideDistance + 'px)';
+        console.log(`🔄 その他要素: ${slideDistance}px下にスライド`);
+      }
       
       setTimeout(() => {
         console.log('✅ Step 3完了: スライドアニメーション完了（画面外に消失）');
@@ -7185,7 +7224,16 @@ function startRotationAnimation(rotationWaitTime) {
           
           // 要素の位置とスタイルをリセット
           animationTarget.style.transition = 'none';
-          animationTarget.style.transform = 'translateX(-50%) rotate(0deg) translateY(0px)';
+          
+          if (animationTarget.id === 'back2-wrapper') {
+            // back2-wrapperの場合：元の180度回転状態に戻す
+            animationTarget.style.transform = 'rotate(180deg)';
+            console.log('🔄 back2-wrapper: 元の180度回転状態に復帰');
+          } else {
+            // その他の要素の場合：0度状態に戻す
+            animationTarget.style.transform = 'translateX(-50%) rotate(0deg) translateY(0px)';
+            console.log('🔄 その他要素: 元の0度状態に復帰');
+          }
           
           // 背景画像を再表示
           if (back2Wrapper) {
