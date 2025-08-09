@@ -694,10 +694,10 @@
       }
       
       #drawCanvas {
-        width: 80% !important; /* タブレット横画面で0.8倍 */
-        height: auto !important;
-        max-height: 85vh; /* さらに大きく表示 */
-        aspect-ratio: 859 / 607; /* 元のキャンバスアスペクト比に統一 */
+        width: 100% !important; /* ピンクエリアと同じサイズに固定 */
+        height: 100% !important;
+        transform: scale(1.3) !important; /* ピンクエリアと同じスケール */
+        transform-origin: center !important;
         margin: 0 auto;
       }
       
