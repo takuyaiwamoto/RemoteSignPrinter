@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://realtime-sign-server-1.onrender.com ws://localhost:* wss://localhost:* https://api.switch-bot.com; img-src 'self' data: blob:; media-src 'self';">
+  <title>受信側1.2</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f0f0f0;
+      font-family: Arial, sans-serif;
+    }
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+    canvas {
+      display: block;
+      margin: auto;
+    }
+    #devButton {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 20000;
+      background: #FF4444;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #devPanel {
+      position: fixed;
+      top: 60px;
+      right: 10px;
+      width: 300px;
+      background: white;
+      border: 2px solid #FF4444;
+      border-radius: 10px;
+      padding: 20px;
+      z-index: 20000;
+      display: none;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    .control-group {
+      margin-bottom: 15px;
+    }
+    .control-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    .control-group input {
+      width: 60px;
+      padding: 5px;
+      margin-right: 10px;
+    }
+    .control-group button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 3px;
+      cursor: pointer;
+      margin-right: 5px;
+    }
+    .control-group button:hover {
+      background: #45a049;
+    }
+    #drawingArea {
+      position: absolute;
+      border: 2px solid rgba(255, 0, 0, 0.5);
+      background: rgba(255, 0, 0, 0.1);
+      display: none;
+      pointer-events: auto;
+      cursor: move;
+      z-index: 10000;
+    }
+    
+    .resize-handle {
+      position: absolute;
+      background: rgba(255, 0, 0, 0.8);
+      border: 1px solid #fff;
+      z-index: 10001;
+    }
+    
+    .resize-handle.nw {
+      top: -5px;
+      left: -5px;
+      width: 10px;
+      height: 10px;
+      cursor: nw-resize;
+    }
+    
+    .resize-handle.ne {
+      top: -5px;
+      right: -5px;
+      width: 10px;
+      height: 10px;
+      cursor: ne-resize;
+    }
+    
+    .resize-handle.sw {
+      bottom: -5px;
+      left: -5px;
+      width: 10px;
+      height: 10px;
+      cursor: sw-resize;
+    }
+    
+    .resize-handle.se {
+      bottom: -5px;
+      right: -5px;
+      width: 10px;
+      height: 10px;
+      cursor: se-resize;
+    }
+    
+    .resize-handle.n {
+      top: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 10px;
+      height: 10px;
+      cursor: n-resize;
+    }
+    
+    .resize-handle.s {
+      bottom: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 10px;
+      height: 10px;
+      cursor: s-resize;
+    }
+    
+    .resize-handle.w {
+      top: 50%;
+      left: -5px;
+      transform: translateY(-50%);
+      width: 10px;
+      height: 10px;
+      cursor: w-resize;
+    }
+    
+    .resize-handle.e {
+      top: 50%;
+      right: -5px;
+      transform: translateY(-50%);
+      width: 10px;
+      height: 10px;
+      cursor: e-resize;
+    }
+    
+    #printPreviewModal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 2000;
+      display: none;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    #printPreviewContent {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 90%;
+      max-height: 90%;
+      overflow: auto;
+      position: relative;
+    }
+    
+    #printPreviewCanvas {
+      border: 1px solid #ddd;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .close-button {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      background: #ff4444;
+      color: white;
+      border: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    
+    .print-buttons {
+      margin-top: 15px;
+      text-align: center;
+    }
+    
+    .print-buttons button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin: 0 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    
+    .print-buttons button:hover {
+      background: #45a049;
+    }
+    
+    /* 受信側ハートエフェクト用のCSSアニメーション */
+    .receiver-drawing-heart {
+      position: fixed;
+      width: 12px;
+      height: 12px;
+      background: var(--heart-color, #ff1493);
+      pointer-events: none;
+      z-index: 9998;
+      transform: rotate(45deg);
+      animation: receiverHeartFloat 1.5s ease-out forwards;
+      box-shadow: 0 0 8px var(--heart-color, #ff1493), 0 0 16px var(--heart-color, #ff1493);
+    }
+    
+    /* 受信側星エフェクト用のCSSアニメーション */
+    .star {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: gold;
+      pointer-events: none;
+      animation: starTwinkle 1s ease-out forwards;
+      z-index: 10;
+      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    }
+    .receiver-drawing-heart::before,
+    .receiver-drawing-heart::after {
+      content: '';
+      width: 12px;
+      height: 12px;
+      position: absolute;
+      background: var(--heart-color, #ff1493);
+      border-radius: 50%;
+    }
+    .receiver-drawing-heart::before {
+      top: -6px;
+      left: 0;
+    }
+    .receiver-drawing-heart::after {
+      top: 0;
+      left: -6px;
+    }
+    
+    @keyframes receiverHeartFloat {
+      0% {
+        opacity: 1;
+        transform: rotate(45deg) scale(0.3) translateY(0px);
+      }
+      50% {
+        opacity: 0.8;
+        transform: rotate(45deg) scale(1) translateY(-20px);
+      }
+      100% {
+        opacity: 0;
+        transform: rotate(45deg) scale(0.5) translateY(-50px);
+      }
+    }
+    
+    @keyframes starTwinkle {
+      0% {
+        opacity: 1;
+        transform: scale(0) rotate(0deg) translateX(0px) translateY(0px);
+        filter: blur(0px);
+      }
+      30% {
+        opacity: 1;
+        transform: scale(1.2) rotate(180deg) translateX(10px) translateY(-10px);
+        filter: blur(0px);
+      }
+      60% {
+        opacity: 0.7;
+        transform: scale(1.0) rotate(270deg) translateX(20px) translateY(-20px);
+        filter: blur(1px);
+      }
+      85% {
+        opacity: 0.3;
+        transform: scale(0.6) rotate(330deg) translateX(25px) translateY(-25px);
+        filter: blur(2px);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(0.2) rotate(360deg) translateX(30px) translateY(-30px);
+        filter: blur(3px);
+      }
+    }
+    
+  </style>
+</head>
+<body>
+
+<button id="devButton" onclick="toggleDevPanel()">DEV</button>
+<button id="reviewButton" onclick="showPrintPreview()" style="position: fixed; top: 10px; left: 10px; z-index: 15000; background: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;">レビュー</button>
+
+<div id="devPanel">
+  <h3>描画エリア調整</h3>
+  
+  <div class="control-group">
+    <label>中央位置 (X, Y):</label>
+    <input type="number" id="centerX" value="0" placeholder="X">
+    <input type="number" id="centerY" value="0" placeholder="Y">
+  </div>
+  
+  <div class="control-group">
+    <label>幅・高さ:</label>
+    <input type="number" id="areaWidth" value="630" placeholder="幅">
+    <input type="number" id="areaHeight" value="450" placeholder="高さ">
+  </div>
+  
+  <div class="control-group">
+    <button onclick="showDrawingArea()">プレビュー</button>
+    <button onclick="applyDrawingArea()">適用</button>
+    <button onclick="hideDrawingArea()">非表示</button>
+  </div>
+  
+  <div class="control-group">
+    <button onclick="resetDrawingArea()">リセット</button>
+  </div>
+  
+  <div class="control-group">
+    <button onclick="toggleFullscreen()" style="background: #2196F3; color: white;">フル</button>
+  </div>
+  
+  <div class="control-group">
+    <button onclick="createReceiverFireworks()" style="background: #FF5722; color: white;">🎆 受信側花火テスト</button>
+  </div>
+  
+</div>
+
+<div id="drawingArea">
+  <div class="resize-handle nw"></div>
+  <div class="resize-handle n"></div>
+  <div class="resize-handle ne"></div>
+  <div class="resize-handle w"></div>
+  <div class="resize-handle e"></div>
+  <div class="resize-handle sw"></div>
+  <div class="resize-handle s"></div>
+  <div class="resize-handle se"></div>
+</div>
+
+<div id="container" style="position: relative; z-index: 1;">
+  <canvas id="drawCanvas" width="1470" height="1040" style="position: relative; z-index: 1;"></canvas>
+</div>
+
+<div id="printPreviewModal">
+  <div id="printPreviewContent">
+    <button class="close-button" onclick="closePrintPreview()">×</button>
+    <h3>印刷物プレビュー</h3>
+    <canvas id="printPreviewCanvas"></canvas>
+    <div class="print-buttons">
+      <button onclick="printFull()">印刷フル</button>
+      <button onclick="printPen()">印刷ペン</button>
+    </div>
+  </div>
+</div>
+
+<script src="renderer.js"></script>
+</body>
+</html>

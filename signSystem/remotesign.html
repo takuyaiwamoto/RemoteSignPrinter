@@ -67,9 +67,9 @@
       display: block;
       margin-bottom: 10px;
       max-width: 100%;
-      width: 100%; /* より大きく表示 */
-      height: auto;
-      aspect-ratio: 859 / 607; /* 元のアスペクト比を固定 */
+      width: 283px; /* 背景画像と同じサイズに固定 */
+      height: 420px;
+      aspect-ratio: 283 / 420; /* 背景画像の比率に修正 */
     }
     body.classic button {
       margin-right: 5px;
@@ -117,7 +117,9 @@
       display: flex;
       justify-content: center;
       gap: 15px;
-      margin: 15px 0;
+      margin: 80px 0 15px 0; /* 上マージンを大幅に増加 */
+      position: relative;
+      z-index: 1000; /* 背景画像より前面に */
     }
     
     body.modern .pen-controls {
@@ -787,7 +789,11 @@
 
 <div class="main-container">
 <div class="canvas-container">
-<canvas id="drawCanvas" width="859" height="607" style="position: relative; z-index: 100000; background: transparent; cursor: crosshair; pointer-events: auto;"></canvas>
+<div style="position: relative; display: inline-block; margin: 50px auto 20px auto;">
+  <img src="back2.png" alt="背景画像" style="transform: scale(1.3); display: block;">
+  <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: pink; transform: scale(1.3); transform-origin: center;"></div>
+  <canvas id="drawCanvas" width="283" height="420" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scale(1.3); transform-origin: center; cursor: crosshair; background: transparent;"></canvas>
+</div>
 
 <!-- メインコントロール: Clear、自分だけ削除、送信 -->
 <div class="main-controls">
@@ -931,6 +937,11 @@
   <div class="button-group">
     <button onclick="testSwitchBot()" style="background-color: #FF6B35; color: white;">🤖 Botテスト</button>
   </div>
+  
+  <div class="button-group">
+    <label>座標テスト:</label>
+    <button onclick="testDrawRightBottom()" style="background-color: #FF1493; color: white;">テスト右下</button>
+  </div>
 </div>
 
 <div id="countdown"></div>
@@ -996,17 +1007,15 @@ const backgroundSizes = {
   'white': { width: 859, height: 607 }     // 白背景 - 統一アスペクト比
 };
 socket.onopen = () => {
-  // console.log("✅ WebSocket接続完了（送信側）");
+  console.log("✅ WebSocket接続完了（送信側）");
   
   // 少し待ってからwriter ID を要求（受信側の準備完了を待つ）
   setTimeout(() => {
+    console.log("🔄 WriterID要求を開始");
     requestWriterId();
     
-    // 初期背景画像を設定（まだ設定されていない場合）
-    if (!backgroundImage && !lastBackgroundSrc) {
-      console.log('🖼️ 初期背景画像を設定: back2.png');
-      setBackground('./back2.png');
-    }
+    // 初期背景画像の設定はWriterID割り当て完了後に実行するため、ここでは削除
+    console.log('⏳ WriterID割り当て待ち - 背景画像送信はWriterID取得後に実行');
   }, 500);
 };
 
@@ -1055,9 +1064,13 @@ function processMessage(data) {
   
   if (data.type === "assignWriterId") {
     // writer ID の割り当てを受信
+    console.log("📨 WriterID割り当てメッセージ受信（生データ）:", data);
+    console.log("📊 自分のセッションID:", mySessionId);
+    console.log("📊 メッセージのセッションID:", data.sessionId);
+    
     // セッションIDが一致する場合のみログ出力と処理
     if (data.sessionId && data.sessionId === mySessionId) {
-      console.log("📨 Writer ID割り当てメッセージ受信:", data);
+      console.log("✅ セッションID一致 - WriterID処理開始");
       // 既に同じWriterIDを持っている他のブラウザがいないかチェック
       if (data.conflictDetected) {
         console.warn("⚠️ WriterID重複検出！再割り当てを要求します");
@@ -1068,6 +1081,7 @@ function processMessage(data) {
         return;
       }
       
+      console.log("📋 WriterID割り当て実行:", data.writerId);
       myWriterId = data.writerId;
       console.log(`📝 Writer ID 割り当て: ${myWriterId} (SessionID: ${mySessionId})`);
       document.title = `送信側 - ${myWriterId}`;
@@ -1083,9 +1097,15 @@ function processMessage(data) {
         sessionId: mySessionId,
         timestamp: Date.now()
       }));
+      
+      // WriterID割り当て完了後に背景画像を受信側に送信
+      console.log("🖼️ WriterID割り当て完了 - 背景画像を受信側に送信");
+      setBackground('./back2.png');
     } else {
       // 他のクライアント向けのメッセージなので静かに無視（エラーではない）
-      // console.log("🔇 他のクライアント向けのWriterID割り当てメッセージを無視");
+      console.log("🔇 セッションID不一致のWriterID割り当てメッセージ（他クライアント向け）");
+      console.log("  自分のセッション:", mySessionId);
+      console.log("  メッセージのセッション:", data.sessionId);
     }
     
   } else if (data.type === "start" || data.type === "draw") {
@@ -1197,55 +1217,19 @@ function processMessage(data) {
 function drawBackgroundImage(ctx, image, canvas) {
   if (!image) return;
   
-  const canvasRatio = canvas.width / canvas.height;
-  const imageRatio = image.width / image.height;
+  console.log('🖼️ 背景画像をキャンバス下に設定');
+  console.log(`📥 画像サイズ: ${image.naturalWidth}x${image.naturalHeight}`);
   
-  let baseWidth, baseHeight;
-  
-  // 基本サイズを計算（contain方式）
-  if (imageRatio > canvasRatio) {
-    // 画像の方が横長
-    baseWidth = canvas.width;
-    baseHeight = canvas.width / imageRatio;
-  } else {
-    // 画像の方が縦長
-    baseHeight = canvas.height;
-    baseWidth = canvas.height * imageRatio;
+  // キャンバスサイズはそのままで、CSSで背景画像を設定
+  const canvasElement = document.getElementById('drawCanvas');
+  if (canvasElement) {
+    canvasElement.style.backgroundImage = `url(${image.src})`;
+    canvasElement.style.backgroundSize = 'contain';
+    canvasElement.style.backgroundRepeat = 'no-repeat';
+    canvasElement.style.backgroundPosition = 'center';
+    
+    console.log(`✅ 背景画像をCSS背景として設定: ${image.src}`);
   }
-  
-  // スケール調整：全体を表示するため1.0に変更（トリミング防止）
-  const scale = 1.0;
-  const drawWidth = baseWidth * scale;
-  const drawHeight = baseHeight * scale;
-  
-  // キャンバスサイズの自動調整を無効化（サイズ破損の原因）
-  // const requiredWidth = Math.max(canvas.width, drawWidth);
-  // const requiredHeight = Math.max(canvas.height, drawHeight);
-  
-  // キャンバスサイズを必要に応じて拡大
-  // if (canvas.width < requiredWidth || canvas.height < requiredHeight) {
-  //   canvas.width = requiredWidth;
-  //   canvas.height = requiredHeight;
-  //   
-  //   // CSSサイズも調整（アスペクト比維持）
-  //   const canvasElement = document.getElementById('drawCanvas');
-  //   if (canvasElement) {
-  //     canvasElement.style.width = '100%';
-  //     canvasElement.style.height = 'auto';
-  //     canvasElement.style.aspectRatio = `${requiredWidth} / ${requiredHeight}`;
-  //   }
-  // }
-  
-  // 中央配置の座標を計算
-  const offsetX = (canvas.width - drawWidth) / 2;
-  const offsetY = (canvas.height - drawHeight) / 2;
-  
-  // 背景色を白で塗りつぶし
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
-  // 画像を中央に配置して描画（2倍サイズ）
-  ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
 }
 
 // 不要なコントロール表示機能を削除 - シンプルなUIに統一
@@ -1527,18 +1511,22 @@ function generateSessionId() {
 
 // Writer ID要求関数
 function requestWriterId() {
+  console.log("🔄 requestWriterId関数呼び出し");
+  console.log("📊 WebSocket状態:", socket ? socket.readyState : 'socket未初期化');
+  console.log("📊 WebSocket.OPEN定数:", WebSocket.OPEN);
+  
   if (socket && socket.readyState === WebSocket.OPEN) {
     // セッションIDが未設定の場合は生成
     if (!mySessionId) {
       mySessionId = generateSessionId();
-      // console.log("🆔 セッションID生成:", mySessionId);
+      console.log("🆔 セッションID生成:", mySessionId);
     }
     
     const requestMsg = {
       type: "requestWriterId",
       sessionId: mySessionId
     };
-    // console.log("🔄 Writer ID再要求送信:", requestMsg);
+    console.log("📤 Writer ID要求送信:", requestMsg);
     socket.send(JSON.stringify(requestMsg));
     
     // 要求後の確認（自動再試行機能付き）
@@ -1637,15 +1625,17 @@ function createWriterStatusDiv() {
     cursor: pointer;
   `;
   testBtn.onclick = () => {
-    // console.log(`🔍 現在のWriter ID: ${myWriterId}`);
-    // console.log(`🔍 WebSocket状態: ${socket ? socket.readyState : 'socket未初期化'}`);
-    // console.log(`🔍 他の書き手データ:`, otherWritersData);
+    console.log(`🔍 現在のWriter ID: ${myWriterId}`);
+    console.log(`🔍 WebSocket状態: ${socket ? socket.readyState : 'socket未初期化'}`);
+    console.log(`🔍 セッションID: ${mySessionId}`);
+    console.log(`🔍 他の書き手データ:`, otherWritersData);
     
-    let message = `Version: 3.0\nWriter ID: ${myWriterId || '未割り当て'}\nWebSocket: ${socket ? socket.readyState : '未初期化'}\n他の書き手: ${Object.keys(otherWritersData).length}人`;
+    let message = `Version: 3.0\nWriter ID: ${myWriterId || '未割り当て'}\nWebSocket: ${socket ? socket.readyState : '未初期化'}\nセッションID: ${mySessionId || '未生成'}\n他の書き手: ${Object.keys(otherWritersData).length}人`;
     
     if (!myWriterId) {
       message += '\n\n🔄 Writer IDを再要求しますか？';
       if (confirm(message)) {
+        console.log("🔄 手動でWriterID要求を実行");
         requestWriterId();
       }
     } else {
@@ -1897,12 +1887,13 @@ function redrawCanvasWithOthers() {
 
 socket.onerror = (error) => console.error("❌ WebSocketエラー（送信側）:", error);
 socket.onclose = (event) => {
-  // console.log("⚠️ WebSocket切断（送信側）:", event.code, event.reason);
+  console.log("⚠️ WebSocket切断（送信側）:", event.code, event.reason);
+  console.log("🧹 切断前の状態:", { myWriterId, mySessionId });
   
   // 接続切断時にセッション情報をリセット
   mySessionId = null;
   myWriterId = null;
-  // console.log("🧹 WebSocket切断に伴いセッション情報をリセット");
+  console.log("🧹 WebSocket切断に伴いセッション情報をリセット");
   
   // Writer ID表示をクリア
   const statusDiv = document.getElementById('writerStatus');
@@ -2136,29 +2127,29 @@ function setPrintMode(mode) {
 
 // 🔸 キャンバスサイズ変更関数を追加
 function setCanvasToPortraitSize() {
-  // 縦長サイズ（A4縦の1.02倍）に変更
-  canvas.width = 607;  // A4縦の幅 (595*0.6*1.7)
-  canvas.height = 859; // A4縦の高さ (842*0.6*1.7)
+  // 背景画像と同じサイズに変更
+  canvas.width = 283;
+  canvas.height = 420;
   
   // 🔸 HTML要素のサイズも変更
-  canvas.setAttribute('width', '607');
-  canvas.setAttribute('height', '859');
-  canvas.style.width = '607px';
-  canvas.style.height = '859px';
+  canvas.setAttribute('width', '283');
+  canvas.setAttribute('height', '420');
+  canvas.style.width = '283px';
+  canvas.style.height = '420px';
   
   // console.log(`書き手側キャンバスを縦長に変更: ${canvas.width} x ${canvas.height}`);
 }
 
 function resetCanvasToNormalSize() {
-  // 通常サイズ（A4横の1.02倍）に戻す
-  canvas.width = 859;  // 元のサイズ (842*0.6*1.7)
-  canvas.height = 607; // 元のサイズ (595*0.6*1.7)
+  // 背景画像と同じサイズに戻す
+  canvas.width = 283;
+  canvas.height = 420;
   
   // 🔸 HTML要素のサイズも変更
-  canvas.setAttribute('width', '859');
-  canvas.setAttribute('height', '607');
-  canvas.style.width = '859px';
-  canvas.style.height = '607px';
+  canvas.setAttribute('width', '283');
+  canvas.setAttribute('height', '420');
+  canvas.style.width = '283px';
+  canvas.style.height = '420px';
   
   // console.log(`書き手側キャンバスを通常サイズに変更: ${canvas.width} x ${canvas.height}`);
 }
@@ -2176,17 +2167,33 @@ function setBackground(src) {
   if (src === null) {
     backgroundImage = null;
     
-    // 🔸 白背景のキャンバスサイズを設定
-    setCanvasSize('white');
+    // 🔸 白背景の場合も縦長サイズを設定（背景画像と同じ傾向）
+    canvas.width = 400;  // 幅（横）
+    canvas.height = 600; // 高さ（縦）
+    
+    console.log(`📄 白背景縦長確認: 幅${canvas.width} < 高さ${canvas.height} = ${canvas.width < canvas.height ? '縦長' : '横長'}`);
+    
+    console.log(`📄 白背景キャンバス: ${canvas.width}x${canvas.height}`);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // 受信側にサイズ情報付きで送信（devtoolのスケール値も含める）
-    socket.send(JSON.stringify({ 
-      type: "background", 
-      src: "white",
-      canvasSize: backgroundSizes['white'],
-      scale: canvasScale
-    }));
+    // 🔧 WebSocket接続状態を確認してから白背景データを送信
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ 
+        type: "background", 
+        src: "white",
+        writerId: myWriterId,
+        canvasSize: { 
+          width: canvas.width,
+          height: canvas.height 
+        },
+        scale: canvasScale,
+        originalSize: backgroundSizes['white']
+      }));
+      
+      console.log(`📡 白背景とキャンバスサイズを受信側に送信: ${canvas.width}x${canvas.height}`);
+    } else {
+      console.log(`⚠️ WebSocket未接続のため白背景データ送信をスキップ (状態: ${socket?.readyState})`);
+    }
   } else {
     const img = new Image();
     img.src = src;
@@ -2196,9 +2203,10 @@ function setBackground(src) {
       // console.log("✅ 背景画像読み込み成功:", src);
       backgroundImage = img;
       
-      // 🔸 背景に応じたキャンバスサイズを設定
+      // 🔸 背景画像キーを取得（後で参照用）
       const backgroundKey = src.includes('back3') ? 'back3' : (src.includes('back4') ? 'back4' : (src.includes('back5') ? 'back5' : (src.includes('back6') ? 'back6' : 'back2')));
-      setCanvasSize(backgroundKey);
+      
+      // ⚠️ setCanvasSize()を削除 - drawBackgroundImage()でサイズ決定
       
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
@@ -2250,13 +2258,24 @@ function setBackground(src) {
         addBackgroundDebugVisuals(offsetX, offsetY, drawWidth, drawHeight);
       }
       
-      // 受信側にサイズ情報付きで送信（devtoolのスケール値も含める）
-      socket.send(JSON.stringify({ 
-        type: "background", 
-        src: src,
-        canvasSize: backgroundSizes[backgroundKey],
-        scale: canvasScale
-      }));
+      // 🔧 WebSocket接続状態を確認してから背景画像データを送信
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ 
+          type: "background", 
+          src: src,
+          writerId: myWriterId,
+          canvasSize: { 
+            width: canvas.width,
+            height: canvas.height 
+          },
+          scale: canvasScale,
+          originalSize: backgroundSizes[backgroundKey]
+        }));
+        
+        console.log(`📡 背景画像とキャンバスサイズを受信側に送信: ${canvas.width}x${canvas.height}`);
+      } else {
+        console.log(`⚠️ WebSocket未接続のため背景画像データ送信をスキップ (状態: ${socket?.readyState})`);
+      }
     };
     
     img.onerror = (error) => {
@@ -2282,15 +2301,9 @@ function setSpecialBackground(src) {
 
 // 🔸 キャンバスサイズ設定関数
 function setCanvasSize(backgroundKey) {
-  const size = backgroundSizes[backgroundKey];
-  if (!size) return;
-  
-  canvas.width = size.width;
-  canvas.height = size.height;
-  canvas.setAttribute('width', size.width);
-  canvas.setAttribute('height', size.height);
-  canvas.style.width = size.width + 'px';
-  canvas.style.height = size.height + 'px';
+  // ❌ この関数を無効化 - drawBackgroundImageでサイズ管理
+  console.log(`⚠️ setCanvasSize(${backgroundKey})は無効化されました`);
+  return;
   
   // console.log(`📐 送信側キャンバスサイズ変更: ${size.width} x ${size.height}`);
 }
@@ -2347,9 +2360,10 @@ function setSpecialBackground(src) {
       if (backgroundImage) {
         // console.log("✅ 特殊背景画像設定開始:", src);
         
-        // 背景に応じたキャンバスサイズを設定
+        // 背景画像キーを取得（参照用）
         const backgroundKey = src.includes('back3') ? 'back3' : (src.includes('back4') ? 'back4' : (src.includes('back5') ? 'back5' : (src.includes('back6') ? 'back6' : 'back2')));
-        setCanvasSize(backgroundKey);
+        
+        // ⚠️ setCanvasSize()を削除 - drawBackgroundImage()でサイズ決定
         
         // キャンバスをクリアして背景を描画
         ctx.restore();
@@ -2501,7 +2515,7 @@ function startCountdown() {
       // ✅ 背景の同期送信
       const bgSrc = backgroundImage ? backgroundImage.src : "white";
       socket.send(JSON.stringify({ type: "clear" }));
-      socket.send(JSON.stringify({ type: "background", src: bgSrc }));
+      socket.send(JSON.stringify({ type: "background", src: bgSrc, writerId: myWriterId }));
     }
   }, 1000);
 }
@@ -3454,8 +3468,8 @@ document.addEventListener('DOMContentLoaded', function() {
         baseWidth = canvas.height * imageRatio;
       }
       
-      // 2倍に拡大
-      const scale = 2.0;
+      // 背景画像と描画エリアを同じサイズに
+      const scale = 1.0;
       const drawWidth = baseWidth * scale;
       const drawHeight = baseHeight * scale;
       
@@ -3481,9 +3495,26 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 座標が背景画像の範囲内かチェックする関数
     function isWithinBackgroundArea(x, y) {
-      // 一時的に範囲チェックを無効化（背景画像が2倍拡大されて画面外にはみ出すため）
-      // TODO: 将来的には適切な範囲計算を実装
-      return true;
+      // 背景画像範囲チェックを再有効化して詳細ログ出力
+      const bgArea = getBackgroundArea();
+      
+      const withinX = x >= bgArea.x && x <= bgArea.x + bgArea.width;
+      const withinY = y >= bgArea.y && y <= bgArea.y + bgArea.height;
+      const isWithin = withinX && withinY;
+      
+      console.log('🖼️ 背景画像範囲チェック詳細:', {
+        clickX: x,
+        clickY: y,
+        bgX: bgArea.x,
+        bgY: bgArea.y,
+        bgWidth: bgArea.width,
+        bgHeight: bgArea.height,
+        withinX: withinX,
+        withinY: withinY,
+        結果: isWithin ? '✅ 範囲内' : '❌ 範囲外'
+      });
+      
+      return isWithin;
       
       /* オリジナルのチェックロジック（参考用）
       const bgArea = getBackgroundArea();
@@ -3614,7 +3645,11 @@ document.addEventListener('DOMContentLoaded', function() {
           thickness: currentPenThickness,
           color: currentPenColor,
           writerId: myWriterId,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          canvasSize: {
+            width: canvas.width,
+            height: canvas.height
+          }
         };
         if (socket && socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify(drawMsg));
@@ -3722,7 +3757,11 @@ document.addEventListener('DOMContentLoaded', function() {
           thickness: currentPenThickness,
           color: currentPenColor,
           writerId: myWriterId,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          canvasSize: {
+            width: canvas.width,
+            height: canvas.height
+          }
         };
         if (socket && socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify(drawMsg));
@@ -4395,6 +4434,23 @@ function toggleDevTools() {
 function updateCanvasScale(value) {
   canvasScale = parseFloat(value);
   document.getElementById("canvasScaleValue").textContent = value + "x";
+  
+  // キャンバスサイズ変更を受信側に通知
+  if (socket.readyState === WebSocket.OPEN && myWriterId) {
+    const canvasSize = {
+      width: canvas.width,
+      height: canvas.height
+    };
+    
+    socket.send(JSON.stringify({
+      type: "canvasSizeUpdate",
+      canvasSize: canvasSize,
+      scale: canvasScale,
+      writerId: myWriterId
+    }));
+    
+    console.log(`📡 キャンバスサイズ変更を受信側に送信: ${canvas.width}x${canvas.height}, scale=${canvasScale}`);
+  }
 }
 
 function updateAnimationStartWait(value) {
@@ -4500,10 +4556,10 @@ function saveRotatedImage() {
 function saveDoubleRotatedImage() {
   // 音楽制御は送信側では無効化（受信側のみで音楽再生）
   
-  // console.log(`🔄 送信ボタン: 印刷処理開始→${animationStartWaitTime}秒後にアニメーション開始`);
+  console.log(`🔄🔄🔄 送信ボタン押下: globalSend送信開始→${animationStartWaitTime}秒後にアニメーション開始 🔄🔄🔄`);
   
   // 🔸 まず受信側に印刷指示を送信（データが残っている状態で）
-  // console.log('📤 受信側に印刷指示を先に送信');
+  console.log('📤📤📤 受信側にglobalSend指示を送信中... 📤📤📤');
   socket.send(JSON.stringify({
     type: "globalSend",
     writerId: myWriterId,
@@ -4511,7 +4567,7 @@ function saveDoubleRotatedImage() {
     animationStartWaitTime: animationStartWaitTime,
     rotationWaitTime: rotationWaitTime
   }));
-  // console.log('✅ 受信側への印刷指示送信完了');
+  console.log('✅✅✅ 受信側へのglobalSend指示送信完了 ✅✅✅');
   
   // 🔸 少し待ってから送信側の印刷処理のみ実行
   setTimeout(() => {
@@ -5234,6 +5290,101 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }, 500); // WebSocket接続を待つため少し遅延
 });
+
+// 🎯 座標テスト用関数：右下に短い線を描画
+function testDrawRightBottom() {
+  console.log('🎯 テスト右下ボタンが押されました');
+  
+  if (!canvas || !ctx) {
+    console.error('❌ キャンバスまたはコンテキストが存在しません');
+    alert('キャンバスが初期化されていません');
+    return;
+  }
+  
+  // キャンバスサイズを取得
+  const canvasWidth = canvas.width;
+  const canvasHeight = canvas.height;
+  
+  console.log(`🎯 キャンバスサイズ: ${canvasWidth} x ${canvasHeight}`);
+  
+  // 右下の位置を計算（キャンバスの右下角から少し内側）
+  const margin = 20; // 端からの余白
+  const lineLength = 30; // 線の長さ
+  
+  const startX = canvasWidth - margin - lineLength;
+  const startY = canvasHeight - margin - lineLength;
+  const endX = canvasWidth - margin;
+  const endY = canvasHeight - margin;
+  
+  console.log(`🎯 テスト線の座標: (${startX}, ${startY}) → (${endX}, ${endY})`);
+  
+  // 線を描画
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.lineTo(endX, endY);
+  ctx.strokeStyle = '#FF1493'; // 目立つピンク色
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  
+  // WebSocketでデータを送信（実際の描画と同じ形式）
+  if (socket.readyState === WebSocket.OPEN && myWriterId) {
+    // 開始点を送信
+    socket.send(JSON.stringify({
+      type: "draw",
+      x: startX,
+      y: startY,
+      drawing: true,
+      writerId: myWriterId,
+      thickness: 4,
+      color: '#FF1493',
+      canvasSize: {
+        width: canvas.width,
+        height: canvas.height
+      }
+    }));
+    
+    // 終了点を送信
+    setTimeout(() => {
+      socket.send(JSON.stringify({
+        type: "draw",
+        x: endX,
+        y: endY,
+        drawing: true,
+        writerId: myWriterId,
+        thickness: 4,
+        color: '#FF1493',
+        canvasSize: {
+          width: canvas.width,
+          height: canvas.height
+        }
+      }));
+      
+      // 描画終了を送信
+      setTimeout(() => {
+        socket.send(JSON.stringify({
+          type: "draw",
+          x: endX,
+          y: endY,
+          drawing: false,
+          writerId: myWriterId,
+          thickness: 4,
+          color: '#FF1493',
+          canvasSize: {
+            width: canvas.width,
+            height: canvas.height
+          }
+        }));
+      }, 50);
+    }, 100);
+    
+    console.log('🎯 右下テスト線のデータを受信側に送信しました');
+    alert(`書き手側の右下に線を描画しました\n座標: (${startX}, ${startY}) → (${endX}, ${endY})\n受信側でどの位置に表示されるか確認してください`);
+  } else {
+    console.error('❌ WebSocket未接続またはWriterID未設定');
+    alert('WebSocket接続またはWriterIDに問題があります');
+  }
+}
+
 
 </script>
 </div>

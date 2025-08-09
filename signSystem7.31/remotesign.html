@@ -1,0 +1,3197 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://realtime-sign-server-1.onrender.com ws://localhost:* wss://localhost:*; img-src 'self' data: blob:; media-src 'self';">
+  <title>送信側1.2</title>
+  <style>
+    /* クラシックスタイル（デフォルト） */
+    body.classic canvas {
+      border: 1px solid black;
+      display: block;
+      margin-bottom: 10px;
+    }
+    body.classic button {
+      margin-right: 5px;
+      margin-bottom: 5px;
+    }
+    body.classic .button-group {
+      margin-bottom: 10px;
+    }
+    body.classic .button-group label {
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    
+    /* モダンスタイル */
+    body.modern {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    
+    body.modern .main-container {
+      position: relative;
+      max-width: 1200px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+      backdrop-filter: blur(10px);
+    }
+    
+    body.modern canvas {
+      border: none;
+      border-radius: 15px;
+      display: block;
+      margin: 0 auto 20px auto;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      background: white;
+    }
+    
+    body.modern button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 10px 20px;
+      margin: 5px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    body.modern button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+    }
+    
+    body.modern button:active {
+      transform: translateY(0);
+    }
+    
+    body.modern .button-group {
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 15px;
+      padding: 15px;
+      margin-bottom: 12px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    body.modern .button-group label {
+      font-weight: 700;
+      margin-right: 15px;
+      color: #2d3748;
+      font-size: 16px;
+    }
+    
+    body.modern h1 {
+      text-align: center;
+      color: #2d3748;
+      font-size: 2.5rem;
+      margin-bottom: 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 800;
+    }
+    body.modern #countdown {
+      font-size: 32px;
+      background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-top: 20px;
+      text-align: center;
+      font-weight: 800;
+    }
+    
+    body.classic #countdown {
+      font-size: 24px;
+      color: red;
+      margin-top: 10px;
+    }
+    
+    body.modern .selected {
+      background: linear-gradient(135deg, #48bb78, #38a169) !important;
+      color: white;
+      box-shadow: 0 6px 20px rgba(72, 187, 120, 0.5) !important;
+    }
+    
+    body.classic .selected {
+      background-color: #4CAF50;
+      color: white;
+    }
+    
+    /* テーマ切り替えボタン */
+    #themeToggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 50px;
+      padding: 12px 20px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      transition: all 0.3s ease;
+    }
+    
+    #themeToggle:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+    
+    /* モダンな開発ツールパネル */
+    body.modern #devToolsPanel {
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 20px;
+      padding: 25px;
+      margin-top: 20px;
+      border: 2px solid rgba(102, 126, 234, 0.2);
+      backdrop-filter: blur(10px);
+    }
+    
+    body.modern #devToolsPanel h3 {
+      color: #2d3748;
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    body.modern input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      margin-right: 10px;
+      accent-color: #667eea;
+    }
+    body.modern .color-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: 3px solid rgba(255, 255, 255, 0.8);
+      margin: 0 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    body.modern .color-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    }
+    
+    body.modern .color-btn.selected {
+      border: 4px solid #2d3748;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+      transform: scale(1.1);
+    }
+    
+    body.classic .color-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid #ccc;
+      margin: 0 5px;
+      cursor: pointer;
+    }
+    
+    body.classic .color-btn.selected {
+      border: 3px solid #333;
+      box-shadow: 0 0 5px rgba(0,0,0,0.5);
+    }
+    .color-btn.neon {
+      background: linear-gradient(45deg, #ff0000, #0000ff, #ffff00);
+      animation: neonGlow 2s ease-in-out infinite;
+    }
+    @keyframes neonGlow {
+      0%, 100% { box-shadow: 0 0 10px #ff0000; }
+      33% { box-shadow: 0 0 10px #0000ff; }
+      66% { box-shadow: 0 0 10px #ffff00; }
+    }
+    .thickness-btn {
+      min-width: 60px;
+      padding: 5px 10px;
+    }
+    .thickness-btn.selected {
+      background-color: #2196F3;
+      color: white;
+    }
+    .star {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: gold;
+      pointer-events: none;
+      animation: starTwinkle 1s ease-out forwards;
+      z-index: 10;
+      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    }
+    @keyframes starTwinkle {
+      0% {
+        opacity: 1;
+        transform: scale(0) rotate(0deg) translateX(0px) translateY(0px);
+        filter: blur(0px);
+      }
+      30% {
+        opacity: 1;
+        transform: scale(1.2) rotate(180deg) translateX(10px) translateY(-10px);
+        filter: blur(0px);
+      }
+      60% {
+        opacity: 0.7;
+        transform: scale(1.0) rotate(270deg) translateX(20px) translateY(-20px);
+        filter: blur(1px);
+      }
+      85% {
+        opacity: 0.3;
+        transform: scale(0.6) rotate(330deg) translateX(25px) translateY(-25px);
+        filter: blur(2px);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(0.2) rotate(360deg) translateX(30px) translateY(-30px);
+        filter: blur(3px);
+      }
+    }
+    .fairy-dust {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      background: #fff;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: fairyDustTwinkle 3s ease-in-out forwards;
+      z-index: 9;
+      box-shadow: 0 0 8px #fff, 0 0 16px #fff, 0 0 24px #fff;
+    }
+    @keyframes fairyDustTwinkle {
+      0% {
+        opacity: 0;
+        transform: scale(0) translateX(0px) translateY(0px);
+        filter: blur(2px);
+      }
+      15% {
+        opacity: 0.7;
+        transform: scale(0.5) translateX(3px) translateY(-3px);
+        filter: blur(1px);
+      }
+      30% {
+        opacity: 1;
+        transform: scale(1) translateX(8px) translateY(-8px);
+        filter: blur(0px);
+      }
+      60% {
+        opacity: 0.9;
+        transform: scale(0.9) translateX(15px) translateY(-15px);
+        filter: blur(0.5px);
+      }
+      80% {
+        opacity: 0.5;
+        transform: scale(0.6) translateX(20px) translateY(-20px);
+        filter: blur(1.5px);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(0.2) translateX(25px) translateY(-25px);
+        filter: blur(3px);
+      }
+    }
+    .heart {
+      position: fixed;
+      width: 25px;
+      height: 25px;
+      background: #ff69b4;
+      right: 50px;
+      bottom: 20px;
+      pointer-events: none;
+      z-index: 10000;
+      transform: rotate(45deg);
+    }
+    .heart::before,
+    .heart::after {
+      content: '';
+      width: 25px;
+      height: 25px;
+      position: absolute;
+      background: #ff69b4;
+      border-radius: 50%;
+    }
+    .heart::before {
+      top: -12.5px;
+      left: 0;
+    }
+    .heart::after {
+      top: 0;
+      left: -12.5px;
+    }
+    
+    /* 描画エフェクト用の小さなハート */
+    .drawing-heart {
+      position: fixed;
+      width: 12px;
+      height: 12px;
+      background: var(--heart-color, #ff1493);
+      pointer-events: none;
+      z-index: 10000;
+      transform: rotate(45deg);
+      animation: heartFloat 1.5s ease-out forwards;
+      box-shadow: 0 0 8px var(--heart-color, #ff1493), 0 0 16px var(--heart-color, #ff1493);
+    }
+    .drawing-heart::before,
+    .drawing-heart::after {
+      content: '';
+      width: 12px;
+      height: 12px;
+      position: absolute;
+      background: var(--heart-color, #ff1493);
+      border-radius: 50%;
+    }
+    .drawing-heart::before {
+      top: -6px;
+      left: 0;
+    }
+    .drawing-heart::after {
+      top: 0;
+      left: -6px;
+    }
+    
+    @keyframes heartFloat {
+      0% {
+        opacity: 1;
+        transform: rotate(45deg) scale(0.3) translateY(0px);
+      }
+      50% {
+        opacity: 0.8;
+        transform: rotate(45deg) scale(1) translateY(-20px);
+      }
+      100% {
+        opacity: 0;
+        transform: rotate(45deg) scale(0.5) translateY(-50px);
+      }
+    }
+    
+    /* 特別演出用の大きなハート */
+    .special-heart {
+      position: fixed;
+      width: 120px;
+      height: 120px;
+      background: #ff1493;
+      pointer-events: none;
+      z-index: 99999;
+      transform: rotate(45deg);
+      box-shadow: 0 0 20px #ff1493, 0 0 40px #ff1493, 0 0 60px #ff1493;
+    }
+    .special-heart::before,
+    .special-heart::after {
+      content: '';
+      width: 120px;
+      height: 120px;
+      position: absolute;
+      background: #ff1493;
+      border-radius: 50%;
+      box-shadow: 0 0 20px #ff1493;
+    }
+    .special-heart::before {
+      top: -60px;
+      left: 0;
+    }
+    .special-heart::after {
+      top: 0;
+      left: -60px;
+    }
+  </style>
+</head>
+<body class="modern">
+<button id="themeToggle" onclick="toggleTheme()">📝 クラシック</button>
+
+<div class="main-container">
+<canvas id="drawCanvas" width="859" height="607" style="position: relative; z-index: 100; background: transparent; transform: rotate(180deg); transform-origin: center center;"></canvas>
+
+<div class="button-group">
+  <button onclick="clearCanvas()">Clear</button>
+  <button onclick="saveDoubleRotatedImage()" style="background-color: #4CAF50; color: white; font-size: 18px; padding: 12px 24px; font-weight: bold;">送信</button>
+</div>
+
+<div class="button-group">
+  <label>背景:</label>
+  <button onclick="setBackground('./back3.png')">背景1</button>
+  <button onclick="setBackground('./back2.png')">背景2</button>
+  <button onclick="setBackground('./back4.png')">背景3</button>
+  <button onclick="setBackground('./back6.png')">背景4</button>
+  <button onclick="setBackground(null)">白</button>
+  <button onclick="setSpecialBackgroundToggle()" style="background: linear-gradient(45deg, #ff1493, #00ffff); color: white;">🎬 動画背景</button>
+</div>
+
+
+<div class="button-group">
+  <label>ペンの太さ:</label>
+  <button class="thickness-btn" onclick="setPenThickness(2)">細い</button>
+  <button class="thickness-btn" onclick="setPenThickness(4)">普通</button>
+  <button class="thickness-btn selected" onclick="setPenThickness(8)">太い</button>
+  <button class="thickness-btn" onclick="setPenThickness(12)">極太</button>
+</div>
+
+<div class="button-group">
+  <label>色:</label>
+  <button class="color-btn selected" style="background: black;" onclick="setPenColor('black')"></button>
+  <button class="color-btn" style="background: white; border: 3px solid #333;" onclick="setPenColor('white')"></button>
+  <button class="color-btn" style="background: red;" onclick="setPenColor('red')"></button>
+  <button class="color-btn" style="background: blue;" onclick="setPenColor('blue')"></button>
+  <button class="color-btn" style="background: green;" onclick="setPenColor('green')"></button>
+  <button class="color-btn" style="background: #ff69b4;" onclick="setPenColor('pink')"></button>
+  <button class="color-btn neon" onclick="setPenColor('neon')"></button>
+</div>
+
+<div class="button-group">
+  <button onclick="toggleDevTools()" style="background-color: #FFA500; color: white;">🔧 Dev Tool</button>
+</div>
+
+<div id="devTools" style="display: none; border: 2px solid orange; padding: 10px; margin-top: 10px;">
+  <h3>開発者ツール</h3>
+  
+  <div class="button-group">
+    <label>キャンバスサイズ調整:</label>
+    <input type="range" id="canvasScale" min="0.1" max="3.0" step="0.05" value="0.35" oninput="updateCanvasScale(this.value)">
+    <span id="canvasScaleValue">0.35x</span>
+  </div>
+  
+  <div class="button-group">
+    <label>アニメーション開始待機時間（秒）:</label>
+    <input type="range" id="animationStartWait" min="0.1" max="10" step="0.1" value="3.3" oninput="updateAnimationStartWait(this.value)">
+    <span id="animationStartWaitValue">3.3秒</span>
+  </div>
+  
+  <div class="button-group">
+    <label>回転後待機時間（秒）:</label>
+    <input type="range" id="rotationWait" min="1" max="10" step="0.5" value="7.5" oninput="updateRotationWait(this.value)">
+    <span id="rotationWaitValue">7.5秒</span>
+  </div>
+  
+  <div class="button-group">
+    <button onclick="sendDevSettings()">設定を受信側に送信</button>
+  </div>
+  
+  <hr style="margin: 15px 0;">
+  
+  <div class="button-group">
+    <label>テスト演出:</label>
+    <button onclick="createFireworks()" style="background: linear-gradient(45deg, #ff4500, #ffd700); color: white;">🎆 花火テスト</button>
+    <button onclick="createConfetti()" style="background: linear-gradient(45deg, #ff69b4, #00fa9a); color: white;">🎊 紙吹雪テスト</button>
+  </div>
+  
+  <div class="button-group">
+    <label>ビデオサイズ:</label>
+    <button id="size100Btn" class="selected" onclick="setVideoSize(100)">100%</button>
+    <button id="size90Btn" onclick="setVideoSize(90)">90%</button>
+    <button id="size80Btn" onclick="setVideoSize(80)">80%</button>
+  </div>
+  
+  <div class="button-group">
+    <button onclick="playVideo()" style="background-color: #FF6B6B; color: white;">📹 ビデオ再生</button>
+  </div>
+  
+  <div class="button-group">
+    <label>エフェクト:</label>
+    <input type="checkbox" id="starEffect" checked onchange="toggleStarEffect()">
+    <label for="starEffect">星</label>
+    <input type="checkbox" id="fairyDustEffect" onchange="toggleFairyDustEffect()" checked>
+    <label for="fairyDustEffect">妖精の粉</label>
+    <input type="checkbox" id="heartEffect" onchange="toggleHeartEffect()">
+    <label for="heartEffect">💖 ハート</label>
+    <input type="checkbox" id="penSoundEffect" onchange="togglePenSound()">
+    <label for="penSoundEffect">🎵 ペン音</label>
+  </div>
+  
+  <div class="button-group">
+    <label>送信後演出:</label>
+    <input type="checkbox" id="fireworksEffect" checked>
+    <label for="fireworksEffect">🎆 花火</label>
+    <input type="checkbox" id="confettiEffect" checked>
+    <label for="confettiEffect">🎊 紙吹雪</label>
+    <input type="checkbox" id="backgroundDebug" onchange="toggleBackgroundDebug()">
+    <label for="backgroundDebug">🔍 背景デバッグ</label>
+  </div>
+  
+  <div class="button-group">
+    <label>用紙サイズ:</label>
+    <button id="a4Btn" class="selected" onclick="setPaperSize('A4')">A4</button>
+    <button id="lBtn" onclick="setPaperSize('L')">L判</button>
+    <button id="posterBtn" onclick="setPaperSize('poster')">ポストカード</button>
+  </div>
+  
+  <div class="button-group">
+    <label>印刷モード:</label>
+    <button id="drawOnlyBtn" class="selected" onclick="setPrintMode('drawOnly')">描画モード</button>
+    <button id="fullModeBtn" onclick="setPrintMode('fullMode')">フルモード</button>
+  </div>
+  
+  <hr style="margin: 15px 0;">
+  
+  <div class="button-group">
+    <label>SwitchBot:</label>
+    <input type="checkbox" id="switchBotEffect">
+    <label for="switchBotEffect">🤖 バブル</label>
+  </div>
+  
+  <div class="button-group">
+    <button onclick="testSwitchBot()" style="background-color: #FF6B35; color: white;">🤖 Botテスト</button>
+  </div>
+</div>
+
+<div id="countdown"></div>
+
+<script>
+const canvas = document.getElementById("drawCanvas");
+const ctx = canvas.getContext("2d");
+let drawing = false;
+let socket = new WebSocket("wss://realtime-sign-server-1.onrender.com");
+let backgroundImage = null;
+let currentPaperSize = "A4"; // 現在の用紙サイズ
+let currentPrintMode = "drawOnly"; // 現在の印刷モード（デフォルト：描画モード）
+let currentVideoSize = 100; // 現在のビデオサイズ（デフォルト100%）
+let canvasScale = 0.35; // キャンバススケール
+let animationStartWaitTime = 3.3; // アニメーション開始待機時間
+let rotationWaitTime = 7.5; // 回転後待機時間
+let currentPenThickness = 8; // 現在のペンの太さ（標準は太い）
+let currentPenColor = 'black'; // 現在のペンの色
+let neonColorIndex = 0; // ネオン用の色インデックス
+let drawDistance = 0; // 描画距離の追跡（ネオン用）
+let lastPosition = null; // 前回の位置を記録
+let secondLastPosition = null; // さらに前の位置（曲線描画用）
+let currentPath = []; // 現在のストロークのポイント配列
+let smoothingFactor = 0.3; // 曲線の滑らかさ（0-1の範囲）
+let starEffectEnabled = true; // 星エフェクトの有効/無効（標準でON）
+let fairyDustEffectEnabled = true; // 妖精の粉エフェクトの有効/無効（標準でON）
+let heartEffectEnabled = false; // ハートエフェクトの有効/無効（標準でOFF）
+let penSoundEnabled = false; // ペン音の有効/無効（標準でOFF）
+let specialBackgroundState = 'ready'; // 'ready', 'door_shown', 'door_opened'
+let specialBackgroundToggle = false; // 特殊背景の画像を切り替えるフラグ
+
+// 🎬 送信側動画背景関連変数
+let senderVideoElement = null;
+let isSenderVideoActive = false;
+
+// 🎵 ペン音制御
+let drawingAudio = null; // 描画中の音楽オブジェクト
+let isDrawingActive = false; // 描画中フラグ
+let drawingInactiveTimer = null; // 描画停止タイマー
+const DRAWING_PAUSE_DELAY = 500; // 描画停止から一時停止までの遅延（ミリ秒）
+
+// 🔍 背景デバッグ表示制御
+let backgroundDebugEnabled = false;
+let lastBackgroundSrc = null;
+
+// 背景別キャンバスサイズ設定（1.02倍サイズ = 0.6*1.7）
+const backgroundSizes = {
+  'back3': { width: 859, height: 607 },    // 背景1 (842*0.6*1.7, 595*0.6*1.7)
+  'back2': { width: 455, height: 644 },    // 背景2（縦向き）25%縮小 (607*0.75, 859*0.75)
+  'back4': { width: 859, height: 607 },    // 背景3 (842*0.6*1.7, 595*0.6*1.7)
+  'back5': { width: 859, height: 607 },    // 背景5 (842*0.6*1.7, 595*0.6*1.7)
+  'back6': { width: 859, height: 607 },    // 背景4（横長） (842*0.6*1.7, 595*0.6*1.7)
+  'white': { width: 859, height: 607 }     // 白背景 (842*0.6*1.7, 595*0.6*1.7)
+};
+socket.onopen = () => console.log("✅ WebSocket接続完了（送信側）");
+socket.onerror = (error) => console.error("❌ WebSocketエラー（送信側）:", error);
+socket.onclose = (event) => console.log("⚠️ WebSocket切断（送信側）:", event.code, event.reason);
+
+// ハートエフェクト生成関数
+function createHeart() {
+  // ハート生成開始
+  const heart = document.createElement('div');
+  heart.className = 'heart';
+  
+  // ランダムなゆらゆら効果を生成
+  const randomAnimationName = `heartFloat_${Math.random().toString(36).substr(2, 9)}`;
+  const randomMoves = [];
+  for (let i = 0; i <= 5; i++) {
+    const randomX = (Math.random() - 0.5) * 30; // -15px to 15px
+    randomMoves.push(randomX);
+  }
+  
+  // ランダム移動値計算
+  
+  // ランダムなキーフレームを動的に生成
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes ${randomAnimationName} {
+      0% {
+        opacity: 1;
+        transform: rotate(45deg) translateX(${randomMoves[0]}px);
+        bottom: 20px;
+      }
+      20% {
+        opacity: 1;
+        transform: rotate(45deg) translateX(${randomMoves[1]}px);
+        bottom: 80px;
+      }
+      40% {
+        opacity: 0.9;
+        transform: rotate(45deg) translateX(${randomMoves[2]}px);
+        bottom: 140px;
+      }
+      60% {
+        opacity: 0.8;
+        transform: rotate(45deg) translateX(${randomMoves[3]}px);
+        bottom: 200px;
+      }
+      80% {
+        opacity: 0.5;
+        transform: rotate(45deg) translateX(${randomMoves[4]}px);
+        bottom: 260px;
+      }
+      100% {
+        opacity: 0;
+        transform: rotate(45deg) translateX(${randomMoves[5]}px);
+        bottom: 320px;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+  // スタイル追加
+  
+  // ランダムアニメーションを適用
+  heart.style.animation = `${randomAnimationName} 3s linear forwards`;
+  
+  // デバッグ用スタイル追加
+  heart.style.border = '2px solid red';
+  heart.style.zIndex = '99999';
+  
+  document.body.appendChild(heart);
+  // ハートをDOMに追加
+  
+  // 音楽再生
+  const audio = new Audio('./poyo.mp3');
+  audio.play().catch(e => console.log('音楽再生エラー:', e));
+  
+  // アニメーション終了後削除（スタイルも削除）
+  setTimeout(() => {
+    if (heart.parentNode) {
+      heart.parentNode.removeChild(heart);
+      // ハート削除
+    }
+    if (style.parentNode) {
+      style.parentNode.removeChild(style);
+      // スタイル削除
+    }
+  }, 3000);
+}
+
+// 特別演出用の大きなハート生成関数
+function createSpecialHeart() {
+  // 特別ハート演出開始
+  
+  // 30個のハートを30ms間隔で生成
+  for (let i = 0; i < 30; i++) {
+    setTimeout(() => {
+      const heart = document.createElement('div');
+      heart.className = 'special-heart';
+      
+      // ランダムなアニメーション名を生成
+      const randomAnimationName = `specialHeartFloat_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // 中央から±300px（合計600px）の範囲でランダム配置
+      const windowCenterX = window.innerWidth / 2;
+      const randomX = windowCenterX + (Math.random() - 0.5) * 600; // -300px to +300px
+      
+      // 特別ハート配置
+      
+      // 個別のキーフレームアニメーションを動的に生成
+      const style = document.createElement('style');
+      style.textContent = `
+        @keyframes ${randomAnimationName} {
+          0% {
+            transform: rotate(45deg);
+            bottom: -150px;
+            left: ${randomX}px;
+          }
+          100% {
+            transform: rotate(45deg);
+            bottom: ${window.innerHeight + 150}px;
+            left: ${randomX}px;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+      
+      heart.style.animation = `${randomAnimationName} 1s linear forwards`;
+      heart.style.position = 'fixed';
+      
+      document.body.appendChild(heart);
+      // console.log(`🎉 送信側に特別ハート${i+1}追加完了`);
+      
+      // アニメーション終了後に削除
+      setTimeout(() => {
+        if (heart.parentNode) {
+          heart.parentNode.removeChild(heart);
+        }
+        if (style.parentNode) {
+          style.parentNode.removeChild(style);
+        }
+        // console.log(`🎉 特別ハート${i+1}削除完了`);
+      }, 1000);
+    }, i * 30); // 30ms間隔で順次生成
+  }
+}
+
+// 受信側からのメッセージ処理
+socket.onmessage = function(event) {
+  try {
+    // Blobの場合は文字列として読み取る
+    if (event.data instanceof Blob) {
+      // console.log('📦 Blobデータを受信 - テキストとして読み取り試行');
+      const reader = new FileReader();
+      reader.onload = function() {
+        try {
+          const data = JSON.parse(reader.result);
+          // console.log('📨 Blobから解析したメッセージ:', data);
+          
+          if (data.type === "heartEffect") {
+            // ハートエフェクト指示受信
+            createHeart();
+          } else if (data.type === "specialHeartEffect") {
+            // 特別ハートエフェクト指示受信
+            createSpecialHeart();
+          } else if (data.type === "autoSelectBackground") {
+            console.log('🖼️ 受信側から背景自動選択指示を受信（Blob経由）:', data.background);
+            // 背景4を自動選択
+            if (data.background === "back6") {
+              setBackground('./back6.png');
+              console.log('✅ 背景4を自動選択しました（Blob経由）');
+            }
+          }
+        } catch (error) {
+          console.log('⚠️ Blob解析エラー:', error.message);
+        }
+      };
+      reader.readAsText(event.data);
+      return;
+    }
+    
+    const data = JSON.parse(event.data);
+    console.log('📨 送信側で受信したメッセージ:', data);
+    
+    if (data.type === "heartEffect") {
+      // ハートエフェクト指示受信
+      createHeart();
+    } else if (data.type === "specialHeartEffect") {
+      // 特別ハートエフェクト指示受信
+      createSpecialHeart();
+    } else if (data.type === "autoSelectBackground") {
+      console.log('🖼️ 受信側から背景自動選択指示を受信:', data.background);
+      // 背景4を自動選択
+      if (data.background === "back6") {
+        setBackground('./back6.png');
+        console.log('✅ 背景4を自動選択しました');
+      }
+    } else {
+      console.log('⚠️ 不明なメッセージタイプ:', data.type);
+    }
+  } catch (error) {
+    console.log('⚠️ メッセージ解析エラー:', error.message);
+    console.log('📄 受信データ:', event.data);
+  }
+};
+
+// 送信側でもlキーでハートを表示（テスト用）
+let senderLKeyCount = 0;
+let senderLKeyTimer = null;
+
+document.addEventListener('keydown', function(event) {
+  if (event.key.toLowerCase() === 'l') {
+    senderLKeyCount++;
+    // 送信側lキー押下
+    
+    if (senderLKeyTimer) {
+      clearTimeout(senderLKeyTimer);
+    }
+    
+    if (senderLKeyCount >= 10) {
+      console.log('🎉 送信側でl10回達成 - 特別演出テスト');
+      createSpecialHeart();
+      senderLKeyCount = 0;
+    } else {
+      createHeart();
+    }
+    
+    senderLKeyTimer = setTimeout(() => {
+      senderLKeyCount = 0;
+      console.log('⏰ 送信側lキーカウントリセット');
+    }, 3000);
+  }
+});
+
+// テスト用：5秒後に自動でハートを表示
+setTimeout(() => {
+  // テスト: 自動ハート表示
+  createHeart();
+}, 5000);
+
+// 🔸 用紙サイズ設定関数
+function setPaperSize(size) {
+  currentPaperSize = size;
+  
+  // ボタンの選択状態を更新
+  document.getElementById("a4Btn").classList.remove("selected");
+  document.getElementById("lBtn").classList.remove("selected");
+  document.getElementById("posterBtn").classList.remove("selected");
+  
+  if (size === "A4") {
+    document.getElementById("a4Btn").classList.add("selected");
+    console.log("📄 用紙サイズをA4に設定");
+  } else if (size === "L") {
+    document.getElementById("lBtn").classList.add("selected");
+    console.log("📄 用紙サイズをL判に設定");
+  } else if (size === "poster") {
+    document.getElementById("posterBtn").classList.add("selected");
+    console.log("📄 用紙サイズをポストカードに設定");
+  }
+  
+  // 受信側に用紙サイズ情報を送信
+  socket.send(JSON.stringify({ 
+    type: "paperSize", 
+    size: size 
+  }));
+}
+
+// 🖨️ 印刷モード設定関数
+function setPrintMode(mode) {
+  currentPrintMode = mode;
+  
+  // ボタンの選択状態を更新
+  document.getElementById("drawOnlyBtn").classList.remove("selected");
+  document.getElementById("fullModeBtn").classList.remove("selected");
+  
+  if (mode === "drawOnly") {
+    document.getElementById("drawOnlyBtn").classList.add("selected");
+    // 印刷モードを描画モードに設定
+  } else if (mode === "fullMode") {
+    document.getElementById("fullModeBtn").classList.add("selected");
+    // 印刷モードをフルモードに設定
+  }
+  
+  // 受信側に印刷モード情報を送信
+  socket.send(JSON.stringify({ 
+    type: "printMode", 
+    mode: mode 
+  }));
+}
+
+// 🔸 キャンバスサイズ変更関数を追加
+function setCanvasToPortraitSize() {
+  // 縦長サイズ（A4縦の1.02倍）に変更
+  canvas.width = 607;  // A4縦の幅 (595*0.6*1.7)
+  canvas.height = 859; // A4縦の高さ (842*0.6*1.7)
+  
+  // 🔸 HTML要素のサイズも変更
+  canvas.setAttribute('width', '607');
+  canvas.setAttribute('height', '859');
+  canvas.style.width = '607px';
+  canvas.style.height = '859px';
+  
+  console.log(`書き手側キャンバスを縦長に変更: ${canvas.width} x ${canvas.height}`);
+}
+
+function resetCanvasToNormalSize() {
+  // 通常サイズ（A4横の1.02倍）に戻す
+  canvas.width = 859;  // 元のサイズ (842*0.6*1.7)
+  canvas.height = 607; // 元のサイズ (595*0.6*1.7)
+  
+  // 🔸 HTML要素のサイズも変更
+  canvas.setAttribute('width', '859');
+  canvas.setAttribute('height', '607');
+  canvas.style.width = '859px';
+  canvas.style.height = '607px';
+  
+  console.log(`書き手側キャンバスを通常サイズに変更: ${canvas.width} x ${canvas.height}`);
+}
+
+function setBackground(src) {
+  console.log('setBackground関数呼び出し:', src, 'WebSocket状態:', socket ? socket.readyState : 'socket未初期化');
+  
+  if (src === null) {
+    backgroundImage = null;
+    
+    // 🔸 白背景のキャンバスサイズを設定
+    setCanvasSize('white');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 受信側にサイズ情報付きで送信（devtoolのスケール値も含める）
+    socket.send(JSON.stringify({ 
+      type: "background", 
+      src: "white",
+      canvasSize: backgroundSizes['white'],
+      scale: canvasScale
+    }));
+  } else {
+    const img = new Image();
+    img.src = src;
+    console.log("🔍 背景画像読み込み開始:", src);
+    
+    img.onload = () => {
+      console.log("✅ 背景画像読み込み成功:", src);
+      backgroundImage = img;
+      
+      // 🔸 背景に応じたキャンバスサイズを設定
+      const backgroundKey = src.includes('back3') ? 'back3' : (src.includes('back4') ? 'back4' : (src.includes('back5') ? 'back5' : (src.includes('back6') ? 'back6' : 'back2')));
+      setCanvasSize(backgroundKey);
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // アスペクト比を保持して描画
+      const imageAspect = img.naturalWidth / img.naturalHeight;
+      const canvasAspect = canvas.width / canvas.height;
+      
+      let drawWidth, drawHeight, offsetX, offsetY;
+      
+      if (imageAspect > canvasAspect) {
+        // 画像が横長の場合、幅をキャンバス幅に合わせる
+        drawWidth = canvas.width;
+        drawHeight = drawWidth / imageAspect;
+        offsetX = 0;
+        offsetY = (canvas.height - drawHeight) / 2;
+      } else {
+        // 画像が縦長の場合、高さをキャンバス高さに合わせる
+        drawHeight = canvas.height;
+        drawWidth = drawHeight * imageAspect;
+        offsetX = (canvas.width - drawWidth) / 2;
+        offsetY = 0;
+      }
+      
+      // 🔸 背景2の場合はキャンバス全体に表示（キャンバスサイズが既に25%小さい）
+      if (src.includes('back2')) {
+        drawWidth = canvas.width;
+        drawHeight = canvas.height;
+        offsetX = 0;
+        offsetY = 0;
+        console.log(`📐 背景2をキャンバス全体に表示: ${drawWidth}x${drawHeight}`);
+      }
+      
+      // 書き手側では背景1〜4を正常な向きで表示するため、キャンバスが180度回転している分を補正
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(Math.PI); // 180度回転
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+      ctx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
+      ctx.restore();
+      
+      // 背景ソースを記録
+      lastBackgroundSrc = src;
+      
+      // 🔍 背景画像の配置情報を詳細表示
+      console.log(`🖼️ 背景画像配置詳細 [${src}]:`);
+      console.log(`  キャンバスサイズ: ${canvas.width}x${canvas.height}`);
+      console.log(`  元画像サイズ: ${img.naturalWidth}x${img.naturalHeight}`);
+      console.log(`  描画サイズ: ${drawWidth.toFixed(1)}x${drawHeight.toFixed(1)}`);
+      console.log(`  描画位置: (${offsetX.toFixed(1)}, ${offsetY.toFixed(1)})`);
+      console.log(`  画像の占有率: ${((drawWidth * drawHeight) / (canvas.width * canvas.height) * 100).toFixed(1)}%`);
+      
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const bgCenterX = offsetX + drawWidth / 2;
+      const bgCenterY = offsetY + drawHeight / 2;
+      console.log(`  キャンバス中心: (${centerX}, ${centerY}) 緑点`);
+      console.log(`  背景画像中心: (${bgCenterX.toFixed(1)}, ${bgCenterY.toFixed(1)}) 青点`);
+      
+      // 🔍 デバッグ表示が有効な場合のみ視覚的な表示を追加
+      if (backgroundDebugEnabled) {
+        addBackgroundDebugVisuals(offsetX, offsetY, drawWidth, drawHeight);
+      }
+      
+      // 受信側にサイズ情報付きで送信（devtoolのスケール値も含める）
+      socket.send(JSON.stringify({ 
+        type: "background", 
+        src: src,
+        canvasSize: backgroundSizes[backgroundKey],
+        scale: canvasScale
+      }));
+    };
+    
+    img.onerror = (error) => {
+      console.error("❌ 背景画像読み込みエラー:", src, error);
+      alert("背景画像が見つかりません: " + src);
+    };
+  }
+}
+
+// 🔸 特殊背景設定関数（扉開く演出付き）
+function setSpecialBackground(src) {
+  console.log(`🚪 特殊背景設定開始: ${src}`);
+  
+  // 受信側に扉アニメーション開始を通知
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: "doorAnimation",
+      imageSrc: src
+    }));
+    console.log('🚪 受信側に扉アニメーション開始を送信');
+  }
+}
+
+// 🔸 キャンバスサイズ設定関数
+function setCanvasSize(backgroundKey) {
+  const size = backgroundSizes[backgroundKey];
+  if (!size) return;
+  
+  canvas.width = size.width;
+  canvas.height = size.height;
+  canvas.setAttribute('width', size.width);
+  canvas.setAttribute('height', size.height);
+  canvas.style.width = size.width + 'px';
+  canvas.style.height = size.height + 'px';
+  
+  console.log(`📐 送信側キャンバスサイズ変更: ${size.width} x ${size.height}`);
+}
+
+// 🎪 特殊背景設定関数（ドア開閉アニメーション付き）
+function setSpecialBackground(src) {
+  console.log('🎪 特殊背景設定開始:', src, 'State:', specialBackgroundState);
+  
+  if (specialBackgroundState === 'ready') {
+    // 第1段階: 扉を表示して停止
+    console.log('🚪 第1段階: 扉表示');
+    specialBackgroundState = 'door_shown';
+    
+    // 受信側に扉表示のみを通知
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ 
+        type: "doorAnimation", 
+        action: "show_door_only",
+        backgroundSrc: src
+      }));
+      console.log('🚪 受信側に扉表示のみを送信');
+    }
+    
+    // 送信側でも視覚的フィードバック
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // 背景画像を事前に読み込み
+    const img = new Image();
+    img.src = src;
+    img.onload = () => {
+      backgroundImage = img;
+      console.log("✅ 特殊背景画像読み込み成功（待機中）:", src);
+    };
+    
+  } else if (specialBackgroundState === 'door_shown') {
+    // 第2段階: 扉を開く
+    console.log('🚪 第2段階: 扉開放');
+    specialBackgroundState = 'door_opened';
+    
+    // 受信側に扉開放を通知
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ 
+        type: "doorAnimation", 
+        action: "open_door",
+        backgroundSrc: src
+      }));
+      console.log('🚪 受信側に扉開放を送信');
+    }
+    
+    // 1秒後に背景を設定（ドアが開くタイミング）
+    setTimeout(() => {
+      if (backgroundImage) {
+        console.log("✅ 特殊背景画像設定開始:", src);
+        
+        // 背景に応じたキャンバスサイズを設定
+        const backgroundKey = src.includes('back3') ? 'back3' : (src.includes('back4') ? 'back4' : (src.includes('back5') ? 'back5' : (src.includes('back6') ? 'back4' : 'back2')));
+        setCanvasSize(backgroundKey);
+        
+        // キャンバスをクリアして背景を描画
+        ctx.restore();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+        
+        // 受信側に背景変更を通知
+        socket.send(JSON.stringify({ 
+          type: "specialBackground", 
+          src: src,
+          canvasSize: backgroundSizes[backgroundKey],
+          doorAction: "opened"
+        }));
+        
+        // 特別なエフェクトを追加（星や妖精の粉を散らす）
+        for (let i = 0; i < 10; i++) {
+          setTimeout(() => {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            if (starEffectEnabled) {
+              createStar(x, y);
+            }
+            if (fairyDustEffectEnabled) {
+              createFairyDust(x, y);
+            }
+          }, i * 100);
+        }
+        
+        // 特別な音を再生（sound1.mp3を削除）
+        
+        // 🎪 背景が正常に適用されたのでトグルフラグを反転
+        specialBackgroundToggle = !specialBackgroundToggle;
+        console.log(`🎪 背景適用完了 - フラグを反転: ${specialBackgroundToggle}`);
+        console.log(`🎪 次回使用予定: ${specialBackgroundToggle ? 'back5.png' : 'back4.png'}`);
+        
+        // 状態をリセット
+        specialBackgroundState = 'ready';
+      }
+    }, 1000); // ドア開閉アニメーションの時間
+  }
+}
+
+// 🎪 特殊背景設定関数（back6.mp4動画を使用）
+function setSpecialBackgroundToggle() {
+  console.log('動画背景ボタン押下 - WebSocket状態:', socket ? socket.readyState : 'socket未初期化');
+  console.log('特殊背景ボタン押下（動画モード） - 現在の状態:', specialBackgroundState);
+  
+  if (specialBackgroundState === 'ready') {
+    // 第1段階: 扉を表示して動画を最初のフレームで停止
+    console.log('🚪 第1段階: 扉表示と動画準備');
+    specialBackgroundState = 'door_shown';
+    
+    // 送信側にも動画を配置
+    createSenderVideo();
+    
+    // 受信側に動画背景開始を通知
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ 
+        type: "videoBackground", 
+        action: "prepare",
+        videoSrc: "./back6.mp4"
+      }));
+      console.log('🎬 受信側に動画背景準備を送信');
+    }
+    
+    // 送信側キャンバスの背景を透明にして動画背景を見せる（描画は保持）
+    canvas.style.backgroundColor = 'transparent';
+    // ctx.clearRect(0, 0, canvas.width, canvas.height); // 描画を保持するためコメントアウト
+    console.log('🎬 送信側キャンバス透明化 - 動画背景準備完了（描画保持）');
+    
+  } else if (specialBackgroundState === 'door_shown') {
+    // 第2段階: 扉を開いて動画再生開始
+    console.log('🚪 第2段階: 扉開放と動画再生開始');
+    specialBackgroundState = 'video_playing';
+    
+    // 送信側の動画も再生開始
+    playSenderVideo();
+    
+    // 受信側に動画再生開始を通知
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ 
+        type: "videoBackground", 
+        action: "play",
+        videoSrc: "./back6.mp4"
+      }));
+      console.log('🎬 受信側に動画再生開始を送信');
+    }
+    
+    // 送信側の表示を更新（キャンバスを透明にして動画背景を見せる）
+    ctx.restore();
+    // ctx.clearRect(0, 0, canvas.width, canvas.height); // 描画を保持するためコメントアウト
+    // 動画背景時はキャンバスを透明にする
+    canvas.style.backgroundColor = 'transparent';
+    console.log('🎬 送信側キャンバスを透明化 - 描画と動画が見える状態（描画保持）');
+    
+    // 動画終了まで待機（back6.mp4の長さに合わせて調整）
+    setTimeout(() => {
+      console.log('🎬 動画再生完了 - 最終フレームで停止');
+      specialBackgroundState = 'ready';
+      
+      // 送信側の動画も終了
+      stopSenderVideo();
+      
+      // 受信側に動画終了を通知
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ 
+          type: "videoBackground", 
+          action: "end"
+        }));
+        console.log('🎬 受信側に動画終了を送信');
+      }
+    }, 15000); // 15秒後（back6.mp4の長さに合わせて調整）
+  }
+}
+
+function startCountdown() {
+  const countdownEl = document.getElementById("countdown");
+  
+  // 🔸 用紙サイズに応じてカウントダウン時間を調整
+  let totalSeconds;
+  if (currentPaperSize === "poster") {
+    totalSeconds = 8; // ポスター：3秒短縮（11秒→8秒）
+  } else if (currentPaperSize === "L") {
+    totalSeconds = 9; // L判：2秒短縮（11秒→9秒）
+  } else {
+    totalSeconds = 11; // A4：従来通り11秒
+  }
+  
+  let seconds = totalSeconds;
+  countdownEl.textContent = `お渡しまで：${seconds}秒`;
+  
+  const timer = setInterval(() => {
+    seconds--;
+    if (seconds >= 0) {
+      countdownEl.textContent = `お渡しまで：${seconds}秒`;
+    } else {
+      clearInterval(timer);
+      countdownEl.textContent = "";
+      // ✅ カウントダウン終了後、筆跡のみ削除（背景維持）
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (backgroundImage) {
+        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+      }
+      
+      // 描画コマンドをクリア
+      drawingCommands = [];
+      console.log('🧹 カウントダウン終了: 描画コマンドをクリア');
+      
+      // ✅ 背景の同期送信
+      const bgSrc = backgroundImage ? backgroundImage.src : "white";
+      socket.send(JSON.stringify({ type: "clear" }));
+      socket.send(JSON.stringify({ type: "background", src: bgSrc }));
+    }
+  }, 1000);
+}
+
+function clearCanvas() {
+  // 🎵 描画クリア時にペン音が有効なら音楽を停止して最初に戻す
+  if (penSoundEnabled) {
+    stopDrawingMusic();
+  }
+  
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (backgroundImage) {
+    ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+  }
+  
+  // 描画コマンドをクリア
+  drawingCommands = [];
+  console.log('🧹 描画コマンドをクリア');
+  
+  socket.send(JSON.stringify({ type: "clear" }));
+}
+
+// ペンの太さ設定関数
+function setPenThickness(thickness) {
+  currentPenThickness = thickness;
+  
+  // ボタンの選択状態を更新
+  document.querySelectorAll('.thickness-btn').forEach(btn => btn.classList.remove('selected'));
+  event.target.classList.add('selected');
+  
+  // ペンの太さ設定
+  
+  // 受信側に太さ情報を送信
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ 
+      type: "penThickness", 
+      thickness: thickness 
+    }));
+  }
+}
+
+// ペンの色設定関数
+function setPenColor(color) {
+  currentPenColor = color;
+  neonColorIndex = 0; // 色変更時にネオンインデックスをリセット
+  drawDistance = 0; // 描画距離もリセット
+  
+  // ボタンの選択状態を更新
+  document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
+  event.target.classList.add('selected');
+  
+  // ペンの色設定
+  
+  // 受信側に色情報を送信
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ 
+      type: "penColor", 
+      color: color 
+    }));
+  }
+}
+
+// 16進数カラーをRGBに変換
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return { r, g, b };
+}
+
+// RGBを16進数カラーに変換
+function rgbToHex(r, g, b) {
+  return "#" + ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
+}
+
+// イージング関数（滑らかな変化のため）
+function easeInOutSine(x) {
+  return -(Math.cos(Math.PI * x) - 1) / 2;
+}
+
+// 2つの色の間を補間する（イージング適用）
+function interpolateColor(color1, color2, factor) {
+  // イージング関数を適用してより滑らかな変化
+  const easedFactor = easeInOutSine(factor);
+  
+  const rgb1 = hexToRgb(color1);
+  const rgb2 = hexToRgb(color2);
+  
+  const r = rgb1.r + easedFactor * (rgb2.r - rgb1.r);
+  const g = rgb1.g + easedFactor * (rgb2.g - rgb1.g);
+  const b = rgb1.b + easedFactor * (rgb2.b - rgb1.b);
+  
+  return rgbToHex(r, g, b);
+}
+
+// ネオン色を取得する関数（滑らかな色補間）
+function getNeonColor() {
+  const colors = [
+    '#ff0000', // 赤
+    '#ff4000', // 赤橙
+    '#ff8000', // オレンジ
+    '#ffb000', // 黄橙
+    '#ffff00', // 黄色
+    '#b0ff00', // 黄緑1
+    '#80ff00', // 黄緑2
+    '#40ff00', // 緑黄
+    '#00ff00', // 緑
+    '#00ff40', // 緑青1
+    '#00ff80', // 緑青2
+    '#00ffb0', // 緑青3
+    '#00ffff', // シアン
+    '#00b0ff', // 青シアン1
+    '#0080ff', // 青シアン2
+    '#0040ff', // 青
+    '#0000ff', // 純青
+    '#4000ff', // 青紫1
+    '#8000ff', // 青紫2
+    '#b000ff', // 紫
+    '#ff00ff', // マゼンタ
+    '#ff00b0', // ピンク紫
+    '#ff0080', // ピンク1
+    '#ff0040'  // ピンク2
+  ];
+  
+  // 現在の位置を色配列の範囲にマッピング
+  const position = (neonColorIndex % colors.length);
+  const colorIndex1 = Math.floor(position);
+  const colorIndex2 = (colorIndex1 + 1) % colors.length;
+  const factor = position - colorIndex1; // 0-1の間の補間係数
+  
+  const color1 = colors[colorIndex1];
+  const color2 = colors[colorIndex2];
+  const interpolatedColor = interpolateColor(color1, color2, factor);
+  
+  console.log(`🌈 ネオン色: index=${neonColorIndex.toFixed(2)}, position=${position.toFixed(2)}, factor=${factor.toFixed(2)}, color=${interpolatedColor}`);
+  return interpolatedColor;
+}
+
+// 星エフェクトのON/OFF切り替え
+function toggleStarEffect() {
+  starEffectEnabled = document.getElementById('starEffect').checked;
+  console.log(`⭐ 星エフェクト: ${starEffectEnabled ? 'ON' : 'OFF'}`);
+  
+  // 受信側に星エフェクト状態を送信
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ 
+      type: "starEffect", 
+      enabled: starEffectEnabled 
+    }));
+  }
+}
+
+// 妖精の粉エフェクトのON/OFF切り替え
+function toggleFairyDustEffect() {
+  fairyDustEffectEnabled = document.getElementById('fairyDustEffect').checked;
+  console.log(`✨ 妖精の粉エフェクト: ${fairyDustEffectEnabled ? 'ON' : 'OFF'}`);
+  
+  // 受信側に妖精の粉エフェクト状態を送信
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ 
+      type: "fairyDustEffect", 
+      enabled: fairyDustEffectEnabled 
+    }));
+  }
+}
+
+// ハートエフェクトのON/OFF切り替え
+function toggleHeartEffect() {
+  heartEffectEnabled = document.getElementById('heartEffect').checked;
+  // ハートエフェクト設定
+  
+  // 受信側にハートエフェクト状態を送信
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ 
+      type: "heartEffect", 
+      enabled: heartEffectEnabled 
+    }));
+  }
+}
+
+// 🎵 ペン音制御関数
+function togglePenSound() {
+  penSoundEnabled = document.getElementById('penSoundEffect').checked;
+  // ペン音設定
+  
+  // ペン音がOFFになった場合は音楽を停止
+  if (!penSoundEnabled) {
+    stopDrawingMusic();
+  }
+}
+
+function toggleBackgroundDebug() {
+  backgroundDebugEnabled = document.getElementById('backgroundDebug').checked;
+  console.log(`🔍 背景デバッグ表示: ${backgroundDebugEnabled ? 'ON' : 'OFF'}`);
+  
+  // 現在の背景を再描画してデバッグ表示を更新
+  if (backgroundImage) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 背景画像を再描画
+    const imageAspect = backgroundImage.naturalWidth / backgroundImage.naturalHeight;
+    const canvasAspect = canvas.width / canvas.height;
+    
+    let drawWidth, drawHeight, offsetX, offsetY;
+    
+    if (imageAspect > canvasAspect) {
+      drawWidth = canvas.width;
+      drawHeight = drawWidth / imageAspect;
+      offsetX = 0;
+      offsetY = (canvas.height - drawHeight) / 2;
+    } else {
+      drawHeight = canvas.height;
+      drawWidth = drawHeight * imageAspect;
+      offsetX = (canvas.width - drawWidth) / 2;
+      offsetY = 0;
+    }
+    
+    // 背景2の特殊処理
+    if (lastBackgroundSrc && lastBackgroundSrc.includes('back2')) {
+      drawWidth = canvas.width;
+      drawHeight = canvas.height;
+      offsetX = 0;
+      offsetY = 0;
+    }
+    
+    ctx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
+    
+    // デバッグ表示が有効な場合のみ視覚的な表示を追加
+    if (backgroundDebugEnabled) {
+      addBackgroundDebugVisuals(offsetX, offsetY, drawWidth, drawHeight);
+    }
+  }
+}
+
+function addBackgroundDebugVisuals(offsetX, offsetY, drawWidth, drawHeight) {
+  ctx.save();
+  
+  // 背景画像の境界線
+  ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 5]);
+  ctx.strokeRect(offsetX, offsetY, drawWidth, drawHeight);
+  
+  // キャンバス中心点（緑）
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+  ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, 5, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  // 背景画像中心点（青）
+  const bgCenterX = offsetX + drawWidth / 2;
+  const bgCenterY = offsetY + drawHeight / 2;
+  ctx.fillStyle = 'rgba(0, 0, 255, 0.8)';
+  ctx.beginPath();
+  ctx.arc(bgCenterX, bgCenterY, 5, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  ctx.restore();
+}
+
+function initDrawingAudio() {
+  if (!drawingAudio) {
+    drawingAudio = new Audio('./draw.mp3');
+    drawingAudio.loop = true; // ループ再生
+    drawingAudio.volume = 0.7; // ボリュームを70%に設定
+    // 描画音楽初期化
+  }
+}
+
+function startDrawingMusic() {
+  if (!penSoundEnabled) return; // ペン音が無効の場合は何もしない
+  
+  initDrawingAudio();
+  
+  if (drawingAudio.paused) {
+    drawingAudio.play().then(() => {
+      // 描画音楽開始
+    }).catch(e => {
+      // 描画音楽再生エラー
+    });
+  }
+  
+  isDrawingActive = true;
+  
+  // 既存のタイマーをクリア
+  if (drawingInactiveTimer) {
+    clearTimeout(drawingInactiveTimer);
+    drawingInactiveTimer = null;
+  }
+}
+
+function pauseDrawingMusic() {
+  if (drawingAudio && !drawingAudio.paused) {
+    drawingAudio.pause();
+    // 描画音楽一時停止
+  }
+  isDrawingActive = false;
+}
+
+function stopDrawingMusic() {
+  if (drawingAudio) {
+    drawingAudio.pause();
+    drawingAudio.currentTime = 0; // 最初に戻す
+    // 描画音楽停止
+  }
+  isDrawingActive = false;
+  
+  // タイマーをクリア
+  if (drawingInactiveTimer) {
+    clearTimeout(drawingInactiveTimer);
+    drawingInactiveTimer = null;
+  }
+}
+
+function handleDrawingActivity() {
+  if (!penSoundEnabled) return; // ペン音が無効の場合は何もしない
+  
+  startDrawingMusic();
+  
+  // 既存のタイマーをクリア
+  if (drawingInactiveTimer) {
+    clearTimeout(drawingInactiveTimer);
+  }
+  
+  // 新しいタイマーを設定（描画停止を検知）
+  drawingInactiveTimer = setTimeout(() => {
+    pauseDrawingMusic();
+    console.log('🎵 描画が停止したため音楽を一時停止');
+  }, DRAWING_PAUSE_DELAY);
+}
+
+// 描画用ハートを生成する関数
+function createDrawingHeart(x, y) {
+  // ハートを少数生成（1-3個）
+  const heartCount = Math.floor(Math.random() * 3) + 1;
+  
+  for (let i = 0; i < heartCount; i++) {
+    const heart = document.createElement('div');
+    heart.className = 'drawing-heart';
+    
+    // ペン先により近い範囲にランダム配置（18px範囲）
+    const offsetX = (Math.random() - 0.5) * 18;
+    const offsetY = (Math.random() - 0.5) * 18;
+    
+    heart.style.left = (x + offsetX) + 'px';
+    heart.style.top = (y + offsetY) + 'px';
+    
+    // ランダムなピンク系の色
+    const colors = ['#ff1493', '#ff69b4', '#ff6347', '#ff1493', '#db7093', '#c71585'];
+    const heartColor = colors[Math.floor(Math.random() * colors.length)];
+    
+    heart.style.background = heartColor;
+    heart.style.boxShadow = `0 0 8px ${heartColor}, 0 0 16px ${heartColor}`;
+    
+    // ランダムな飛び散り方向とアニメーション遅延
+    const randomDirection = (Math.random() - 0.5) * 60; // -30度から30度
+    heart.style.setProperty('--float-direction', randomDirection + 'deg');
+    heart.style.animationDelay = (Math.random() * 0.3) + 's';
+    
+    // 疑似要素の色も更新
+    heart.style.setProperty('--heart-color', heartColor);
+    
+    document.body.appendChild(heart);
+    
+    // アニメーション終了後にハートを削除
+    setTimeout(() => {
+      if (heart.parentNode) {
+        heart.parentNode.removeChild(heart);
+      }
+    }, 1500);
+  }
+}
+
+// 妖精の粉を生成する関数
+function createFairyDust(x, y) {
+  // 妖精の粉を極少数生成（1-2個）
+  const dustCount = Math.floor(Math.random() * 2) + 1;
+  
+  for (let i = 0; i < dustCount; i++) {
+    const dust = document.createElement('div');
+    dust.className = 'fairy-dust';
+    
+    // ペン先により近い範囲にランダム配置（20px範囲）
+    const offsetX = (Math.random() - 0.5) * 20;
+    const offsetY = (Math.random() - 0.5) * 20;
+    
+    dust.style.left = (x + offsetX) + 'px';
+    dust.style.top = (y + offsetY) + 'px';
+    
+    // ランダムな色（キラキラした色）
+    const colors = ['#fff', '#f0f8ff', '#e6e6fa', '#fffacd', '#f5f5dc', '#ffefd5'];
+    dust.style.background = colors[Math.floor(Math.random() * colors.length)];
+    dust.style.boxShadow = `0 0 6px ${dust.style.background}, 0 0 12px ${dust.style.background}, 0 0 18px ${dust.style.background}`;
+    
+    // ランダムな遅延でアニメーション開始
+    dust.style.animationDelay = (Math.random() * 0.5) + 's';
+    
+    document.body.appendChild(dust);
+    
+    // アニメーション終了後に妖精の粉を削除
+    setTimeout(() => {
+      if (dust.parentNode) {
+        dust.parentNode.removeChild(dust);
+      }
+    }, 3000);
+  }
+}
+
+// 星を生成する関数（飛び散る効果）
+function createStar(x, y) {
+  // 星の数をさらに減らす（1個、たまに2個）
+  const starCount = Math.random() < 0.3 ? 2 : 1;
+  
+  for (let i = 0; i < starCount; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    
+    // ペン先により近い範囲にランダム配置（15px範囲）
+    const offsetX = (Math.random() - 0.5) * 15;
+    const offsetY = (Math.random() - 0.5) * 15;
+    
+    star.style.left = (x + offsetX) + 'px';
+    star.style.top = (y + offsetY) + 'px';
+    
+    // ランダムな色（金色系）
+    const colors = ['gold', '#FFD700', '#FFA500', '#FFFF00', '#FFE4B5', '#FFFACD'];
+    star.style.background = colors[Math.floor(Math.random() * colors.length)];
+    
+    // ランダムな飛び散り方向
+    const direction = Math.random() * 360;
+    star.style.setProperty('--fly-direction', direction + 'deg');
+    
+    // ランダムな遅延でアニメーション開始
+    star.style.animationDelay = (Math.random() * 0.3) + 's';
+    
+    document.body.appendChild(star);
+    
+    // アニメーション終了後に星を削除
+    setTimeout(() => {
+      if (star.parentNode) {
+        star.parentNode.removeChild(star);
+      }
+    }, 1000);
+  }
+}
+
+// 🔸 送信側花火エフェクト用のCSSアニメーションを追加
+function addSenderFireworkAnimations() {
+  if (document.getElementById('senderFireworkAnimations')) return; // 既に追加済みの場合はスキップ
+  
+  const style = document.createElement('style');
+  style.id = 'senderFireworkAnimations';
+  style.textContent = `
+    @keyframes fireworkPulse {
+      0% { 
+        transform: scale(1);
+        filter: brightness(1);
+      }
+      100% { 
+        transform: scale(1.1);
+        filter: brightness(1.3);
+      }
+    }
+    
+    @keyframes trailFade {
+      0% { 
+        opacity: 0.6;
+        height: 20px;
+      }
+      100% { 
+        opacity: 0;
+        height: 60px;
+      }
+    }
+    
+    @keyframes particleShimmer {
+      0% { 
+        opacity: 1;
+        transform: scale(1);
+        filter: brightness(1);
+      }
+      50% { 
+        opacity: 0.8;
+        transform: scale(0.9);
+        filter: brightness(1.2);
+      }
+      100% { 
+        opacity: 0;
+        transform: scale(0.3);
+        filter: brightness(0.8);
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+// 打ち上げ花火エフェクト生成関数
+function createFireworks() {
+  console.log('🎆 打ち上げ花火演出を開始（リッチバージョン）');
+  
+  // 🔸 花火アニメーションを追加
+  addSenderFireworkAnimations();
+  
+  // 受信側に花火テスト指示を送信
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: "fireworksTest"
+    }));
+    console.log('🎆 受信側に花火テスト指示を送信');
+  }
+  
+  // 複数の打ち上げ花火を生成（超派手に改良）
+  for (let i = 0; i < 18; i++) {
+    setTimeout(() => {
+      // 画面下部からランダムな位置で花火を発射
+      const launchX = Math.random() * (window.innerWidth - 100) + 50; // 端から50px離す
+      const targetY = Math.random() * (window.innerHeight * 0.5) + 80; // 上部50%の範囲に拡大
+      
+      // console.log(`🎆 花火${i+1}発射: X=${launchX}, Y=${targetY}`);
+      
+      // 花火の軌道となる要素を作成（より派手に）
+      const firework = document.createElement('div');
+      firework.className = 'firework';
+      
+      // ランダムな色の花火（より多彩に）
+      const colors = ['#ffff00', '#ff0000', '#00ff00', '#0000ff', '#ff00ff', '#00ffff', '#ffa500', '#ff69b4', '#ffd700', '#ff1493', '#32cd32', '#ff4500', '#8a2be2', '#00ced1', '#ff6347', '#9370db'];
+      const fireworkColor = colors[Math.floor(Math.random() * colors.length)];
+      
+      // より大きくて明るい花火（リッチな演出）
+      firework.style.cssText = `
+        position: fixed;
+        left: ${launchX}px;
+        bottom: 0px;
+        width: 12px;
+        height: 12px;
+        background: radial-gradient(circle, ${fireworkColor} 0%, ${fireworkColor}99 30%, ${fireworkColor}66 60%, transparent 100%);
+        border-radius: 50%;
+        z-index: 10000;
+        pointer-events: none;
+        box-shadow: 
+          0 0 15px ${fireworkColor}, 
+          0 0 30px ${fireworkColor}, 
+          0 0 45px ${fireworkColor}, 
+          0 0 60px ${fireworkColor},
+          0 0 75px ${fireworkColor}44,
+          inset 0 0 10px ${fireworkColor}aa;
+        animation: fireworkPulse 0.5s ease-in-out infinite alternate;
+      `;
+      
+      document.body.appendChild(firework);
+      // console.log(`🎆 花火${i+1}要素を追加`);
+      
+      // 打ち上げアニメーション（即座に開始）
+      const launchDuration = 1000 + Math.random() * 500; // 1000-1500ms
+      setTimeout(() => {
+        firework.style.transition = `bottom ${launchDuration}ms ease-out`;
+        firework.style.bottom = (window.innerHeight - targetY) + 'px';
+        // console.log(`🎆 花火${i+1}打ち上げ開始`);
+      }, 50);
+      
+      // 花火爆発
+      setTimeout(() => {
+        // console.log(`🎆 花火${i+1}爆発開始`);
+        firework.style.display = 'none';
+        createExplosion(launchX, targetY);
+      }, launchDuration + 100);
+      
+      // 花火要素を削除
+      setTimeout(() => {
+        if (firework.parentNode) firework.parentNode.removeChild(firework);
+        // console.log(`🎆 花火${i+1}要素削除`);
+      }, launchDuration + 200);
+      
+    }, i * 350); // 350msずつ時間差で発射（6.5秒継続: 18発 × 350ms = 6.3秒）
+  }
+}
+
+// 花火爆発エフェクト（超派手に改良）
+function createExplosion(x, y) {
+  // console.log(`💥 爆発エフェクト開始: X=${x}, Y=${y}`);
+  const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff8000', '#8000ff', '#ffd700', '#ff69b4', '#32cd32', '#ff4500', '#8a2be2', '#00ced1', '#ff6347', '#9370db'];
+  const particles = 24; // 爆発する粒子数を大幅増加
+  
+  for (let i = 0; i < particles; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'firework-particle';
+    
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const angle = (360 / particles) * i + Math.random() * 30; // より多くのランダム性を追加
+    const distance = 120 + Math.random() * 80; // 120-200px（爆発範囲をさらに拡大）
+    const size = 5 + Math.random() * 5; // 5-10px（パーティクルサイズをさらに拡大）
+    
+    particle.style.cssText = `
+      position: fixed;
+      left: ${x}px;
+      top: ${y}px;
+      width: ${size}px;
+      height: ${size}px;
+      background: radial-gradient(circle, ${color} 0%, ${color}cc 40%, ${color}66 70%, transparent 100%);
+      border-radius: 50%;
+      z-index: 10001;
+      pointer-events: none;
+      box-shadow: 
+        0 0 15px ${color}, 
+        0 0 30px ${color}, 
+        0 0 45px ${color}, 
+        0 0 60px ${color},
+        0 0 75px ${color}33,
+        inset 0 0 8px ${color}99;
+      animation: particleShimmer 1.2s ease-out forwards;
+    `;
+    
+    // 動的にCSSアニメーションを作成
+    const randomId = Math.random().toString(36).substr(2, 9);
+    const keyframeName = `explode_${randomId}`;
+    
+    const endX = x + Math.cos(angle * Math.PI / 180) * distance;
+    const endY = y + Math.sin(angle * Math.PI / 180) * distance;
+    
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes ${keyframeName} {
+        0% {
+          transform: translate(0, 0) scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(${endX - x}px, ${endY - y}px) scale(0.3);
+          opacity: 0;
+        }
+      }
+    `;
+    
+    document.head.appendChild(style);
+    particle.style.animation = `${keyframeName} 1s ease-out forwards`;
+    
+    document.body.appendChild(particle);
+    
+    // 粒子を削除
+    setTimeout(() => {
+      if (particle.parentNode) particle.parentNode.removeChild(particle);
+      if (style.parentNode) style.parentNode.removeChild(style);
+    }, 1000);
+  }
+}
+
+// 紙吹雪エフェクト生成関数
+function createConfetti() {
+  console.log('🎊 紙吹雪演出を開始');
+  
+  // 40個の紙吹雪を生成
+  for (let i = 0; i < 40; i++) {
+    setTimeout(() => {
+      const confetti = document.createElement('div');
+      confetti.className = 'confetti';
+      
+      // ランダムな色とサイズ
+      const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff8000', '#8000ff', '#ff69b4', '#00fa9a'];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const size = 8 + Math.random() * 6; // 8-14px
+      const startX = Math.random() * window.innerWidth;
+      const fallDuration = 2000 + Math.random() * 2000; // 2-4秒
+      
+      confetti.style.cssText = `
+        position: fixed;
+        left: ${startX}px;
+        top: -10px;
+        width: ${size}px;
+        height: ${size}px;
+        background: ${color};
+        z-index: 10000;
+        pointer-events: none;
+        border-radius: 2px;
+        box-shadow: 0 0 3px ${color};
+        animation: confettiFall ${fallDuration}ms linear forwards;
+      `;
+      
+      // 動的にCSSアニメーションを作成
+      const randomId = Math.random().toString(36).substr(2, 9);
+      const keyframeName = `confettiFall_${randomId}`;
+      
+      const endX = startX + (Math.random() - 0.5) * 200; // 左右に揺らぎ
+      const rotation = Math.random() * 720; // 2回転
+      
+      const style = document.createElement('style');
+      style.textContent = `
+        @keyframes ${keyframeName} {
+          0% {
+            transform: translateY(0) translateX(0) rotate(0deg);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(${window.innerHeight + 20}px) translateX(${endX - startX}px) rotate(${rotation}deg);
+            opacity: 0.3;
+          }
+        }
+      `;
+      
+      document.head.appendChild(style);
+      confetti.style.animation = `${keyframeName} ${fallDuration}ms linear forwards`;
+      
+      document.body.appendChild(confetti);
+      
+      // 紙吹雪を削除
+      setTimeout(() => {
+        if (confetti.parentNode) confetti.parentNode.removeChild(confetti);
+        if (style.parentNode) style.parentNode.removeChild(style);
+      }, fallDuration);
+      
+    }, i * 100); // 100msずつ時間差で生成
+  }
+}
+
+// 🎨 滑らかな描画関数（二次ベジェ曲線を使用）
+function drawSmoothLine(x, y) {
+  if (!lastPosition) {
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    lastPosition = { x, y };
+    return;
+  }
+  
+  // 前の位置からの距離を計算
+  const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
+  
+  // 距離が大きい場合はより細かく補間
+  if (distance > 2) {
+    const steps = Math.max(Math.ceil(distance / 1.5), 3); // より細かい分割
+    
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      // より滑らかなイージング関数を使用
+      const easedT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      
+      const interpX = lastPosition.x + (x - lastPosition.x) * easedT;
+      const interpY = lastPosition.y + (y - lastPosition.y) * easedT;
+      
+      // ベジェ曲線を使用した滑らかな描画
+      if (secondLastPosition) {
+        const cp1x = lastPosition.x + (secondLastPosition.x - lastPosition.x) * 0.1;
+        const cp1y = lastPosition.y + (secondLastPosition.y - lastPosition.y) * 0.1;
+        const cp2x = interpX - (x - lastPosition.x) * 0.1;
+        const cp2y = interpY - (y - lastPosition.y) * 0.1;
+        
+        ctx.beginPath();
+        ctx.moveTo(lastPosition.x, lastPosition.y);
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, interpX, interpY);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+      } else {
+        // 2点目の場合
+        ctx.beginPath();
+        ctx.moveTo(lastPosition.x, lastPosition.y);
+        ctx.lineTo(interpX, interpY);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+      }
+      
+      // 次の補間のために位置を更新
+      secondLastPosition = lastPosition;
+      lastPosition = { x: interpX, y: interpY };
+    }
+  } else {
+    // 距離が小さい場合は単純な線
+    if (secondLastPosition) {
+      const cp1x = lastPosition.x + (secondLastPosition.x - lastPosition.x) * 0.1;
+      const cp1y = lastPosition.y + (secondLastPosition.y - lastPosition.y) * 0.1;
+      const cp2x = x - (x - lastPosition.x) * 0.1;
+      const cp2y = y - (y - lastPosition.y) * 0.1;
+      
+      ctx.beginPath();
+      ctx.moveTo(lastPosition.x, lastPosition.y);
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(lastPosition.x, lastPosition.y);
+      ctx.lineTo(x, y);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    }
+    
+    secondLastPosition = lastPosition;
+    lastPosition = { x, y };
+  }
+}
+
+// 🎨 高品質線の補間関数
+function interpolatePoints(startX, startY, endX, endY, steps) {
+  const points = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    // イージング関数を適用してより自然な動き
+    const easedT = t * t * (3 - 2 * t); // smoothstep関数
+    points.push({
+      x: startX + (endX - startX) * easedT,
+      y: startY + (endY - startY) * easedT
+    });
+  }
+  return points;
+}
+
+canvas.addEventListener("mousedown", (e) => {
+  drawing = true;
+  const x = e.offsetX;
+  const y = e.offsetY;
+  
+  // 🎵 描画開始時に音楽制御
+  handleDrawingActivity();
+  
+  // ネオンモードの初期設定
+  if (currentPenColor === 'neon') {
+    ctx.lineWidth = currentPenThickness;
+    ctx.strokeStyle = getNeonColor();
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = getNeonColor();
+  }
+  
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  
+  // 線の品質を向上させる設定
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  
+  drawDistance = 0; // 新しいストロークの開始時に距離をリセット
+  lastPosition = { x, y }; // 初期位置を記録
+  secondLastPosition = null; // 滑らか描画用の位置をリセット
+  currentPath = [{ x, y }]; // 新しいパスを開始
+  
+  // 描画コマンドを記録
+  const startCmd = {
+    type: "start",
+    x: x,
+    y: y,
+    thickness: currentPenThickness,
+    color: currentPenColor === 'neon' ? getNeonColor() : (currentPenColor === 'black' ? '#000' : currentPenColor)
+  };
+  drawingCommands.push(startCmd);
+  
+  const startMsg = { 
+    type: "start", 
+    x, 
+    y,
+    thickness: currentPenThickness,
+    color: currentPenColor,
+    starEffect: starEffectEnabled,
+    fairyDustEffect: fairyDustEffectEnabled,
+    canvasSize: { width: canvas.width, height: canvas.height }
+  };
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify(startMsg));
+  }
+  console.log("📤 送信 start:", startMsg);
+  
+  // 星エフェクトが有効な場合は星を生成
+  if (starEffectEnabled) {
+    createStar(x, y);
+  }
+  
+  // 妖精の粉エフェクトが有効な場合は妖精の粉を生成
+  if (fairyDustEffectEnabled) {
+    createFairyDust(x, y);
+  }
+});
+
+canvas.addEventListener("mouseup", () => {
+  drawing = false;
+  // 🔸 不要な"end"メッセージを削除（受信側で処理していないため）
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  if (!drawing) return;
+  const x = e.offsetX;
+  const y = e.offsetY;
+  
+  // 🎵 描画継続時に音楽制御
+  handleDrawingActivity();
+  
+  let actualColor;
+  
+  // 補間処理：前の位置から現在の位置までの距離を計算
+  if (lastPosition) {
+    const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
+    
+    // 距離が大きい場合は中間点を補間
+    if (distance > 3) {
+      const steps = Math.ceil(distance / 1.5);
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const interpX = lastPosition.x + (x - lastPosition.x) * t;
+        const interpY = lastPosition.y + (y - lastPosition.y) * t;
+        
+        if (currentPenColor === 'neon') {
+          drawDistance += distance / steps;
+          neonColorIndex = drawDistance / 100;
+          
+          ctx.beginPath();
+          ctx.moveTo(lastPosition.x + (x - lastPosition.x) * ((i-1) / steps), 
+                     lastPosition.y + (y - lastPosition.y) * ((i-1) / steps));
+          
+          const neonColor = getNeonColor();
+          actualColor = neonColor;
+          ctx.lineWidth = currentPenThickness;
+          ctx.strokeStyle = neonColor;
+          ctx.shadowBlur = 5;
+          ctx.shadowColor = neonColor;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          drawSmoothLine(interpX, interpY);
+        } else {
+          actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : (currentPenColor === 'green' ? '#008000' : (currentPenColor === 'pink' ? '#ff69b4' : currentPenColor)));
+          ctx.lineWidth = currentPenThickness;
+          ctx.strokeStyle = actualColor;
+          ctx.shadowBlur = 0;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          drawSmoothLine(interpX, interpY);
+        }
+      }
+    } else {
+      // 距離が小さい場合は通常の描画
+      if (currentPenColor === 'neon') {
+        drawDistance += distance;
+        neonColorIndex = drawDistance / 100;
+        
+        ctx.beginPath();
+        ctx.moveTo(lastPosition.x, lastPosition.y);
+        
+        const neonColor = getNeonColor();
+        actualColor = neonColor;
+        ctx.lineWidth = currentPenThickness;
+        ctx.strokeStyle = neonColor;
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = neonColor;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        drawSmoothLine(x, y);
+      } else {
+        actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : (currentPenColor === 'green' ? '#008000' : (currentPenColor === 'pink' ? '#ff69b4' : currentPenColor)));
+        ctx.lineWidth = currentPenThickness;
+        ctx.strokeStyle = actualColor;
+        ctx.shadowBlur = 0;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        drawSmoothLine(x, y);
+      }
+    }
+  }
+  
+  // 描画コマンドを記録
+  const drawCmd = {
+    type: "draw",
+    x: x,
+    y: y,
+    thickness: currentPenThickness,
+    color: actualColor
+  };
+  drawingCommands.push(drawCmd);
+  
+  // 現在の位置を記録
+  lastPosition = { x, y };
+  
+  const drawMsg = { 
+    type: "draw", 
+    x, 
+    y,
+    thickness: currentPenThickness,
+    color: currentPenColor,
+    neonIndex: currentPenColor === 'neon' ? neonColorIndex : null,
+    starEffect: starEffectEnabled,
+    canvasSize: { width: canvas.width, height: canvas.height }
+  };
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify(drawMsg));
+  }
+  // console.log("📤 送信 draw:", drawMsg); // パフォーマンスのためコメントアウト
+  
+  // 星エフェクトが有効な場合は星を生成（2回に1回の頻度）
+  if (starEffectEnabled && Math.random() < 0.5) {
+    const rect = canvas.getBoundingClientRect();
+    createStar(x + rect.left, y + rect.top);
+  }
+  
+  // 妖精の粉エフェクトが有効な場合は妖精の粉を生成（3回に1回の頻度）
+  if (fairyDustEffectEnabled && Math.random() < 0.33) {
+    const rect = canvas.getBoundingClientRect();
+    createFairyDust(x + rect.left, y + rect.top);
+  }
+  
+  // ハートエフェクトが有効な場合はハートを生成（4回に1回の頻度）
+  if (heartEffectEnabled && Math.random() < 0.25) {
+    const rect = canvas.getBoundingClientRect();
+    createDrawingHeart(x + rect.left, y + rect.top);
+  }
+});
+
+// 🔸 スマホ対応：タッチイベントを追加
+canvas.addEventListener("touchstart", (e) => {
+  e.preventDefault(); // スクロールを防止
+  drawing = true;
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const x = touch.clientX - rect.left;
+  const y = touch.clientY - rect.top;
+  
+  // 🎵 描画開始時に音楽制御
+  handleDrawingActivity();
+  
+  // ネオンモードの初期設定
+  if (currentPenColor === 'neon') {
+    ctx.lineWidth = currentPenThickness;
+    ctx.strokeStyle = getNeonColor();
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = getNeonColor();
+  }
+  
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  
+  // 線の品質を向上させる設定
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  
+  drawDistance = 0; // 新しいストロークの開始時に距離をリセット
+  lastPosition = { x, y }; // 初期位置を記録
+  secondLastPosition = null; // 滑らか描画用の位置をリセット
+  currentPath = [{ x, y }]; // 新しいパスを開始
+  
+  // 描画コマンドを記録
+  const startCmd = {
+    type: "start",
+    x: x,
+    y: y,
+    thickness: currentPenThickness,
+    color: currentPenColor === 'neon' ? getNeonColor() : (currentPenColor === 'black' ? '#000' : currentPenColor)
+  };
+  drawingCommands.push(startCmd);
+  
+  const touchStartMsg = { 
+    type: "start", 
+    x, 
+    y,
+    thickness: currentPenThickness,
+    color: currentPenColor,
+    starEffect: starEffectEnabled,
+    fairyDustEffect: fairyDustEffectEnabled
+  };
+  socket.send(JSON.stringify(touchStartMsg));
+  console.log("📤 送信 touch start:", touchStartMsg);
+  
+  // 星エフェクトが有効な場合は星を生成
+  if (starEffectEnabled) {
+    createStar(x, y);
+  }
+  
+  // 妖精の粉エフェクトが有効な場合は妖精の粉を生成
+  if (fairyDustEffectEnabled) {
+    createFairyDust(x, y);
+  }
+});
+
+canvas.addEventListener("touchend", (e) => {
+  e.preventDefault();
+  drawing = false;
+});
+
+canvas.addEventListener("touchmove", (e) => {
+  e.preventDefault(); // スクロールを防止
+  if (!drawing) return;
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const x = touch.clientX - rect.left;
+  const y = touch.clientY - rect.top;
+  
+  // 🎵 描画継続時に音楽制御
+  handleDrawingActivity();
+  
+  let actualColor;
+  
+  if (currentPenColor === 'neon') {
+    // 前の位置からの距離を計算
+    if (lastPosition) {
+      const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
+      drawDistance += distance;
+      
+      // 100ピクセルごとに色を変更（非常になだらかな変化）
+      neonColorIndex = drawDistance / 100;
+    }
+    
+    // 新しいパスを開始して短いセグメントを描画
+    ctx.beginPath();
+    if (lastPosition) {
+      ctx.moveTo(lastPosition.x, lastPosition.y);
+    }
+    
+    const neonColor = getNeonColor();
+    actualColor = neonColor;
+    ctx.lineWidth = currentPenThickness;
+    ctx.strokeStyle = neonColor;
+    ctx.shadowBlur = 5; // シャドウを小さくして汚れを軽減
+    ctx.shadowColor = neonColor;
+    drawSmoothLine(x, y);
+  } else {
+    actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : (currentPenColor === 'green' ? '#008000' : (currentPenColor === 'pink' ? '#ff69b4' : currentPenColor)));
+    ctx.lineWidth = currentPenThickness;
+    ctx.strokeStyle = actualColor;
+    ctx.shadowBlur = 0;
+    drawSmoothLine(x, y);
+  }
+  
+  // 描画コマンドを記録
+  const drawCmd = {
+    type: "draw",
+    x: x,
+    y: y,
+    thickness: currentPenThickness,
+    color: actualColor
+  };
+  drawingCommands.push(drawCmd);
+  
+  // 現在の位置を記録
+  lastPosition = { x, y };
+  
+  const touchDrawMsg = { 
+    type: "draw", 
+    x, 
+    y,
+    thickness: currentPenThickness,
+    color: currentPenColor,
+    neonIndex: currentPenColor === 'neon' ? neonColorIndex : null,
+    starEffect: starEffectEnabled
+  };
+  socket.send(JSON.stringify(touchDrawMsg));
+  console.log("📤 送信 touch draw:", touchDrawMsg);
+  
+  // 星エフェクトが有効な場合は星を生成（2回に1回の頻度）
+  if (starEffectEnabled && Math.random() < 0.5) {
+    const rect = canvas.getBoundingClientRect();
+    createStar(x + rect.left, y + rect.top);
+  }
+  
+  // 妖精の粉エフェクトが有効な場合は妖精の粉を生成（3回に1回の頻度）
+  if (fairyDustEffectEnabled && Math.random() < 0.33) {
+    const rect = canvas.getBoundingClientRect();
+    createFairyDust(x + rect.left, y + rect.top);
+  }
+  
+  // ハートエフェクトが有効な場合はハートを生成（4回に1回の頻度）
+  if (heartEffectEnabled && Math.random() < 0.25) {
+    const rect = canvas.getBoundingClientRect();
+    createDrawingHeart(x + rect.left, y + rect.top);
+  }
+});
+
+// 🔸 ビデオサイズ設定関数
+function setVideoSize(size) {
+  currentVideoSize = size;
+  
+  // ボタンの選択状態を更新
+  document.getElementById("size100Btn").classList.remove("selected");
+  document.getElementById("size90Btn").classList.remove("selected");
+  document.getElementById("size80Btn").classList.remove("selected");
+  
+  document.getElementById(`size${size}Btn`).classList.add("selected");
+  
+  console.log(`📐 ビデオサイズを${size}%に設定`);
+  
+  // 受信側にサイズ情報を送信
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ 
+      type: "videoSize", 
+      size: size 
+    }));
+  }
+}
+
+// 🔸 ビデオ再生関数
+function playVideo() {
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ 
+      type: "playVideo",
+      size: currentVideoSize
+    }));
+    console.log(`📹 ビデオ再生指示を送信（サイズ: ${currentVideoSize}%）`);
+  } else {
+    console.error("❌ WebSocket接続なし");
+  }
+}
+
+// 🔸 Dev Tools 関数
+function toggleDevTools() {
+  const devTools = document.getElementById("devTools");
+  devTools.style.display = devTools.style.display === "none" ? "block" : "none";
+}
+
+function updateCanvasScale(value) {
+  canvasScale = parseFloat(value);
+  document.getElementById("canvasScaleValue").textContent = value + "x";
+}
+
+function updateAnimationStartWait(value) {
+  animationStartWaitTime = parseFloat(value);
+  document.getElementById("animationStartWaitValue").textContent = value + "秒";
+}
+
+function updateRotationWait(value) {
+  rotationWaitTime = parseFloat(value);
+  document.getElementById("rotationWaitValue").textContent = value + "秒";
+}
+
+function sendDevSettings() {
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: "devSettings",
+      canvasScale: canvasScale,
+      animationStartWaitTime: animationStartWaitTime,
+      rotationWaitTime: rotationWaitTime
+    }));
+    console.log(`🔧 Dev設定送信: scale=${canvasScale}, animationWait=${animationStartWaitTime}, rotationWait=${rotationWaitTime}`);
+    console.log("✅ 設定を受信側に送信しました");
+  } else {
+    console.error("❌ WebSocket接続なし");
+  }
+}
+
+// 描画データを保存する配列
+let drawingCommands = [];
+
+function saveRotatedImage() {
+  console.log('📤 送信ボタン: 180度回転画像ダウンロード開始');
+  
+  try {
+    // 最終的な画像用のcanvasを作成
+    const finalCanvas = document.createElement('canvas');
+    const finalCtx = finalCanvas.getContext('2d');
+    finalCanvas.width = canvas.width;
+    finalCanvas.height = canvas.height;
+    
+    // 1. 背景を先に描画（回転させない）
+    if (backgroundImage) {
+      finalCtx.drawImage(backgroundImage, 0, 0, finalCanvas.width, finalCanvas.height);
+    } else {
+      // 白背景で塗りつぶし
+      finalCtx.fillStyle = '#ffffff';
+      finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+    }
+    
+    // 2. ペイントデータのみを180度回転させて描画
+    if (drawingCommands.length > 0) {
+      console.log(`🎨 描画コマンド数: ${drawingCommands.length}`);
+      
+      // 180度回転変換を適用
+      finalCtx.save();
+      finalCtx.translate(finalCanvas.width, finalCanvas.height);
+      finalCtx.rotate(Math.PI);
+      
+      // 描画コマンドを実行（座標は元のまま、キャンバスが回転している）
+      drawingCommands.forEach(cmd => {
+        if (cmd.type === 'start') {
+          finalCtx.beginPath();
+          finalCtx.moveTo(cmd.x, cmd.y);
+        } else if (cmd.type === 'draw') {
+          finalCtx.lineWidth = cmd.thickness || 8;
+          finalCtx.strokeStyle = cmd.color || 'black';
+          finalCtx.lineTo(cmd.x, cmd.y);
+          finalCtx.stroke();
+        }
+      });
+      
+      finalCtx.restore();
+      console.log('🔄 ペイントデータの180度回転処理完了');
+    } else {
+      console.log('⚠️ 描画データがありません');
+    }
+    
+    // 自動ダウンロード
+    const imageDataUrl = finalCanvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    const now = new Date();
+    const fileName = `rotated_${now.getFullYear()}${(now.getMonth() + 1)
+      .toString().padStart(2, "0")}${now.getDate().toString().padStart(2, "0")}_${now
+      .getHours().toString().padStart(2, "0")}${now.getMinutes().toString().padStart(2, "0")}${now
+      .getSeconds().toString().padStart(2, "0")}.png`;
+    
+    link.download = fileName;
+    link.href = imageDataUrl;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    console.log('📥 180度回転画像ダウンロード完了:', fileName);
+    
+  } catch (error) {
+    console.error('❌ 180度回転画像保存エラー詳細:', error.message, error);
+    alert('画像の保存に失敗しました: ' + error.message);
+  }
+}
+
+// 現在の状態から更に180度回転させて保存する関数
+function saveDoubleRotatedImage() {
+  // 🎵 描画完了時にペン音が有効なら音楽を停止して最初に戻す
+  if (penSoundEnabled) {
+    stopDrawingMusic();
+  }
+  
+  console.log(`🔄 送信ボタン: 印刷処理開始→${animationStartWaitTime}秒後にアニメーション開始`);
+  
+  // 🔸 送信ボタンの視覚的フィードバック
+  const sendButton = event.target;
+  sendButton.style.transform = 'scale(0.95)';
+  sendButton.style.backgroundColor = '#ff1493';
+  sendButton.style.color = '#fff';
+  sendButton.textContent = '送信中...';
+  sendButton.disabled = true;
+  
+  // 🔸 打ち上げ花火演出を追加（受信側と同期）
+  // 回転アニメーション完了後1秒で実行するようにタイミング調整
+  const fireworksCheckbox = document.getElementById('fireworksEffect');
+  if (fireworksCheckbox.checked) {
+    const fireworksDelay = animationStartWaitTime * 1000 + 2500; // アニメーション開始待機時間 + 回転時間(1.5秒) + 1秒
+    setTimeout(() => {
+      console.log('🎆 送信側：回転アニメーション完了後1秒で花火を実行');
+      createFireworks();
+    }, fireworksDelay);
+  } else {
+    console.log('🎆 花火演出はオフに設定されています');
+  }
+  
+  // 🔸 紙吹雪演出を追加（受信側と同期）
+  const confettiCheckbox = document.getElementById('confettiEffect');
+  if (confettiCheckbox.checked) {
+    const confettiDelay = animationStartWaitTime * 1000 + 2500 + (rotationWaitTime * 1000) - 1500; // 花火と同じタイミング + 回転後待機時間 - 1.5秒前
+    setTimeout(() => {
+      console.log('🎊 送信側：紙吹雪演出を実行');
+      createConfetti();
+    }, confettiDelay);
+  } else {
+    console.log('🎊 紙吹雪演出はオフに設定されています');
+  }
+  
+  // ボタンを元に戻す
+  setTimeout(() => {
+    sendButton.style.transform = 'scale(1)';
+    sendButton.style.backgroundColor = '';
+    sendButton.style.color = '';
+    sendButton.textContent = '送信';
+    sendButton.disabled = false;
+  }, 2000);
+  
+  // 🔸 送信ボタンを押したと同時に印刷処理を実行（印刷機の起動を早くする）
+  console.log('🖨️ 印刷処理を即座に実行');
+  console.log(`📝 現在の描画コマンド数: ${drawingCommands.length}`);
+  actualPrintProcess();
+  
+  // 🔸 印刷処理開始の設定時間後に回転アニメーションを開始
+  console.log(`🎬 印刷処理開始から${animationStartWaitTime}秒後に回転アニメーション実行予定`);
+  
+  // 設定時間後にWebSocket経由で受信側にアニメーション開始を通知
+  setTimeout(() => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: "startRotationAnimation",
+        waitTime: rotationWaitTime, // 回転後待機時間を設定値から取得
+        fireworksEnabled: document.getElementById('fireworksEffect').checked,
+        confettiEnabled: document.getElementById('confettiEffect').checked
+      }));
+      console.log(`🎬 印刷開始から${animationStartWaitTime}秒後に受信側にアニメーション開始を送信 (回転後${rotationWaitTime}秒待機)`);
+    }
+  }, animationStartWaitTime * 1000); // アニメーション開始待機時間（秒をミリ秒に変換）
+  
+  // 🔸 送信ボタン押下から10秒後にクリアを実行（印刷が即座に開始されるため）
+  setTimeout(() => {
+    console.log('🧹 送信ボタン押下から10秒後にクリア実行');
+    
+    // キャンバスを完全にクリア
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 背景画像があれば180度回転で再描画
+    if (backgroundImage) {
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(Math.PI); // 180度回転
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+      ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+      ctx.restore();
+      console.log('🖼️ 背景画像を180度回転で再描画');
+    }
+    
+    // 描画コマンドをクリア
+    drawingCommands = [];
+    console.log('🧹 drawingCommands配列をクリア:', drawingCommands.length);
+    
+    // 受信側にもクリア指示を送信
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "clear" }));
+      console.log('📤 受信側にクリア指示を送信');
+    }
+    
+    console.log('✅ 送信ボタン押下から10秒後のクリア完了');
+  }, 10000); // 送信ボタン押下から10秒後にクリア
+}
+
+// 実際の印刷処理を行う関数
+function actualPrintProcess() {
+  try {
+    // 新しいcanvasを作成（taintedにならないように）
+    const cleanCanvas = document.createElement('canvas');
+    const cleanCtx = cleanCanvas.getContext('2d');
+    cleanCanvas.width = canvas.width;
+    cleanCanvas.height = canvas.height;
+    
+    // 白背景で塗りつぶし（背景画像は使わない）
+    cleanCtx.fillStyle = '#ffffff';
+    cleanCtx.fillRect(0, 0, cleanCanvas.width, cleanCanvas.height);
+    
+    // 保存された描画コマンドを再実行（360度回転 = 元の向き）
+    if (drawingCommands.length > 0) {
+      console.log(`🎨 描画コマンド数: ${drawingCommands.length}`);
+      
+      // 描画コマンドを実行（回転なし = 元の向き）
+      drawingCommands.forEach(cmd => {
+        if (cmd.type === 'start') {
+          cleanCtx.beginPath();
+          cleanCtx.moveTo(cmd.x, cmd.y);
+        } else if (cmd.type === 'draw') {
+          cleanCtx.lineWidth = cmd.thickness || 8;
+          cleanCtx.strokeStyle = cmd.color || 'black';
+          cleanCtx.lineTo(cmd.x, cmd.y);
+          cleanCtx.stroke();
+        }
+      });
+      
+      console.log('🔄 ペイントデータの360度回転処理完了（元の向き）');
+    } else {
+      // 描画データがない場合は何もしない
+      console.log('🔄 描画データがないため、白紙で印刷');
+      console.log('🔄 canvasには何も描画しません');
+      console.log('🔄 drawingCommands配列:', drawingCommands);
+    }
+    
+    // 自動印刷処理
+    const imageDataUrl = cleanCanvas.toDataURL('image/png');
+    
+    // WebSocket経由で受信側に印刷指示を送信
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      console.log('🖨️ WebSocket経由で受信側に印刷データを送信');
+      socket.send(JSON.stringify({
+        type: "printRotatedImage",
+        imageData: imageDataUrl,
+        printType: 'double_rotated',
+        paperSize: currentPaperSize,
+        printMode: currentPrintMode,
+        switchBotEnabled: document.getElementById('switchBotEffect').checked
+      }));
+      console.log('✅ 更に180度回転画像の印刷処理を開始');
+    } else {
+      // フォールバック: ダウンロード
+      console.log('⚠️ WebSocket接続がないため、ダウンロードします');
+      const link = document.createElement('a');
+      const now = new Date();
+      const fileName = `double_rotated_${now.getFullYear()}${(now.getMonth() + 1)
+        .toString().padStart(2, "0")}${now.getDate().toString().padStart(2, "0")}_${now
+        .getHours().toString().padStart(2, "0")}${now.getMinutes().toString().padStart(2, "0")}${now
+        .getSeconds().toString().padStart(2, "0")}.png`;
+      
+      link.download = fileName;
+      link.href = imageDataUrl;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('📥 更に180度回転画像ダウンロード完了:', fileName);
+    }
+    
+    
+  } catch (error) {
+    console.error('❌ 更に180度回転画像保存エラー詳細:', error.message, error);
+    alert('更に180度回転画像の保存に失敗しました: ' + error.message);
+  }
+}
+
+// 🤖 SwitchBotテスト関数（送信側からメッセージを送信）
+function testSwitchBot() {
+  console.log("🤖 送信側からSwitchBotテスト実行");
+  
+  // 受信側にSwitchBotテストメッセージを送信
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: "switchBotTest"
+    }));
+    console.log("🤖 受信側にSwitchBotテストメッセージを送信");
+  } else {
+    console.error("❌ WebSocket接続が閉じています");
+    alert("WebSocket接続が閉じています");
+  }
+}
+
+// 🎨 テーマ切り替え関数
+function toggleTheme() {
+  const body = document.body;
+  const themeToggle = document.getElementById('themeToggle');
+  
+  if (body.classList.contains('modern')) {
+    // モダン → クラシック
+    body.classList.remove('modern');
+    body.classList.add('classic');
+    themeToggle.textContent = '🎨 モダン';
+    console.log('📝 クラシックテーマに切り替え');
+  } else {
+    // クラシック → モダン
+    body.classList.remove('classic');
+    body.classList.add('modern');
+    themeToggle.textContent = '📝 クラシック';
+    console.log('🎨 モダンテーマに切り替え');
+  }
+}
+
+// 背景画像の変形パラメータ
+let backgroundScale = 1.0; // スケール（大きさ）
+let backgroundOffsetY = 0; // 垂直オフセット
+
+// 🎬 送信側動画関数群
+function createSenderVideo() {
+  console.log('🎬 送信側に動画を作成');
+  
+  // 既存の動画要素を削除
+  if (senderVideoElement) {
+    senderVideoElement.remove();
+  }
+  
+  // 新しい動画要素を作成（キャンバス位置に配置）
+  senderVideoElement = document.createElement('video');
+  senderVideoElement.src = './back6.mp4';
+  
+  // 🔍 デバッグ情報: 現状把握
+  const canvasRect = canvas.getBoundingClientRect();
+  console.log('📊 書き手側デバッグ情報:');
+  console.log(`  canvasScale値: ${canvasScale}`);
+  console.log(`  キャンバス位置: (${canvasRect.left}, ${canvasRect.top})`);
+  console.log(`  キャンバスサイズ: ${canvasRect.width} x ${canvasRect.height}`);
+  console.log(`  ウィンドウサイズ: ${window.innerWidth} x ${window.innerHeight}`);
+  
+  // ステップ1: キャンバスの情報を確認
+  console.log('📏 ステップ1: キャンバス情報確認');
+  console.log(`  キャンバスサイズ: ${canvas.width} x ${canvas.height}`);
+  console.log(`  キャンバス画面位置: (${canvasRect.left}, ${canvasRect.top})`);
+  
+  // ステップ2: キャンバスの中心座標を計算
+  const canvasCenterX = canvas.width / 2;
+  const canvasCenterY = canvas.height / 2;
+  console.log('🎯 ステップ2: キャンバス中心座標計算');
+  console.log(`  キャンバス中心（相対座標）: (${canvasCenterX}, ${canvasCenterY})`);
+  
+  // ステップ3: 動画のアスペクト比（16:9）を保持しながらキャンバスに収まるサイズを計算
+  const videoAspectRatio = 16 / 9;
+  const canvasAspectRatio = canvas.width / canvas.height;
+  let videoWidth, videoHeight;
+  
+  if (canvasAspectRatio > videoAspectRatio) {
+    // キャンバスの方が横長 → 高さを基準にする
+    videoHeight = canvas.height;
+    videoWidth = videoHeight * videoAspectRatio;
+  } else {
+    // キャンバスの方が縦長 → 幅を基準にする
+    videoWidth = canvas.width;
+    videoHeight = videoWidth / videoAspectRatio;
+  }
+  
+  console.log('📐 ステップ3: 動画サイズ計算（16:9比率を保持）');
+  console.log(`  計算された動画サイズ: ${videoWidth.toFixed(1)} x ${videoHeight.toFixed(1)}`);
+  console.log(`  キャンバスに対する比率: ${(videoWidth/canvas.width*100).toFixed(1)}% x ${(videoHeight/canvas.height*100).toFixed(1)}%`);
+  
+  // ステップ4: 動画の画面絶対座標を計算（キャンバス中心に配置）
+  const canvasScreenCenterX = canvasRect.left + canvasCenterX;
+  const canvasScreenCenterY = canvasRect.top + canvasCenterY;
+  const videoScreenLeft = canvasScreenCenterX - (videoWidth / 2);
+  const videoScreenTop = canvasScreenCenterY - (videoHeight / 2);
+  
+  console.log('📍 ステップ4: 動画配置座標計算（画面絶対座標）');
+  console.log(`  キャンバス中心（画面座標）: (${canvasScreenCenterX.toFixed(1)}, ${canvasScreenCenterY.toFixed(1)})`);
+  console.log(`  動画左上座標（画面座標）: (${videoScreenLeft.toFixed(1)}, ${videoScreenTop.toFixed(1)})`);
+  
+  // ステップ5: 動画を画面絶対座標で配置（レイアウト影響を完全排除）
+  senderVideoElement.style.cssText = `
+    position: fixed !important;
+    top: ${videoScreenTop}px !important;
+    left: ${videoScreenLeft}px !important;
+    width: ${videoWidth}px !important;
+    height: ${videoHeight}px !important;
+    z-index: 50 !important;
+    object-fit: contain !important;
+    pointer-events: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    transform: none !important;
+    transform-origin: initial !important;
+  `;
+  
+  // ステップ6: 理論上のずれ確認計算（画面座標）
+  const theoreticalVideoCenterX = videoScreenLeft + (videoWidth / 2);
+  const theoreticalVideoCenterY = videoScreenTop + (videoHeight / 2);
+  const theoreticalOffsetX = theoreticalVideoCenterX - canvasScreenCenterX;
+  const theoreticalOffsetY = theoreticalVideoCenterY - canvasScreenCenterY;
+  
+  console.log('✅ ステップ6: 理論上のずれ確認計算（画面座標）');
+  console.log(`  計算上の動画中心: (${theoreticalVideoCenterX.toFixed(1)}, ${theoreticalVideoCenterY.toFixed(1)})`);
+  console.log(`  キャンバス中心: (${canvasScreenCenterX.toFixed(1)}, ${canvasScreenCenterY.toFixed(1)})`);
+  console.log(`  理論上のずれ: X=${theoreticalOffsetX.toFixed(1)}px, Y=${theoreticalOffsetY.toFixed(1)}px`);
+  
+  if (Math.abs(theoreticalOffsetX) < 0.1 && Math.abs(theoreticalOffsetY) < 0.1) {
+    console.log('✅ 理論上は完璧！');
+  } else {
+    console.log('⚠️ 計算にエラーがあります');
+  }
+  
+  // 最初のフレームで停止
+  senderVideoElement.muted = true;
+  
+  // メタデータ読み込み後に最初のフレームに移動
+  senderVideoElement.addEventListener('loadedmetadata', () => {
+    senderVideoElement.currentTime = 0;
+    console.log('🎬 送信側動画メタデータ読み込み完了');
+    
+    // 実際の配置後の座標を確認
+    setTimeout(() => {
+      const videoRect = senderVideoElement.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+      
+      // 詳細なデバッグ情報
+      console.log('🔍 詳細デバッグ:');
+      console.log(`  動画要素の実際のstyle.top: ${senderVideoElement.style.top}`);
+      console.log(`  動画要素の実際のstyle.left: ${senderVideoElement.style.left}`);
+      console.log(`  動画要素のgetBoundingClientRect: left=${videoRect.left}, top=${videoRect.top}, width=${videoRect.width}, height=${videoRect.height}`);
+      
+      // 画面上の中央座標を計算
+      const videoCenterScreenX = videoRect.left + (videoRect.width / 2);
+      const videoCenterScreenY = videoRect.top + (videoRect.height / 2);
+      const canvasCenterScreenX = canvasRect.left + (canvasRect.width / 2);
+      const canvasCenterScreenY = canvasRect.top + (canvasRect.height / 2);
+      
+      // ずれを計算
+      const screenOffsetX = videoCenterScreenX - canvasCenterScreenX;
+      const screenOffsetY = videoCenterScreenY - canvasCenterScreenY;
+      
+      console.log('🎯 実際の画面座標での中央点確認:');
+      console.log(`  動画中央点（画面座標）: (${videoCenterScreenX.toFixed(1)}, ${videoCenterScreenY.toFixed(1)})`);
+      console.log(`  キャンバス中央点（画面座標）: (${canvasCenterScreenX.toFixed(1)}, ${canvasCenterScreenY.toFixed(1)})`);
+      console.log(`  実際のずれ: X=${screenOffsetX.toFixed(1)}px, Y=${screenOffsetY.toFixed(1)}px`);
+      
+      if (Math.abs(screenOffsetX) < 1 && Math.abs(screenOffsetY) < 1) {
+        console.log('✅ 完璧！ずれが解消されました');
+      } else {
+        console.log('⚠️ まだずれています - さらなる調整が必要');
+      }
+    }, 100);
+  });
+  
+  // bodyに直接追加してレイアウトの影響を回避
+  document.body.appendChild(senderVideoElement);
+  isSenderVideoActive = true;
+  
+  console.log('🎬 送信側動画作成完了 - キャンバス位置に配置');
+}
+
+function playSenderVideo() {
+  if (senderVideoElement) {
+    console.log('🎬 送信側扉開く演出開始');
+    
+    // open.wavを再生（開く演出）
+    const openAudio = new Audio('./open.wav');
+    openAudio.volume = 0.8;
+    openAudio.play().catch(e => {
+      console.error('❌ open.wav再生エラー:', e);
+    });
+    console.log('🔊 open.wav再生開始（送信側）');
+    
+    // 4秒後に動画再生開始
+    setTimeout(() => {
+      // 動画終了時の処理を追加
+      senderVideoElement.addEventListener('ended', () => {
+        console.log('🎬 送信側動画終了 - 背景4ボタンと同じ処理を実行');
+        
+        // 動画を非表示
+        senderVideoElement.style.display = 'none';
+        senderVideoElement.style.visibility = 'hidden';
+        
+        // 背景4ボタンを押したと同じ処理を実行
+        setBackground('./back6.png');
+        
+        console.log('🎬 送信側動画非表示完了、背景4設定完了');
+      });
+      
+      senderVideoElement.play().catch(e => {
+        console.error('❌ 送信側動画再生エラー:', e);
+      });
+      console.log('🎬 送信側動画再生開始（4秒後）');
+    }, 4000);
+  }
+}
+
+function stopSenderVideoAtLastFrame() {
+  if (senderVideoElement && senderVideoElement.tagName === 'VIDEO') {
+    try {
+      console.log('🎬 送信側動画を最後のシーンで停止');
+      
+      // 最終フレームに移動して停止
+      if (senderVideoElement.duration) {
+        senderVideoElement.currentTime = senderVideoElement.duration - 0.1;
+      }
+      senderVideoElement.pause();
+      
+      // 特殊背景状態をリセット
+      specialBackgroundState = 'ready';
+      
+      // キャンバス状態を確実にリセット
+      ctx.globalCompositeOperation = 'source-over';
+      
+      console.log('🎬 送信側動画最終フレームで停止完了');
+      
+    } catch (error) {
+      console.error('❌ 送信側動画停止エラー:', error);
+    }
+  }
+}
+
+function hideSenderVideo() {
+  if (senderVideoElement) {
+    try {
+      console.log('🎬 送信側動画を非表示にする');
+      
+      const mainContainer = document.querySelector('.main-container');
+      
+      // 動画要素を確実に削除（停止してから削除）
+      if (senderVideoElement && senderVideoElement.tagName === 'VIDEO') {
+        senderVideoElement.pause();
+        senderVideoElement.src = '';
+        senderVideoElement.remove();
+        console.log('🎬 送信側動画要素を削除');
+      }
+      
+      // 変数をクリア
+      senderVideoElement = null;
+      isSenderVideoActive = false;
+      
+      // 背景画像もクリア（動画キャプチャを背景にしない）
+      backgroundImage = null;
+      
+      // キャンバス背景を通常状態に戻す
+      canvas.style.backgroundColor = 'transparent';
+      
+      // キャンバスをクリア
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // 特殊背景状態をリセット
+      specialBackgroundState = 'ready';
+      
+      // キャンバス状態を確実にリセット
+      ctx.globalCompositeOperation = 'source-over';
+      
+      console.log('🎬 送信側動画非表示完了 - 通常モードに戻る');
+      
+    } catch (error) {
+      console.error('❌ 送信側動画非表示エラー:', error);
+    }
+  }
+}
+
+function stopSenderVideo() {
+  if (senderVideoElement) {
+    console.log('🎬 送信側動画終了');
+    senderVideoElement.pause();
+    // 最終フレームに移動
+    if (senderVideoElement.duration) {
+      senderVideoElement.currentTime = senderVideoElement.duration - 0.1;
+    }
+  }
+}
+
+// 送信側PNG背景表示関数
+function showSenderPngBackground() {
+  console.log('🖼️ 送信側PNG背景表示開始');
+  
+  // 動画を非表示にする
+  if (senderVideoElement) {
+    senderVideoElement.style.display = 'none';
+    console.log('🎬 送信側動画を非表示');
+  }
+  
+  // PNG画像要素を作成
+  const pngElement = document.createElement('img');
+  pngElement.id = 'senderPngBackground';
+  pngElement.src = './back6.png';
+  
+  // 動画と同じ位置・サイズでPNG画像を配置
+  if (senderVideoElement) {
+    const videoStyle = senderVideoElement.style;
+    pngElement.style.cssText = `
+      position: fixed !important;
+      top: ${videoStyle.top} !important;
+      left: ${videoStyle.left} !important;
+      width: ${videoStyle.width} !important;
+      height: ${videoStyle.height} !important;
+      z-index: 50 !important;
+      object-fit: contain !important;
+      pointer-events: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      transform: none !important;
+      transform-origin: initial !important;
+    `;
+  }
+  
+  // 画像読み込み完了後に表示
+  pngElement.onload = () => {
+    document.body.appendChild(pngElement);
+    console.log('🖼️ 送信側PNG背景表示完了');
+  };
+  
+  pngElement.onerror = () => {
+    console.error('❌ PNG画像の読み込みに失敗しました');
+  };
+}
+
+// 傾きセンサー機能は削除されました
+
+// キーボードイベントリスナーを追加（矢印キーで操作 - デスクトップ用）
+document.addEventListener('keydown', function(event) {
+  // 入力フィールドにフォーカスがある場合は無視
+  if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+    return;
+  }
+  
+  switch(event.key) {
+    case 'ArrowUp':
+      event.preventDefault();
+      // 背景を上に移動・拡大
+      backgroundOffsetY = Math.max(backgroundOffsetY - 20, -100);
+      backgroundScale = Math.min(backgroundScale + 0.1, 2.0);
+      updateBackgroundTransform();
+      console.log(`⬆️ 矢印キー上 - オフセット: ${backgroundOffsetY}, スケール: ${backgroundScale.toFixed(1)}`);
+      break;
+    case 'ArrowDown':
+      event.preventDefault();
+      // 背景を下に移動・縮小
+      backgroundOffsetY = Math.min(backgroundOffsetY + 20, 100);
+      backgroundScale = Math.max(backgroundScale - 0.1, 0.5);
+      updateBackgroundTransform();
+      console.log(`⬇️ 矢印キー下 - オフセット: ${backgroundOffsetY}, スケール: ${backgroundScale.toFixed(1)}`);
+      break;
+    case 'ArrowLeft':
+      event.preventDefault();
+      setBackground('./back3.png');
+      console.log('⬅️ 矢印キー左 - 背景1に変更');
+      break;
+    case 'ArrowRight':
+      event.preventDefault();
+      setBackground('./back4.png');
+      console.log('➡️ 矢印キー右 - 背景3に変更');
+      break;
+  }
+});
+
+// 背景画像の変形を適用する関数
+function updateBackgroundTransform() {
+  if (backgroundImage) {
+    // キャンバスを再描画
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 変形パラメータを適用して背景を描画（アスペクト比保持）
+    const imageAspect = backgroundImage.naturalWidth / backgroundImage.naturalHeight;
+    const canvasAspect = canvas.width / canvas.height;
+    
+    let scaledWidth, scaledHeight;
+    
+    if (imageAspect > canvasAspect) {
+      // 画像が横長の場合、幅をキャンバス幅に合わせる
+      scaledWidth = canvas.width * backgroundScale;
+      scaledHeight = scaledWidth / imageAspect;
+    } else {
+      // 画像が縦長の場合、高さをキャンバス高さに合わせる
+      scaledHeight = canvas.height * backgroundScale;
+      scaledWidth = scaledHeight * imageAspect;
+    }
+    
+    const offsetX = (canvas.width - scaledWidth) / 2;
+    const offsetY = (canvas.height - scaledHeight) / 2 + backgroundOffsetY;
+    
+    ctx.drawImage(backgroundImage, offsetX, offsetY, scaledWidth, scaledHeight);
+    
+    // 描画コマンドを再実行
+    if (drawingCommands && drawingCommands.length > 0) {
+      drawingCommands.forEach(cmd => {
+        if (cmd.type === 'start') {
+          ctx.beginPath();
+          ctx.moveTo(cmd.x, cmd.y);
+        } else if (cmd.type === 'draw') {
+          ctx.lineWidth = cmd.thickness || currentPenThickness;
+          ctx.strokeStyle = cmd.color || currentPenColor;
+          ctx.lineTo(cmd.x, cmd.y);
+          ctx.stroke();
+        }
+      });
+    }
+    
+    // 受信側にも変形パラメータを送信
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: "backgroundTransform",
+        scale: backgroundScale,
+        offsetY: backgroundOffsetY
+      }));
+    }
+  }
+}
+
+
+</script>
+</div>
+</body>
+</html>

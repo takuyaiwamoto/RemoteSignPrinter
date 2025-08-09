@@ -91,8 +91,32 @@ async function executeSwitchBotSequence() {
   }
 }
 
-const canvas = document.getElementById("drawCanvas");
-const ctx = canvas.getContext("2d");
+// 初期化時にcanvasが存在しない場合の対処
+let canvas = document.getElementById("drawCanvas");
+let ctx = null;
+
+if (!canvas) {
+  console.log("⚠️ 初期化時にdrawCanvasが見つかりません - 動的作成待ち");
+  // 一時的なダミーcanvasを作成（後で置き換えられる）
+  canvas = document.createElement('canvas');
+  canvas.id = 'drawCanvas-temp';
+  canvas.style.display = 'none';
+  document.body.appendChild(canvas);
+}
+
+ctx = canvas.getContext("2d");
+
+// 実際のキャンバスが作成されたときにctxを更新する関数
+function updateCanvasContext() {
+  const actualCanvas = document.getElementById("drawCanvas");
+  if (actualCanvas && actualCanvas !== canvas) {
+    console.log("🎨 実際のdrawCanvasに切り替え");
+    canvas = actualCanvas;
+    ctx = canvas.getContext("2d");
+    return true;
+  }
+  return false;
+}
 
 // 色補間関数（送信側と同じ）
 function hexToRgb(hex) {
@@ -172,13 +196,13 @@ function getNeonColorFromIndex(neonIndex) {
   return interpolateColor(color1, color2, factor);
 }
 
-// ネオンパス完了時にピンクの枠を描画する関数
-function finishNeonPath(writerId) {
-  if (!currentNeonPaths[writerId] || currentNeonPaths[writerId].length < 2) {
+// ネオンパス完了時にピンクの枠を描画する関数（削除済み）
+function drawNeonPathComplete(writerId) {
+  if (!{}[writerId] || {}[writerId].length < 2) {
     return; // パスが短すぎる場合は何もしない
   }
   
-  const neonPath = currentNeonPaths[writerId];
+  const neonPath = {}[writerId];
   const ctx = canvas.getContext('2d');
   const areaLeft = drawingAreaOffset.left;
   const areaTop = drawingAreaOffset.top;
@@ -231,10 +255,10 @@ function finishNeonPath(writerId) {
   });
   
   // 現在のパスをクリア
-  delete currentNeonPaths[writerId];
+  delete {}[writerId];
   
   // ピンクの枠を含めて再描画
-  redrawCanvas();
+  // 再描画処理は削除済み
 }
 
 // 妖精の粉エフェクト関数（送信側と完全に同じ）
@@ -827,44 +851,260 @@ canvas.style.left = "50%";
 canvas.style.transform = "translateX(-50%)"; // 180度回転を削除
 canvas.style.zIndex = "10"; // 動画背景より上に設定
 
-let backgroundImage = null; // 現在表示中の背景画像（後方互換性のため保持）
-// WriterID別の背景画像管理（複数Writer同時描画対応）
-const writerBackgroundImages = {};
-let activeBackgroundWriterId = null; // 現在表示中の背景画像のWriterID
-let drawingData = []; // 互換性のために残す（統合データ用）
+// 背景画像とキャンバス管理
+let back2Image = null;
+let back2Wrapper = null;
+let drawCanvas = null;
+let drawCtx = null;
+let initialBack2Size = { width: 283, height: 420 }; // back2.pngの初期サイズ
+let currentScale = 1.0; // 現在のスケール
 
-// ネオン描画パス管理用
-let currentNeonPaths = {}; // WriterID別の現在進行中のネオンパスを管理
-let completedNeonPaths = []; // 完了したネオンパスの履歴
-let neonPathTimers = {}; // WriterID別のパス完了タイマー
-
-// 通常描画パス管理用
-let normalPathTimers = {}; // WriterID別の通常描画パス完了タイマー
-
-// 通常描画パス完了処理
-function finishNormalPath(writerId) {
-  if (normalPathTimers[writerId]) {
-    clearTimeout(normalPathTimers[writerId]);
-    delete normalPathTimers[writerId];
+// 書き手側と接続時にback2.pngを180度回転で表示
+function displayBack2Image() {
+  // 既存の要素を削除
+  if (back2Wrapper) {
+    back2Wrapper.remove();
   }
   
-  // パス完了時に全体再描画（他のWriterとの混在を防ぐため）
-  redrawCanvas();
+  // back2.pngの画像要素を作成
+  back2Image = new Image();
+  back2Image.onload = () => {
+    console.log(`✅ back2.png読み込み完了: ${back2Image.naturalWidth}x${back2Image.naturalHeight}`);
+    
+    // 初期サイズを記録
+    initialBack2Size.width = back2Image.naturalWidth;
+    initialBack2Size.height = back2Image.naturalHeight;
+    
+    createBack2Display();
+  };
+  
+  back2Image.onerror = (error) => {
+    console.error('❌ back2.png読み込み失敗:', error);
+  };
+  
+  back2Image.src = './back2.png';
 }
-let multiWriterData = {
-  writer1: [],
-  writer2: [],
-  writer3: [],
-  writer4: [],
-  writer5: [],
-  writer6: []
-}; // 6人執筆者別データ管理
 
-// WriterID別にパス状態を管理するオブジェクト
-const writerPathStates = {};
+// back2.pngの表示要素を作成
+function createBack2Display() {
+  // 現在のサイズを計算（スケール適用）
+  const displayWidth = Math.round(initialBack2Size.width * currentScale);
+  const displayHeight = Math.round(initialBack2Size.height * currentScale);
+  
+  // 横センタリングの位置を計算
+  const leftPosition = (window.innerWidth - displayWidth) / 2;
+  
+  // ラッパー要素を作成
+  back2Wrapper = document.createElement('div');
+  back2Wrapper.id = 'back2-wrapper';
+  back2Wrapper.style.cssText = `
+    position: fixed !important;
+    top: 100px !important;
+    left: ${leftPosition}px !important;
+    width: ${displayWidth}px !important;
+    height: ${displayHeight}px !important;
+    z-index: 1000 !important;
+    transform: rotate(180deg) !important;
+    transform-origin: center center !important;
+    pointer-events: none !important;
+  `;
+  
+  // 画像要素を作成
+  const imgElement = document.createElement('img');
+  imgElement.src = './back2.png';
+  imgElement.style.cssText = `
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+    object-fit: contain !important;
+  `;
+  
+  // キャンバスを作成（描画用）
+  drawCanvas = document.createElement('canvas');
+  drawCanvas.id = 'draw-canvas';
+  // 描画キャンバスの論理サイズを表示サイズに合わせる
+  drawCanvas.width = displayWidth;
+  drawCanvas.height = displayHeight;
+  drawCanvas.style.cssText = `
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 10 !important;
+    pointer-events: none !important;
+  `;
+  
+  drawCtx = drawCanvas.getContext('2d');
+  
+  // 構造を組み立て
+  back2Wrapper.appendChild(imgElement);
+  back2Wrapper.appendChild(drawCanvas);
+  document.body.appendChild(back2Wrapper);
+  
+  console.log(`🎯 back2表示完了: サイズ${displayWidth}x${displayHeight}, 位置(${leftPosition.toFixed(1)}, 100), scale=${currentScale}`);
+  console.log(`🎯 back2画像サイズ: ${back2Image.naturalWidth}x${back2Image.naturalHeight}`);
+  console.log(`🎯 描画キャンバス論理サイズ: ${drawCanvas.width}x${drawCanvas.height}`);
+  console.log(`🎯 描画キャンバス表示サイズ: ${drawCanvas.style.width} x ${drawCanvas.style.height}`);
+}
 
-// WriterID別リアルタイム描画用の独立した描画関数
-function drawRealtimeWriterPath(writerId, currentCmd, prevCmd) {
+// back2のサイズとキャンバスを更新
+function updateBack2Size(newScale) {
+  if (!back2Wrapper || !back2Image || !drawCanvas) return;
+  
+  currentScale = newScale;
+  const displayWidth = Math.round(initialBack2Size.width * currentScale);
+  const displayHeight = Math.round(initialBack2Size.height * currentScale);
+  const leftPosition = (window.innerWidth - displayWidth) / 2;
+  
+  // ラッパーのサイズと位置を更新
+  back2Wrapper.style.width = `${displayWidth}px`;
+  back2Wrapper.style.height = `${displayHeight}px`;
+  back2Wrapper.style.left = `${leftPosition}px`;
+  
+  // 描画キャンバスの論理サイズもスケールに合わせて更新
+  drawCanvas.width = displayWidth;
+  drawCanvas.height = displayHeight;
+  
+  // 描画キャンバスの表示サイズは100%のまま（ラッパーに合わせる）
+  drawCanvas.style.width = '100%';
+  drawCanvas.style.height = '100%';
+  
+  console.log(`🔄 back2サイズ更新: 表示${displayWidth}x${displayHeight}, キャンバス座標系${drawCanvas.width}x${drawCanvas.height}, scale=${currentScale}`);
+}
+
+// 描画データ管理
+let drawingData = [];
+
+// WriterID別パス状態管理
+let writerPathStates = {};
+
+// WriterID別描画データ管理
+let writerDrawingData = {};
+
+// WriterID別キャンバスサイズ管理
+let writerCanvasSizes = {};
+
+// 180度回転した描画を実行
+function drawRotatedStroke(x1, y1, x2, y2, color, thickness) {
+  console.log(`🎨 drawRotatedStroke開始: drawCtx=${!!drawCtx}`);
+  if (!drawCtx) {
+    console.log(`❌ drawCtx が存在しません`);
+    return;
+  }
+  
+  console.log(`🎨 描画パラメータ: (${x1.toFixed(1)},${y1.toFixed(1)}) → (${x2.toFixed(1)},${y2.toFixed(1)}) color=${color} thickness=${thickness}`);
+  console.log(`🎨 キャンバスサイズ: ${drawCanvas.width}x${drawCanvas.height}`);
+  
+  drawCtx.save();
+  
+  // キャンバスの中心に移動して180度回転
+  drawCtx.translate(drawCanvas.width / 2, drawCanvas.height / 2);
+  drawCtx.rotate(Math.PI);
+  drawCtx.translate(-drawCanvas.width / 2, -drawCanvas.height / 2);
+  
+  // 基本設定
+  drawCtx.strokeStyle = color || '#000000';
+  drawCtx.lineWidth = thickness || 2;
+  drawCtx.lineCap = 'round';
+  drawCtx.lineJoin = 'round';
+  
+  // 180度回転した描画
+  drawCtx.beginPath();
+  drawCtx.moveTo(x1, y1);
+  drawCtx.lineTo(x2, y2);
+  drawCtx.stroke();
+  
+  console.log(`✅ 180度回転描画完了`);
+  drawCtx.restore();
+}
+
+// キャンバスをクリア
+function clearDrawCanvas() {
+  if (!drawCtx) return;
+  drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+}
+
+// 全描画データを再描画
+function redrawAllStrokes() {
+  if (!drawCtx) return;
+  
+  clearDrawCanvas();
+  
+  for (let i = 1; i < drawingData.length; i++) {
+    const current = drawingData[i];
+    const previous = drawingData[i - 1];
+    
+    // 連続する描画のみ線を引く
+    if (current.type === 'draw' && previous.type === 'draw') {
+      drawRotatedStroke(
+        previous.x, previous.y,
+        current.x, current.y,
+        current.color,
+        current.thickness
+      );
+    }
+  }
+}
+
+// Writer描画データをback2.png上に180度回転で描画
+function processDrawingForBack2(data, writerId) {
+  console.log(`🎨 processDrawingForBack2開始: type=${data.type}, writerId=${writerId}`);
+  console.log(`🎨 状態チェック: drawCtx=${!!drawCtx}, back2Wrapper=${!!back2Wrapper}`);
+  
+  if (!drawCtx || !back2Wrapper) {
+    console.log(`❌ 描画不可: drawCtx=${!!drawCtx}, back2Wrapper=${!!back2Wrapper}`);
+    return;
+  }
+  
+  // 描画データを配列に追加
+  drawingData.push(data);
+  console.log(`📝 描画データ追加: 配列サイズ=${drawingData.length}`);
+  
+  // 連続描画の場合のみ線を引く
+  if (data.type === 'draw' && drawingData.length > 1) {
+    const prevData = drawingData[drawingData.length - 2];
+    
+    // 直前がstart or drawで同じwriterの場合に描画
+    if ((prevData.type === 'start' || prevData.type === 'draw') && prevData.writerId === writerId) {
+      // 座標変換: 書き手側座標を受信側キャンバスサイズに合わせて変換
+      const currentCanvasWidth = drawCanvas.width;
+      const currentCanvasHeight = drawCanvas.height;
+      
+      // 書き手側のキャンバスサイズを取得（WebSocketで送信されるcanvasSizeを使用、または標準サイズ）
+      const writerCanvasWidth = data.canvasSize?.width || prevData.canvasSize?.width || initialBack2Size.width;
+      const writerCanvasHeight = data.canvasSize?.height || prevData.canvasSize?.height || initialBack2Size.height;
+      
+      // 書き手側座標を受信側キャンバスサイズにスケール変換
+      const prevX = (prevData.x / writerCanvasWidth) * currentCanvasWidth;
+      const prevY = (prevData.y / writerCanvasHeight) * currentCanvasHeight;
+      const currX = (data.x / writerCanvasWidth) * currentCanvasWidth;
+      const currY = (data.y / writerCanvasHeight) * currentCanvasHeight;
+      
+      // 180度回転を適用
+      const rotatedPrevX = currentCanvasWidth - prevX;
+      const rotatedPrevY = currentCanvasHeight - prevY;
+      const rotatedCurrX = currentCanvasWidth - currX;
+      const rotatedCurrY = currentCanvasHeight - currY;
+      
+      console.log(`🖊️ 描画実行: 書き手(${prevX},${prevY}) → (${currX},${currY}) | 受信側180度回転後(${rotatedPrevX.toFixed(1)},${rotatedPrevY.toFixed(1)}) → (${rotatedCurrX.toFixed(1)},${rotatedCurrY.toFixed(1)})`);
+      
+      drawRotatedStroke(
+        rotatedPrevX, rotatedPrevY,
+        rotatedCurrX, rotatedCurrY,
+        data.color || '#000000',
+        data.thickness || 2
+      );
+      
+      console.log(`✅ 描画完了: 180度回転正常実行`);
+    } else {
+      console.log(`❌ 描画スキップ: prevType=${prevData.type}, prevWriter=${prevData.writerId}, currentWriter=${writerId}`);
+    }
+  } else {
+    console.log(`📝 描画データのみ保存: type=${data.type}, 配列サイズ=${drawingData.length}`);
+  }
+}
+function removeDrawRealtimeWriterPath(writerId, currentCmd, prevCmd) {
   if (!currentCmd || !prevCmd) return;
   
   ctx.save();
@@ -922,7 +1162,7 @@ function drawRealtimeWriterPath(writerId, currentCmd, prevCmd) {
 }
 
 // WriterID別に独立して描画する関数（受信側用）
-function drawWriterCommandsReceiver(commands, writerId) {
+function removeDrawWriterCommandsReceiver(commands, writerId) {
   if (commands.length === 0) return;
   
   // このWriterのパス状態を初期化
@@ -1120,7 +1360,7 @@ function drawWriterCommandsReceiver(commands, writerId) {
 }
 
 // 🖨️ WriterID別印刷用描画関数（Canvas状態完全分離）
-function drawWriterCommandsForPrint(commands, writerId, printCtx) {
+function removeDrawWriterCommandsForPrint(commands, writerId, printCtx) {
   if (commands.length === 0) return;
   
   // 🔥 印刷用WriterID別Canvas状態完全分離
@@ -1226,7 +1466,7 @@ function drawWriterCommandsForPrint(commands, writerId, printCtx) {
 }
 
 // 🖨️ WriterID別ダウンロード用描画関数（Canvas状態完全分離）
-function drawWriterCommandsForDownload(commands, writerId, downloadCtx) {
+function removeDrawWriterCommandsForDownload(commands, writerId, downloadCtx) {
   if (commands.length === 0) return;
   
   // 🔥 ダウンロード用WriterID別Canvas状態完全分離
@@ -1273,7 +1513,7 @@ function drawWriterCommandsForDownload(commands, writerId, downloadCtx) {
 }
 
 // 単一パスを描画する補助関数
-function drawSinglePath(pathCommands, ctx) {
+function removeDrawSinglePath(pathCommands, ctx) {
   if (pathCommands.length === 0) return;
   
   ctx.beginPath();
@@ -1305,8 +1545,8 @@ function consolidateDrawingData() {
   // 時系列順に並べるため、全データを収集してタイムスタンプでソート
   const allData = [];
   
-  Object.keys(multiWriterData).forEach(writerId => {
-    multiWriterData[writerId].forEach(cmd => {
+  Object.keys({}).forEach(writerId => {
+    {}[writerId].forEach(cmd => {
       allData.push({
         ...cmd,
         writerId: writerId,
@@ -1318,7 +1558,7 @@ function consolidateDrawingData() {
   // タイムスタンプでソート
   allData.sort((a, b) => a.timestamp - b.timestamp);
   
-  const writerCounts = Object.keys(multiWriterData).map(id => `${id}: ${multiWriterData[id].length}`).join(', ');
+  const writerCounts = Object.keys({}).map(id => `${id}: ${{}[id].length}`).join(', ');
   console.log(`📊 統合描画データ: ${allData.length}個のコマンド（${writerCounts}）`);
   
   return allData;
@@ -1377,10 +1617,16 @@ let drawingAreaSize = { width: 630, height: 450 }; // 描画エリアのサイ�
 
 // 背景画像比率に合わせて描画エリアサイズを更新する関数
 function updateDrawingAreaToBackgroundSize() {
-  if (backgroundImage) {
+  // 動的背景の場合はスキップ（DevPanelの設定を維持）
+  if (false) {
+    console.log('🔒 動的背景検出: 描画エリアサイズの自動調整をスキップ');
+    return;
+  }
+  
+  if (null) {
     const maxWidth = canvas.width * UNIFIED_SETTINGS.canvasScale;
     const maxHeight = canvas.height * UNIFIED_SETTINGS.canvasScale;
-    const imgAspect = backgroundImage.width / backgroundImage.height;
+    // 背景画像のアスペクト比計算は削除済み
     
     let bgWidth, bgHeight;
     if (imgAspect > maxWidth / maxHeight) {
@@ -1395,7 +1641,7 @@ function updateDrawingAreaToBackgroundSize() {
     drawingAreaSize.width = bgWidth;
     drawingAreaSize.height = bgHeight;
     
-    //console.log(`🎯 描画エリアサイズを背景画像に合わせて更新: ${bgWidth.toFixed(1)}x${bgHeight.toFixed(1)}`);
+    console.log(`🎯 描画エリアサイズを背景画像に合わせて更新: ${bgWidth.toFixed(1)}x${bgHeight.toFixed(1)}`);
   }
 }
 let showDrawingAreaFrame = false; // 描画エリアの枠表示フラグ
@@ -1418,7 +1664,7 @@ let sendAnimationTimer = null; // 送信アニメーション後の扉タイマ�
 // 🔸 送信側と受信側のキャンバスサイズ情報
 let senderCanvasSize = { width: 859, height: 607 }; // 送信側のキャンバスサイズ（デフォルト: 横長）
 // WriterID別のキャンバスサイズ管理（複数Writer同時描画対応）
-const writerCanvasSizes = {};
+const {} = {};
 let receiverCanvasSize = { width: 1202, height: 849 }; // 受信側のキャンバスサイズ（デフォルト: 横長 859*1.4=1202, 607*1.4=849）
 
 // 🔧 書き手側のdevtool設定値（UNIFIED_SETTINGSで管理）
@@ -1589,6 +1835,16 @@ document.addEventListener('DOMContentLoaded', () => {
   setReceiverCanvasSize();
   //console.log('🔧 初期化: 横長キャンバスサイズを適用');
   //console.log(`🔧 初期化後の描画エリアサイズ: ${drawingAreaSize.width} x ${drawingAreaSize.height}`);
+  
+  // ウィンドウリサイズ時にback2.pngを中央に再配置
+  window.addEventListener('resize', () => {
+    if (back2Wrapper && back2Image) {
+      const displayWidth = Math.round(initialBack2Size.width * currentScale);
+      const leftPosition = (window.innerWidth - displayWidth) / 2;
+      back2Wrapper.style.left = `${leftPosition}px`;
+      console.log(`🔄 ウィンドウリサイズ対応: back2.png中央配置更新 left=${leftPosition}px`);
+    }
+  });
 });
 
 // 🎬 動画背景関数群
@@ -1693,7 +1949,7 @@ function prepareVideoBackground(videoSrc) {
   //console.log('🎨 受信側キャンバス透明化完了 - 描画表示準備OK');
   
   // 既存の描画を再描画して表示を確実にする
-  redrawCanvas();
+  // 再描画処理は削除済み;
   
   // 動画配置後に扉演出：既存の扉があれば開く、なければ作成
   setTimeout(() => {
@@ -1774,7 +2030,7 @@ function endVideoBackground() {
       img.src = './back6.png';
       img.onload = () => {
         //console.log('🖼️ 回転後：back6.png画像読み込み完了、表示開始');
-        backgroundImage = img;
+        // 背景画像設定処理は削除済み
         lastBackgroundSrc = './back6.png';
         
         // 背景画像サイズに合わせて描画エリアサイズを更新
@@ -1786,7 +2042,7 @@ function endVideoBackground() {
           createPngOverlay();
           
           // PNG要素で表示するため、キャンバス描画は無効化
-          backgroundImage = null;
+          // 背景画像設定処理は削除済み
           lastBackgroundSrc = null;
           //console.log('🖼️ PNG要素を動画の上に重ねて配置（キャンバス描画無効化）');
         } else {
@@ -1794,7 +2050,7 @@ function endVideoBackground() {
         }
         
         // CSS背景を削除してcanvas描画に統一
-        canvas.style.backgroundImage = 'none';
+        // canvas表示設定処理は削除済み
         
         // 背景画像を描画（180度回転状態を維持）
         isCanvasRotated = true; // 180度回転状態フラグを設定
@@ -1804,24 +2060,24 @@ function endVideoBackground() {
         canvas.style.transform = 'translateX(-50%) rotate(180deg)';
         //console.log('🔄 キャンバスをCSS transformで180度回転状態に設定');
         
-        redrawCanvas();
+        // 再描画処理は削除済み;
         
         // back6.pngの中央座標を出力（実際の描画位置から計算）
         //console.log(`📍 BACK6.PNG中央座標計算開始`);
-        redrawCanvas(); // まず再描画して最新の状態にする
+        // 再描画処理は削除済み; // まず再描画して最新の状態にする
         
         // 遅延してボールを追加（redrawCanvasで実際の描画位置が確定してから）
         setTimeout(() => {
-          // backgroundImageのnullチェック
-          if (!backgroundImage) {
-            //console.warn('⚠️ backgroundImageがnullのため、背景画像座標計算をスキップ');
+          // nullのnullチェック
+          if (!null) {
+            //console.warn('⚠️ nullがnullのため、背景画像座標計算をスキップ');
             return;
           }
           
           // redrawCanvas内で使用される実際の座標を取得
           const maxWidth = canvas.width * UNIFIED_SETTINGS.canvasScale;
           const maxHeight = canvas.height * UNIFIED_SETTINGS.canvasScale;
-          const imgAspect = backgroundImage.width / backgroundImage.height;
+          // 背景画像のアスペクト比計算は削除済み
           let actualBgWidth, actualBgHeight;
           
           if (imgAspect > maxWidth / maxHeight) {
@@ -1911,7 +2167,7 @@ function hideVideoBackground() {
     
     // キャンバスをクリアして再描画
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    redrawCanvas();
+    // 再描画処理は削除済み;
     
     //console.log('🎬 動画背景完全終了 - 通常モードに戻る');
   }
@@ -2140,7 +2396,7 @@ function resetCanvasToNormalSize() {
 // 🔸 キャンバスサイズ更新関数を追加
 function updateCanvasSize() {
   // 現在の背景に応じてサイズを再計算
-  if (backgroundImage && lastBackgroundSrc && lastBackgroundSrc.includes('back2')) {
+  if (null && lastBackgroundSrc && lastBackgroundSrc.includes('back2')) {
     setCanvasToPortraitSize();
   } else {
     resetCanvasToNormalSize();
@@ -2150,10 +2406,10 @@ function updateCanvasSize() {
   setReceiverCanvasSize();
   
   // キャンバスを再描画
-  redrawCanvas();
+  // 再描画処理は削除済み;
 }
 
-function redrawCanvas(withBackground = true) {
+function removeRedrawCanvas(withBackground = true) {
   // 動画背景時でも確実に描画が見えるよう設定
   ctx.globalCompositeOperation = 'source-over';
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -2174,7 +2430,7 @@ function redrawCanvas(withBackground = true) {
   // WriterID別の背景画像管理：現在アクティブなWriterの背景を使用
   const currentBackgroundImage = activeBackgroundWriterId && writerBackgroundImages[activeBackgroundWriterId] 
     ? writerBackgroundImages[activeBackgroundWriterId] 
-    : backgroundImage;
+    : null;
   
   if (withBackground && currentBackgroundImage) {
     //console.log('🖼️ 背景画像描画開始（シンプル版）');
@@ -2199,25 +2455,34 @@ function redrawCanvas(withBackground = true) {
       bgWidth = maxHeight * imgAspect;
     }
     
-    // 全ての背景画像を180度回転で表示
+    // 背景画像描画：動的背景の場合はスキップ（CSS wrapperを使用）
     let drawX, drawY;
     
-    // 全ての背景画像を統一した位置計算で中央揃え  
-    drawX = canvas.width / 2 - bgWidth / 2;
-    drawY = canvas.height / 2 - bgHeight / 2;
-    
-    // 背景画像を描画
-    ctx.drawImage(currentBackgroundImage, drawX, drawY, bgWidth, bgHeight);
-    
-    // 🔍 デバッグ: 背景画像の境界線を表示
-    ctx.save();
-    ctx.strokeStyle = 'lime';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(drawX, drawY, bgWidth, bgHeight);
-    ctx.fillStyle = 'lime';
-    ctx.font = '16px Arial';
-    ctx.fillText(`背景画像 ${bgWidth.toFixed(0)}x${bgHeight.toFixed(0)}`, drawX + 10, drawY + 25);
-    ctx.restore();
+    if (false) {
+      // 🔒 動的背景：Canvas描画をスキップしてCSS wrapperのみ使用
+      console.log('🎯 動的背景検出: Canvas背景描画をスキップ（CSS wrapperを使用）');
+      // CSS wrapperの位置に合わせて仮想座標を設定（後続の位置計算用）
+      drawX = canvas.width / 2 - bgWidth / 2; // 水平中央
+      drawY = 150; // 上から150px（固定）
+    } else {
+      // 🔒 通常背景：Canvas上に描画
+      // 全ての背景画像を統一した位置計算で中央揃え  
+      drawX = canvas.width / 2 - bgWidth / 2;
+      drawY = canvas.height / 2 - bgHeight / 2;
+      
+      // 背景画像を描画
+      ctx.drawImage(currentBackgroundImage, drawX, drawY, bgWidth, bgHeight);
+      
+      // 🔍 デバッグ: 背景画像の境界線を表示
+      ctx.save();
+      ctx.strokeStyle = 'lime';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(drawX, drawY, bgWidth, bgHeight);
+      ctx.fillStyle = 'lime';
+      ctx.font = '16px Arial';
+      ctx.fillText(`背景画像 ${bgWidth.toFixed(0)}x${bgHeight.toFixed(0)}`, drawX + 10, drawY + 25);
+      ctx.restore();
+    }
     
     // 🎯 ズレ確認ログ: 背景画像の位置・サイズ
     console.log(`🟢 背景画像: 位置(${drawX.toFixed(1)}, ${drawY.toFixed(1)}) サイズ${Math.round(bgWidth)}x${Math.round(bgHeight)}`);
@@ -2228,33 +2493,54 @@ function redrawCanvas(withBackground = true) {
     window.lastBgWidth = Math.round(bgWidth);
     window.lastBgHeight = Math.round(bgHeight);
     
-    // 📐 描画エリアサイズを背景画像サイズに合わせる（最優先）
-    // 書き手側と受信側の背景画像が同じ比率なので、描画エリアも背景画像と同じサイズにする
-    drawingAreaSize.width = Math.round(bgWidth);
-    drawingAreaSize.height = Math.round(bgHeight);
-    
-    // 🔒 背景画像サイズ設定を強制適用（他の処理による上書きを防ぐ）
-    window.backgroundImageBasedDrawingAreaSize = { 
-      width: drawingAreaSize.width, 
-      height: drawingAreaSize.height,
-      isActive: true 
-    };
+    // 📐 描画エリアサイズの処理（動的背景と通常背景で異なる）
+    if (false) {
+      // 🔒 動的背景の場合：DevPanelで設定された描画エリアサイズを維持
+      console.log(`📐 動的背景: 描画エリアサイズを維持 ${drawingAreaSize.width}x${drawingAreaSize.height}`);
+      // nullBasedDrawingAreaSizeは無効化
+      window.nullBasedDrawingAreaSize = { 
+        width: drawingAreaSize.width, 
+        height: drawingAreaSize.height,
+        isActive: false // 動的背景では無効
+      };
+    } else {
+      // 📐 通常背景の場合：描画エリアサイズを背景画像サイズに合わせる
+      drawingAreaSize.width = Math.round(bgWidth);
+      drawingAreaSize.height = Math.round(bgHeight);
+      
+      // 🔒 背景画像サイズ設定を強制適用（他の処理による上書きを防ぐ）
+      window.nullBasedDrawingAreaSize = { 
+        width: drawingAreaSize.width, 
+        height: drawingAreaSize.height,
+        isActive: true 
+      };
+    }
     
     // 📍 描画エリア位置を背景画像位置に合わせる
-    // 背景画像の実際の位置（左上角）を基準に描画エリアを配置
-    // 描画エリアの左上角を背景画像の左上角に一致させる
-    const bgLeft = drawX;
-    const bgTop = drawY;
-    
-    // 描画エリアの中心位置を計算: エリア中心 = 左上 + サイズ/2
-    const targetAreaCenterX = bgLeft + drawingAreaSize.width / 2;
-    const targetAreaCenterY = bgTop + drawingAreaSize.height / 2;
-    
-    // キャンバス中央からのoffsetを計算 + 130px下に移動
-    // areaCenterX = canvas.width/2 + drawingAreaOffset.x = targetAreaCenterX
-    // よって: drawingAreaOffset.x = targetAreaCenterX - canvas.width/2
-    drawingAreaOffset.x = Math.round(targetAreaCenterX - canvas.width / 2);
-    drawingAreaOffset.y = Math.round(targetAreaCenterY - canvas.height / 2 + 130); // 130px下に移動
+    if (false) {
+      // 🔒 動的背景の場合：描画エリアを青色エリア位置に固定
+      // 複雑な計算を避けて、ログに表示された青色エリアの理想的な位置を直接使用
+      drawingAreaOffset.x = 0; // 水平中央
+      drawingAreaOffset.y = -canvas.height / 2 + 150; // 上から150px
+      
+      console.log(`🎯 動的背景検出: 描画エリアを青色エリア理想位置に固定 → offset(${drawingAreaOffset.x}, ${drawingAreaOffset.y})`);
+    } else {
+      // 🔒 通常背景の場合：キャンバス座標ベースの位置計算
+      // 背景画像の実際の位置（左上角）を基準に描画エリアを配置
+      // 描画エリアの左上角を背景画像の左上角に一致させる
+      const bgLeft = drawX;
+      const bgTop = drawY;
+      
+      // 描画エリアの中心位置を計算: エリア中心 = 左上 + サイズ/2
+      const targetAreaCenterX = bgLeft + drawingAreaSize.width / 2;
+      const targetAreaCenterY = bgTop + drawingAreaSize.height / 2;
+      
+      // キャンバス中央からのoffsetを計算 + 130px下に移動
+      // areaCenterX = canvas.width/2 + drawingAreaOffset.x = targetAreaCenterX
+      // よって: drawingAreaOffset.x = targetAreaCenterX - canvas.width/2
+      drawingAreaOffset.x = Math.round(targetAreaCenterX - canvas.width / 2);
+      drawingAreaOffset.y = Math.round(targetAreaCenterY - canvas.height / 2 + 130); // 130px下に移動
+    }
     
     // デバッグパネルの値も更新（130px下に移動済み）
     const centerXInput = document.getElementById('centerX');
@@ -2335,7 +2621,7 @@ function redrawCanvas(withBackground = true) {
     }
     
     //console.log(`📍 背景画像描画: ${bgWidth.toFixed(1)}x${bgHeight.toFixed(1)}`);
-    //console.log(`  元画像サイズ: ${backgroundImage.width}x${backgroundImage.height}`);
+    //console.log(`  元画像サイズ: ${null.width}x${null.height}`);
     //console.log(`  アスペクト比: ${imgAspect.toFixed(3)}`);
     //console.log(`  現在のキャンバスサイズ: ${canvas.width}x${canvas.height}`);
     //console.log(`  背景画像ファイル: ${lastBackgroundSrc || 'unknown'}`);
@@ -2410,18 +2696,22 @@ function redrawCanvas(withBackground = true) {
     }
     //console.log(`🎯 背景画像中央座標: (${(drawX + bgWidth/2).toFixed(1)}, ${(drawY + bgHeight/2).toFixed(1)})`);
     
-    // 背景画像を描画
-    ctx.drawImage(currentBackgroundImage, drawX, drawY, bgWidth, bgHeight);
-    
-    // 🔍 デバッグ: 背景画像の境界線を表示
-    ctx.save();
-    ctx.strokeStyle = 'lime';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(drawX, drawY, bgWidth, bgHeight);
-    ctx.fillStyle = 'lime';
-    ctx.font = '16px Arial';
-    ctx.fillText(`背景画像 ${bgWidth.toFixed(0)}x${bgHeight.toFixed(0)}`, drawX + 10, drawY + 25);
-    ctx.restore();
+    // 背景画像を描画（動的背景の場合はスキップ）
+    if (!false) {
+      ctx.drawImage(currentBackgroundImage, drawX, drawY, bgWidth, bgHeight);
+      
+      // 🔍 デバッグ: 背景画像の境界線を表示
+      ctx.save();
+      ctx.strokeStyle = 'lime';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(drawX, drawY, bgWidth, bgHeight);
+      ctx.fillStyle = 'lime';
+      ctx.font = '16px Arial';
+      ctx.fillText(`背景画像 ${bgWidth.toFixed(0)}x${bgHeight.toFixed(0)}`, drawX + 10, drawY + 25);
+      ctx.restore();
+    } else {
+      console.log('🎯 動的背景検出: Canvas背景描画をスキップ（第2箇所）');
+    }
     
     // 🎯 ズレ確認ログ: 背景画像の位置・サイズ
     console.log(`🟢 背景画像: 位置(${drawX.toFixed(1)}, ${drawY.toFixed(1)}) サイズ${Math.round(bgWidth)}x${Math.round(bgHeight)}`);
@@ -2433,34 +2723,55 @@ function redrawCanvas(withBackground = true) {
     window.lastBgHeight = Math.round(bgHeight);
     
     
-    // 📐 描画エリアサイズを背景画像サイズに合わせる（最優先）
-    // 書き手側と受信側の背景画像が同じ比率なので、描画エリアも背景画像と同じサイズにする
-    drawingAreaSize.width = Math.round(bgWidth);
-    drawingAreaSize.height = Math.round(bgHeight);
-    
-    // 🔒 背景画像サイズ設定を強制適用（他の処理による上書きを防ぐ）
-    window.backgroundImageBasedDrawingAreaSize = { 
-      width: drawingAreaSize.width, 
-      height: drawingAreaSize.height,
-      isActive: true 
-    };
+    // 📐 描画エリアサイズの処理（動的背景と通常背景で異なる）
+    if (false) {
+      // 🔒 動的背景の場合：DevPanelで設定された描画エリアサイズを維持
+      console.log(`📐 動的背景: 描画エリアサイズを維持 ${drawingAreaSize.width}x${drawingAreaSize.height}`);
+      // nullBasedDrawingAreaSizeは無効化
+      window.nullBasedDrawingAreaSize = { 
+        width: drawingAreaSize.width, 
+        height: drawingAreaSize.height,
+        isActive: false // 動的背景では無効
+      };
+    } else {
+      // 📐 通常背景の場合：描画エリアサイズを背景画像サイズに合わせる
+      drawingAreaSize.width = Math.round(bgWidth);
+      drawingAreaSize.height = Math.round(bgHeight);
+      
+      // 🔒 背景画像サイズ設定を強制適用（他の処理による上書きを防ぐ）
+      window.nullBasedDrawingAreaSize = { 
+        width: drawingAreaSize.width, 
+        height: drawingAreaSize.height,
+        isActive: true 
+      };
+    }
     
     
     // 📍 描画エリア位置を背景画像位置に合わせる
-    // 背景画像の実際の位置（左上角）を基準に描画エリアを配置
-    // 描画エリアの左上角を背景画像の左上角に一致させる
-    const bgLeft = drawX;
-    const bgTop = drawY;
-    
-    // 描画エリアの中心位置を計算: エリア中心 = 左上 + サイズ/2
-    const targetAreaCenterX = bgLeft + drawingAreaSize.width / 2;
-    const targetAreaCenterY = bgTop + drawingAreaSize.height / 2;
-    
-    // キャンバス中央からのoffsetを計算 + 130px下に移動
-    // areaCenterX = canvas.width/2 + drawingAreaOffset.x = targetAreaCenterX
-    // よって: drawingAreaOffset.x = targetAreaCenterX - canvas.width/2
-    drawingAreaOffset.x = Math.round(targetAreaCenterX - canvas.width / 2);
-    drawingAreaOffset.y = Math.round(targetAreaCenterY - canvas.height / 2 + 130); // 130px下に移動
+    if (false) {
+      // 🔒 動的背景の場合：描画エリアを青色エリア位置に固定
+      // 複雑な計算を避けて、ログに表示された青色エリアの理想的な位置を直接使用
+      drawingAreaOffset.x = 0; // 水平中央
+      drawingAreaOffset.y = -canvas.height / 2 + 150; // 上から150px
+      
+      console.log(`🎯 動的背景検出: 描画エリアを青色エリア理想位置に固定 → offset(${drawingAreaOffset.x}, ${drawingAreaOffset.y})`);
+    } else {
+      // 🔒 通常背景の場合：キャンバス座標ベースの位置計算
+      // 背景画像の実際の位置（左上角）を基準に描画エリアを配置
+      // 描画エリアの左上角を背景画像の左上角に一致させる
+      const bgLeft = drawX;
+      const bgTop = drawY;
+      
+      // 描画エリアの中心位置を計算: エリア中心 = 左上 + サイズ/2
+      const targetAreaCenterX = bgLeft + drawingAreaSize.width / 2;
+      const targetAreaCenterY = bgTop + drawingAreaSize.height / 2;
+      
+      // キャンバス中央からのoffsetを計算 + 130px下に移動
+      // areaCenterX = canvas.width/2 + drawingAreaOffset.x = targetAreaCenterX
+      // よって: drawingAreaOffset.x = targetAreaCenterX - canvas.width/2
+      drawingAreaOffset.x = Math.round(targetAreaCenterX - canvas.width / 2);
+      drawingAreaOffset.y = Math.round(targetAreaCenterY - canvas.height / 2 + 130); // 130px下に移動
+    }
     
     // 検証用：背景画像の中心位置
     const bgCenterX = drawX + bgWidth / 2;
@@ -2484,7 +2795,7 @@ function redrawCanvas(withBackground = true) {
   
   // 🔸 筆跡描画（描画エリア調整を適用して180度回転）
   //console.log('✏️ 筆跡描画開始');
-  //console.log(`  描画データ数: ${drawingData.length}`);
+  //console.log(`  描画データ数: ${[].length}`);
   
   // 描画エリアの位置とサイズを計算
   const areaCenterX = canvas.width / 2 + drawingAreaOffset.x;
@@ -2493,21 +2804,21 @@ function redrawCanvas(withBackground = true) {
   const areaTop = areaCenterY - drawingAreaSize.height / 2;
   
   // WriterID別に独立して描画（線の混在を防ぐ）
-  Object.keys(multiWriterData).forEach(writerId => {
-    if (multiWriterData[writerId].length > 0) {
-      drawWriterCommandsReceiver(multiWriterData[writerId], writerId);
+  Object.keys({}).forEach(writerId => {
+    if ({}[writerId].length > 0) {
+      drawWriterCommandsReceiver({}[writerId], writerId);
     }
   });
   
   // 旧方式（統合データ）もサポート（後方互換性のため）
-  if (drawingData.length > 0 && Object.keys(multiWriterData).length === 0) {
+  if ([].length > 0 && Object.keys({}).length === 0) {
     ctx.save();
     ctx.translate(areaCenterX, areaCenterY);
     ctx.rotate(Math.PI);
     ctx.translate(-areaCenterX, -areaCenterY);
     
     let lastWriterId = null;
-    drawingData.forEach(cmd => {
+    [].forEach(cmd => {
     if (cmd.type === "start") {
       ctx.beginPath();
       lastWriterId = cmd.writerId; // 現在のwriterIDを記録
@@ -2539,7 +2850,7 @@ function redrawCanvas(withBackground = true) {
       // ネオンの場合はセグメントごとに新しいパスを作成（送信側と同じ方式）
       if (cmd.color === 'neon' && typeof cmd.neonIndex === 'number') {
         // 前の位置から移動（前のdrawコマンドの位置を取得）
-        const prevCmd = drawingData[drawingData.indexOf(cmd) - 1];
+        const prevCmd = [][[].indexOf(cmd) - 1];
         if (prevCmd && (prevCmd.type === 'start' || prevCmd.type === 'draw')) {
           const prevCoords = transformCoordinatesWithAspectRatio(prevCmd.x, prevCmd.y, senderCanvasSize, drawingAreaSize);
           const prevScaledX = prevCoords.x;
@@ -2695,13 +3006,13 @@ function redrawCanvas(withBackground = true) {
 }
 
 socket.onmessage = (event) => {
-  //console.log("🔔 受信側WebSocketメッセージ受信:", event.data);
+  console.log("🔔 受信側WebSocketメッセージ受信:", event.data);
   
   const handle = (raw) => {
     try {
-      // //console.log("📝 解析前のrawデータ:", raw);
+      console.log("📝 解析前のrawデータ:", raw);
       const data = JSON.parse(raw);
-      //console.log("📊 受信側解析後のデータ:", data.type, data);
+      console.log("📊 受信側解析後のデータ:", data.type, data);
       handleMessage(data);
     } catch (e) {
       //console.error("❌ JSON parse error:", e, "Raw data:", raw);
@@ -2943,6 +3254,13 @@ function handleMessage(data) {
     return;
   }
   
+  // 描画データ受信のデバッグログを一時的に有効化
+  if (data.type === "start" || data.type === "draw") {
+    console.log("🖊️ 描画データ受信:", data.type, "WriterID:", data.writerId);
+    console.log("🖊️ データ詳細:", { x: data.x, y: data.y, color: data.color, thickness: data.thickness });
+    console.log("🖊️ 条件分岐へ進む前の確認: type =", data.type);
+  }
+  
   // 描画データ以外のメッセージのみログ出力（送信ボタンを探すため）
   if (data.type !== "start" && data.type !== "draw" && data.type !== "clear") {
     console.log("🔍 送信ボタン探索 - メッセージタイプ:", data.type);
@@ -2961,10 +3279,25 @@ function handleMessage(data) {
     console.log(`📨 背景変更メッセージ受信: ${data.src} (WriterID: ${writerId})`);
     console.log(`📨 背景メッセージ詳細:`, data);
     console.log(`📨 back6.png含まれているか:`, data.src ? data.src.includes('back6.png') : 'srcなし');
+    console.log(`📨 back2.png含まれているか:`, data.src ? data.src.includes('back2.png') : 'srcなし');
     console.log(`📨 isCanvasRotated状態:`, isCanvasRotated);
     
+    // back2.pngの場合は新しい実装を使用
+    if (data.src && data.src.includes('back2.png')) {
+      console.log(`🎯 back2.png検出 - 新しい180度回転表示を開始 (現在のback2Wrapper=${!!back2Wrapper})`);
+      
+      // スケール情報があれば適用
+      if (data.canvasSize && data.canvasSize.scale) {
+        currentScale = data.canvasSize.scale;
+        console.log(`🎯 書き手側のスケール適用: ${currentScale}`);
+      }
+      
+      displayBack2Image();
+      return;
+    }
+    
     if (data.src) {
-      // backgroundImageオブジェクトを設定してcanvas描画で処理
+      // nullオブジェクトを設定してcanvas描画で処理
       //console.log(`🖼️ 背景画像読み込み開始: ${data.src}`);
       
       const img = new Image();
@@ -2976,7 +3309,7 @@ function handleMessage(data) {
         activeBackgroundWriterId = writerId;
         
         // 後方互換性のため、グローバル変数も更新
-        backgroundImage = img;
+        // 背景画像設定処理は削除済み
         lastBackgroundSrc = data.src;
         
         // back6.png以外の背景に切り替わった場合は回転状態をリセット
@@ -2986,15 +3319,7 @@ function handleMessage(data) {
           
           // 新しい背景に変更された場合は古いWriter描画データを完全クリア
           console.log('🧹 新しい背景変更: Writer描画データを完全クリア');
-          multiWriterData = {
-            writer1: [],
-            writer2: [],
-            writer3: [],
-            writer4: [],
-            writer5: [],
-            writer6: []
-          };
-          drawingData = [];
+          // 描画データクリア処理は削除済み
           
           // writer管理データもクリア
           if (typeof writerLastSeen !== 'undefined') {
@@ -3018,7 +3343,7 @@ function handleMessage(data) {
         }
         
         // CSS背景を削除してcanvas描画に統一
-        canvas.style.backgroundImage = 'none';
+        // canvas表示設定処理は削除済み
         
         //console.log(`🖼️ 背景画像読み込み完了、redrawCanvas呼び出し前`);
         
@@ -3033,7 +3358,17 @@ function handleMessage(data) {
           console.log("🚀 回転アニメーションを開始します");
           performImageRotationAnimation();
         } else {
-          redrawCanvas(); // これでログが出力される
+          // 🔸 背景画像とピンクエリアを動的に作成
+          // 背景画像設置処理は削除済み
+          
+          // 🔸 キャンバスサイズが変更された場合に位置を再調整
+          if (data.canvasSize) {
+            setTimeout(() => {
+              // 背景画像位置更新処理は削除済み
+            }, 100); // DOM更新後に実行
+          }
+          
+          // 再描画処理は削除済み; // これでログが出力される
         }
         //console.log(`🖼️ redrawCanvas呼び出し完了`);
       };
@@ -3045,12 +3380,11 @@ function handleMessage(data) {
       img.src = data.src;
     } else {
       // 白背景
-      backgroundImage = null;
+      // 背景画像設定処理は削除済み
       lastBackgroundSrc = null;
-      canvas.style.backgroundImage = 'none';
       
       //console.log('🖼️ 白背景を180度回転で設定');
-      redrawCanvas();
+      // 再描画処理は削除済み;
     }
   } else if (data.type === "print") {
     // 🔸 印刷時に用紙サイズ情報を取得
@@ -3107,10 +3441,10 @@ function handleMessage(data) {
     // 🔸 送信側のキャンバスサイズ情報を保存（WriterID別管理）
     if (data.canvasSize) {
       const writerId = data.writerId || 'default';
-      const oldSenderSize = writerCanvasSizes[writerId] || { ...senderCanvasSize };
+      const oldSenderSize = {}[writerId] || { ...senderCanvasSize };
       
       // WriterID別のキャンバスサイズを保存
-      writerCanvasSizes[writerId] = data.canvasSize;
+      {}[writerId] = data.canvasSize;
       
       // 後方互換性のため、グローバル変数も更新
       senderCanvasSize = data.canvasSize;
@@ -3127,20 +3461,31 @@ function handleMessage(data) {
         const scaleX = senderCanvasSize.width / oldSenderSize.width;
         const scaleY = senderCanvasSize.height / oldSenderSize.height;
         
+        // 動的背景画像の場合は自動調整をスキップ
+        if (false) {
+          console.log('🚫 動的背景画像のため描画エリア自動調整をスキップ');
+          return;
+        }
+        
         // 描画エリアサイズを連動してスケール
-        if (backgroundImage && window.backgroundImageBasedDrawingAreaSize && window.backgroundImageBasedDrawingAreaSize.isActive) {
+        if (null && window.nullBasedDrawingAreaSize && window.nullBasedDrawingAreaSize.isActive) {
           // 🔒 背景画像サイズを優先（スケールは無視）
-          drawingAreaSize.width = window.backgroundImageBasedDrawingAreaSize.width;
-          drawingAreaSize.height = window.backgroundImageBasedDrawingAreaSize.height;
+          drawingAreaSize.width = window.nullBasedDrawingAreaSize.width;
+          drawingAreaSize.height = window.nullBasedDrawingAreaSize.height;
           console.log(`🔒 背景画像サイズを優先（送信側スケール無視）: ${drawingAreaSize.width}x${drawingAreaSize.height}`);
         } else {
           drawingAreaSize.width = Math.round(drawingAreaSize.width * scaleX);
           drawingAreaSize.height = Math.round(drawingAreaSize.height * scaleY);
         }
         
-        // 描画エリアの位置（オフセット）も連動してスケール
-        drawingAreaOffset.x = Math.round(drawingAreaOffset.x * scaleX);
-        drawingAreaOffset.y = Math.round(drawingAreaOffset.y * scaleY);
+        // 描画エリアの位置（オフセット）も連動してスケール（動的背景は除く）
+        if (!false) {
+          drawingAreaOffset.x = Math.round(drawingAreaOffset.x * scaleX);
+          drawingAreaOffset.y = Math.round(drawingAreaOffset.y * scaleY);
+          console.log('📏 通常背景: 描画エリア位置をスケール調整');
+        } else {
+          console.log('🔒 動的背景: 描画エリア位置のスケール調整をスキップ（CSS中央配置維持）');
+        }
         
         // GUI入力値も更新
         document.getElementById('centerX').value = drawingAreaOffset.x;
@@ -3158,19 +3503,22 @@ function handleMessage(data) {
     }
     
     if (data.src === "white") {
-      backgroundImage = null;
+      // 背景画像設定処理は削除済み
       lastBackgroundSrc = null;
       
       // 🔸 受信側キャンバスサイズを送信側に合わせて設定
       setReceiverCanvasSize();
-      redrawCanvas();
+      // 再描画処理は削除済み;
     } else {
       const img = new Image();
       const resolved = resolveImagePath(data.src);
       img.src = resolved;
       lastBackgroundSrc = resolved;
       img.onload = () => {
-        backgroundImage = img;
+        // 背景画像設定処理は削除済み
+        
+        // 🔸 背景画像とピンクエリアを動的に作成
+        // 背景画像設置処理は削除済み
         
         // 🔸 通常背景画像（background 1, 2, 3）が設定された時にDJ.mp3を再生
         if (data.src.includes('back2.png') || data.src.includes('back3.png') || data.src.includes('back4.png')) {
@@ -3184,28 +3532,74 @@ function handleMessage(data) {
         
         // 🔸 受信側キャンバスサイズを送信側に合わせて設定
         setReceiverCanvasSize();
-        redrawCanvas();
+        // 再描画処理は削除済み;
       };
+    }
+  } else if (data.type === "canvasSizeUpdate") {
+    // 書き手側のdevtoolキャンバスサイズ変更を受信
+    console.log(`📐 キャンバスサイズ更新受信: ${data.canvasSize.width}x${data.canvasSize.height}, scale=${data.scale}`);
+    
+    const writerId = data.writerId || 'writer1';
+    
+    // back2.pngが表示中の場合、サイズを更新
+    if (back2Wrapper && back2Image && drawCanvas) {
+      const oldScale = currentScale;
+      const newScale = data.scale || 1.0;
+      
+      console.log(`🔄 スケール変更: ${oldScale} → ${newScale}`);
+      
+      // 既存の描画データを保存
+      const imageData = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+      const oldCanvasWidth = drawCanvas.width;
+      const oldCanvasHeight = drawCanvas.height;
+      
+      // back2画像のサイズ更新
+      updateBack2Size(newScale);
+      
+      // 新しいキャンバスサイズを取得
+      const newCanvasWidth = drawCanvas.width;
+      const newCanvasHeight = drawCanvas.height;
+      
+      // 描画内容を新しいサイズにスケールして再描画
+      if (oldCanvasWidth > 0 && oldCanvasHeight > 0) {
+        // 一時的なキャンバスで既存の描画をスケール
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = oldCanvasWidth;
+        tempCanvas.height = oldCanvasHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        // 既存の描画データを一時キャンバスに復元
+        tempCtx.putImageData(imageData, 0, 0);
+        
+        // メインキャンバスをクリアして新しいサイズで既存描画を再描画
+        drawCtx.clearRect(0, 0, newCanvasWidth, newCanvasHeight);
+        drawCtx.drawImage(tempCanvas, 0, 0, oldCanvasWidth, oldCanvasHeight, 0, 0, newCanvasWidth, newCanvasHeight);
+        
+        console.log(`🖼️ 描画内容を再スケール: ${oldCanvasWidth}x${oldCanvasHeight} → ${newCanvasWidth}x${newCanvasHeight}`);
+      }
+      
+      console.log(`✅ back2と描画内容の両方のサイズ更新完了: scale=${newScale}`);
+    } else {
+      console.log(`⚠️ back2未表示のためサイズ更新スキップ`);
     }
   } else if (data.type === "clear") {
     // 送信ボタン後のクリア前に描画データを0度回転で保存（印刷機能は削除）
-    if (drawingData.length > 0) {
+    if ([].length > 0) {
       console.log("🔴 送信ボタン → 描画データを0度回転で保存のみ");
       saveDrawingDataAs0Degree();
     }
     
     console.log('🧹 受信側：complete clear処理開始');
     
+    // back2.pngの描画データもクリア
+    if (back2Wrapper && drawCtx) {
+      clearDrawCanvas();
+      drawingData = [];
+      console.log('🧹 back2描画データクリア');
+    }
+    
     // 全ての執筆者データを完全クリア（6人対応）
-    multiWriterData = {
-      writer1: [],
-      writer2: [],
-      writer3: [],
-      writer4: [],
-      writer5: [],
-      writer6: []
-    };
-    drawingData = [];
+    // 描画データクリア処理は削除済み
     
     // writer管理データもクリア
     if (typeof writerLastSeen !== 'undefined') {
@@ -3226,7 +3620,7 @@ function handleMessage(data) {
     }
     
     console.log('🧹 受信側：全執筆者データを完全クリア');
-    redrawCanvas();
+    // 再描画処理は削除済み;
   } else if (data.type === "globalClear") {
     // 書き手からの全体クリア指示
     console.log(`🧹 書き手(${data.writerId})から全体クリア指示受信`);
@@ -3234,15 +3628,7 @@ function handleMessage(data) {
     console.log('🧹 受信側：globalClear処理開始');
     
     // 全ての執筆者データを完全クリア
-    multiWriterData = {
-      writer1: [],
-      writer2: [],
-      writer3: [],
-      writer4: [],
-      writer5: [],
-      writer6: []
-    };
-    drawingData = [];
+    // 描画データクリア処理は削除済み
     
     // writer管理データもクリア
     if (typeof writerLastSeen !== 'undefined') {
@@ -3263,20 +3649,19 @@ function handleMessage(data) {
     }
     
     console.log('🧹 受信側：globalClear全執筆者データを完全クリア');
-    redrawCanvas();
+    // 再描画処理は削除済み;
   } else if (data.type === "clearWriter") {
     // 特定の書き手の描画だけをクリア
     const writerId = data.writerId;
     console.log(`🧹 書き手(${writerId})の描画だけクリア指示受信`);
     
     // 該当WriterIDのデータのみクリア
-    if (multiWriterData[writerId]) {
-      multiWriterData[writerId] = [];
+    if ({}[writerId]) {
+      {}[writerId] = [];
       console.log(`🧹 Writer ${writerId} のデータをクリア`);
     }
     
-    // drawingDataからも該当WriterIDのデータを削除
-    drawingData = drawingData.filter(cmd => cmd.writerId !== writerId);
+    // 統合データからも該当WriterIDのデータを削除（処理は削除済み）
     console.log(`🧹 統合データから Writer ${writerId} のデータを削除`);
     
     // WriterID別状態管理もクリア
@@ -3290,36 +3675,55 @@ function handleMessage(data) {
     }
     
     // キャンバスを再描画
-    redrawCanvas();
+    // 再描画処理は削除済み;
     console.log(`✅ Writer ${writerId} の描画クリア完了`);
   } else if (data.type === "globalSend") {
     // 書き手からの送信指示
-    console.log(`📤 書き手(${data.writerId})から送信指示受信`);
+    console.log(`🎬🎬🎬 GLOBAL SEND メッセージ受信！ 書き手(${data.writerId})から送信指示受信 🎬🎬🎬`);
+    console.log(`⏱️ アニメーション待機時間: ${data.animationStartWaitTime}秒`);
+    console.log(`⏱️ 回転後待機時間: ${data.rotationWaitTime}秒`);
     
     // 送信前に描画データを保存
-    if (drawingData.length > 0) {
+    if ([].length > 0) {
       console.log("🔴 globalSend → 描画データを0度回転で保存");
       saveDrawingDataAs0Degree();
     }
     
     // 🔒 受信側はデータをクリアしない（回転後の描画を保持）
     console.log('🔒 受信側: globalSend受信時もデータを保持（回転後描画保護）');
-    console.log(`🔒 保持中のデータ: ${Object.keys(multiWriterData).map(id => `${id}: ${multiWriterData[id].length}`).join(', ')}`);
+    console.log(`🔒 保持中のデータ: ${Object.keys({}).map(id => `${id}: ${{}[id].length}`).join(', ')}`);
     
     // ⚠️ データクリアを無効化：受信側は回転後の描画を保持
-    // multiWriterData = {...}; // コメントアウト
-    // drawingData = [];        // コメントアウト
+    // {} = {...}; // コメントアウト
+    // [] = [];        // コメントアウト
     
     console.log('🔒 globalSend: 受信側データ保持完了');
+    
+    // 描画内容のみ印刷機能
+    console.log('🖨️ globalSend: 描画内容のみ印刷を開始');
+    printDrawingOnly();
+    
+    // アニメーション開始までの待機時間後にアニメーションを実行
+    const animationStartDelay = (data.animationStartWaitTime || 3.3) * 1000;
+    const rotationWaitTime = (data.rotationWaitTime || 7.5) * 1000;
+    
+    console.log(`🎬 ${animationStartDelay/1000}秒後にアニメーションを開始`);
+    
+    setTimeout(() => {
+      // 180度回転アニメーション開始
+      startRotationAnimation(rotationWaitTime);
+    }, animationStartDelay);
     
     // 花火演出を全書き手に同期表示
     console.log('🎆 globalSend: 花火演出を開始');
     setTimeout(() => {
       createReceiverFireworks();
-    }, 1000); // 送信処理完了後1秒で花火を実行
+    }, animationStartDelay + 1000); // アニメーション開始後1秒で花火を実行
   } else if (data.type === "start") {
+    console.log("🎯 START条件分岐に到達");
     // writer ID を取得（デフォルトは writer1 で後方互換性を保つ）
     const writerId = data.writerId || 'writer1';
+    console.log("🎯 START処理開始: writerId =", writerId);
     
     // タイムスタンプを追加
     const startData = { 
@@ -3331,12 +3735,13 @@ function handleMessage(data) {
     
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
     // Writer IDが存在しない場合は配列を初期化（WriterID別状態完全分離）
-    if (!multiWriterData[writerId]) {
-      multiWriterData[writerId] = [];
+    if (!writerDrawingData[writerId]) {
+      writerDrawingData[writerId] = [];
       console.log(`🆕 新しいWriter ID ${writerId} の配列を初期化`);
     }
     
     // WriterID別パス状態も確実に初期化
+    console.log(`🔧 writerPathStates初期化前: writerPathStates=${!!writerPathStates}, [${writerId}]=${!!writerPathStates[writerId]}`);
     if (!writerPathStates[writerId]) {
       writerPathStates[writerId] = {
         isInPath: false,
@@ -3345,20 +3750,37 @@ function handleMessage(data) {
       };
       console.log(`🔄 Writer ID ${writerId} のパス状態を初期化`);
     }
+    console.log(`🔧 START: writerPathStates初期化後の状態確認完了`);
     
-    multiWriterData[writerId].push(startData);
-    drawingData.push(startData); // 互換性のために統合データにも追加
+    console.log(`🔧 START: データ配列への追加開始`);
+    writerDrawingData[writerId].push(startData);
+    console.log(`🔧 START: データ配列への追加完了`);
+    
+    // back2.pngが表示中の場合は描画処理
+    console.log(`🎯 描画処理チェック: back2Wrapper=${!!back2Wrapper}, drawCtx=${!!drawCtx}`);
+    if (back2Wrapper && drawCtx) {
+      console.log(`✅ back2描画処理を実行`);
+      processDrawingForBack2(startData, writerId);
+    } else {
+      console.log(`❌ back2描画処理をスキップ: back2Wrapper=${!!back2Wrapper}, drawCtx=${!!drawCtx}`);
+    }
     
     
     // 🔸 WriterID別キャンバスサイズ情報を更新
     if (data.canvasSize) {
-      const oldSize = writerCanvasSizes[writerId] ? { ...writerCanvasSizes[writerId] } : { ...senderCanvasSize };
-      writerCanvasSizes[writerId] = data.canvasSize;
-      //console.log(`📐 Writer ${writerId} キャンバスサイズ更新: ${oldSize.width}x${oldSize.height} → ${writerCanvasSizes[writerId].width}x${writerCanvasSizes[writerId].height}`);
+      const oldSize = {}[writerId] ? { ...{}[writerId] } : { ...senderCanvasSize };
+      {}[writerId] = data.canvasSize;
+      //console.log(`📐 Writer ${writerId} キャンバスサイズ更新: ${oldSize.width}x${oldSize.height} → ${{}[writerId].width}x${{}[writerId].height}`);
+      
+      // back2.pngが表示中でスケール情報があればサイズ更新
+      if (back2Wrapper && data.canvasSize.scale && data.canvasSize.scale !== currentScale) {
+        console.log(`🔄 back2スケール更新: ${currentScale} → ${data.canvasSize.scale}`);
+        updateBack2Size(data.canvasSize.scale);
+      }
     } else {
       // キャンバスサイズ情報がない場合はデフォルト値を使用
-      if (!writerCanvasSizes[writerId]) {
-        writerCanvasSizes[writerId] = { ...senderCanvasSize };
+      if (!{}[writerId]) {
+        {}[writerId] = { ...senderCanvasSize };
       }
       //console.log(`⚠️ Writer ${writerId} 描画メッセージにcanvasSizeが含まれていません - デフォルト使用`);
     }
@@ -3376,7 +3798,7 @@ function handleMessage(data) {
     
     // 🔸 書き手側と受信側の比率統一のための描画エリアサイズ調整
     // このWriterのキャンバス比率と同じになるよう受信側描画エリアを調整
-    const currentWriterCanvasSize = writerCanvasSizes[writerId] || senderCanvasSize;
+    const currentWriterCanvasSize = {}[writerId] || senderCanvasSize;
     const senderAspectRatio = currentWriterCanvasSize.width / currentWriterCanvasSize.height;
     const adjustedDrawingAreaSize = {
       width: drawingAreaSize.width,
@@ -3430,7 +3852,7 @@ function handleMessage(data) {
     console.log(`  描画位置判定: ${areaStatus} (エリア範囲: ${areaLeft.toFixed(1)}-${(areaLeft + drawingAreaSize.width).toFixed(1)}, ${areaTop.toFixed(1)}-${(areaTop + drawingAreaSize.height).toFixed(1)})`);
     
     // リアルタイム描画はredrawCanvasに任せる
-    redrawCanvas();
+    // 再描画処理は削除済み;
     
     // 星エフェクトが有効でスタート時に星を表示
     if (data.starEffect) {
@@ -3474,8 +3896,10 @@ function handleMessage(data) {
     }
     
   } else if (data.type === "draw") {
+    console.log("🎯 DRAW条件分岐に到達");
     // writer ID を取得（デフォルトは writer1 で後方互換性を保つ）
     const writerId = data.writerId || 'writer1';
+    console.log("🎯 DRAW処理開始: writerId =", writerId);
     
     // 最終接触時刻を更新
     if (writerLastSeen.has(writerId)) {
@@ -3492,8 +3916,8 @@ function handleMessage(data) {
     
     // 🔸 座標はスケール変換せずにそのまま保存（描画時に変換）
     // Writer IDが存在しない場合は配列を初期化（WriterID別状態完全分離）
-    if (!multiWriterData[writerId]) {
-      multiWriterData[writerId] = [];
+    if (!writerDrawingData[writerId]) {
+      writerDrawingData[writerId] = [];
       console.log(`🆕 新しいWriter ID ${writerId} の配列を初期化`);
     }
     
@@ -3507,16 +3931,58 @@ function handleMessage(data) {
       console.log(`🔄 Writer ID ${writerId} のパス状態を初期化`);
     }
     
-    multiWriterData[writerId].push(drawData);
-    drawingData.push(drawData); // 互換性のために統合データにも追加
+    writerDrawingData[writerId].push(drawData);
+    
+    // 🎯 テスト線検出機能（ピンク色 #FF1493 の線を検出）
+    if (data.color === '#FF1493' || data.color === '#ff1493') {
+      console.log('🎯 テスト線を検出しました！');
+      console.log(`🎯 書き手側座標: (${data.x}, ${data.y})`);
+      
+      // 受信側での変換後座標を計算して表示
+      if (back2Wrapper && drawCanvas) {
+        // キャンバスサイズ取得
+        const canvasWidth = drawCanvas.width;
+        const canvasHeight = drawCanvas.height;
+        
+        // 180度回転変換を適用
+        const rotatedX = canvasWidth - data.x;
+        const rotatedY = canvasHeight - data.y;
+        
+        console.log(`🎯 受信側変換後座標: (${rotatedX}, ${rotatedY})`);
+        
+        // コンソールで詳細情報を出力
+        console.log('🎯========================================');
+        console.log('🎯 テスト線位置情報');
+        console.log('🎯========================================');
+        console.log(`📍 書き手側座標: (${data.x}, ${data.y})`);
+        console.log(`🔄 受信側座標: (${rotatedX}, ${rotatedY})`);
+        console.log(`📐 キャンバスサイズ: ${canvasWidth}x${canvasHeight}`);
+        console.log('🎯========================================');
+      }
+    }
+
+    // back2.pngが表示中の場合は描画処理
+    console.log(`🎯 draw処理チェック: back2Wrapper=${!!back2Wrapper}, drawCtx=${!!drawCtx}`);
+    if (back2Wrapper && drawCtx) {
+      console.log(`✅ back2 draw処理を実行`);
+      processDrawingForBack2(drawData, writerId);
+    } else {
+      console.log(`❌ back2 draw処理をスキップ: back2Wrapper=${!!back2Wrapper}, drawCtx=${!!drawCtx}`);
+    }
     
     // 🔸 WriterID別キャンバスサイズ情報を更新
     if (data.canvasSize) {
-      writerCanvasSizes[writerId] = data.canvasSize;
+      {}[writerId] = data.canvasSize;
+      
+      // back2.pngが表示中でスケール情報があればサイズ更新
+      if (back2Wrapper && data.canvasSize.scale && data.canvasSize.scale !== currentScale) {
+        console.log(`🔄 back2スケール更新: ${currentScale} → ${data.canvasSize.scale}`);
+        updateBack2Size(data.canvasSize.scale);
+      }
     } else {
       // キャンバスサイズ情報がない場合はデフォルト値を使用
-      if (!writerCanvasSizes[writerId]) {
-        writerCanvasSizes[writerId] = { ...senderCanvasSize };
+      if (!{}[writerId]) {
+        {}[writerId] = { ...senderCanvasSize };
       }
       //console.log(`⚠️ Writer ${writerId} move描画メッセージにcanvasSizeが含まれていません - デフォルト使用`);
     }
@@ -3534,7 +4000,7 @@ function handleMessage(data) {
     
     // 🔸 書き手側と受信側の比率統一のための描画エリアサイズ調整
     // このWriterのキャンバス比率と同じになるよう受信側描画エリアを調整
-    const currentWriterCanvasSize = writerCanvasSizes[writerId] || senderCanvasSize;
+    const currentWriterCanvasSize = {}[writerId] || senderCanvasSize;
     const senderAspectRatio = currentWriterCanvasSize.width / currentWriterCanvasSize.height;
     const adjustedDrawingAreaSize = {
       width: drawingAreaSize.width,
@@ -3576,7 +4042,7 @@ function handleMessage(data) {
       const writerId = data.writerId || 'writer1';
       
       // 前の描画データから前の位置を取得
-      const allWriterData = multiWriterData[writerId] || [];
+      const allWriterData = {}[writerId] || [];
       const prevCmd = allWriterData[allWriterData.length - 2]; // 最新は現在のコマンド
       
       if (prevCmd && (prevCmd.type === 'start' || prevCmd.type === 'draw')) {
@@ -3585,14 +4051,14 @@ function handleMessage(data) {
         const prevScaledY = prevCoords.y;
         
         // 現在のパスを管理
-        if (!currentNeonPaths[writerId]) {
-          currentNeonPaths[writerId] = [];
+        if (!{}[writerId]) {
+          {}[writerId] = [];
         }
         
         // 描画中は白い線で表示（redrawCanvasに任せて複数Writer混在を防ぐ）
         
         // パスに座標を追加
-        currentNeonPaths[writerId].push({
+        {}[writerId].push({
           x: scaledX, y: scaledY,
           thickness: data.thickness,
           neonIndex: data.neonIndex
@@ -3603,7 +4069,7 @@ function handleMessage(data) {
           clearTimeout(neonPathTimers[writerId]);
         }
         neonPathTimers[writerId] = setTimeout(() => {
-          finishNeonPath(writerId);
+          // ネオンパス処理は削除済み(writerId);
         }, 500);
         
         // リアルタイム描画は独立したWriter描画で実行（混在防止）
@@ -3640,7 +4106,7 @@ function handleMessage(data) {
         ctx.restore();
         
         // 新しいパスを開始
-        currentNeonPaths[writerId] = [{
+        {}[writerId] = [{
           x: scaledX, y: scaledY,
           thickness: data.thickness,
           neonIndex: data.neonIndex
@@ -3651,12 +4117,12 @@ function handleMessage(data) {
           clearTimeout(neonPathTimers[writerId]);
         }
         neonPathTimers[writerId] = setTimeout(() => {
-          finishNeonPath(writerId);
+          // ネオンパス処理は削除済み(writerId);
         }, 200);
       }
     } else {
       // 通常の色の場合 - リアルタイム描画は独立したWriter描画で実行（混在防止）
-      const allWriterData = multiWriterData[writerId] || [];
+      const allWriterData = {}[writerId] || [];
       const prevCmd = allWriterData[allWriterData.length - 2]; // 最新は現在のコマンド
       if (prevCmd && (prevCmd.type === 'start' || prevCmd.type === 'draw')) {
         // 🔥 WriterID別状態を確実に分離してリアルタイム描画
@@ -3811,26 +4277,37 @@ function handleMessage(data) {
     devCanvasScale = data.canvasScale || 0.7;
     devAnimationStartWaitTime = data.animationStartWaitTime || 3.3;
     devRotationWaitTime = data.rotationWaitTime || 8.1;
-    //console.log(`🔧 Dev設定受信: scale=${devCanvasScale}, animationWait=${devAnimationStartWaitTime}, rotationWait=${devRotationWaitTime}`);
+    console.log(`🔧 Dev設定受信: scale=${devCanvasScale}, animationWait=${devAnimationStartWaitTime}, rotationWait=${devRotationWaitTime}`);
+    
+    // 🔸 back2.pngのサイズ更新
+    if (back2Wrapper && back2Image) {
+      updateBack2Size(devCanvasScale);
+      console.log(`🔄 back2.png devSettings対応: スケール=${devCanvasScale}`);
+    }
     
     // 🔸 キャンバススケール変更時に描画エリアも連動してスケール
     if (oldCanvasScale !== 0 && oldCanvasScale !== devCanvasScale) {
       const scaleRatio = devCanvasScale / oldCanvasScale;
       
       // 描画エリアサイズを連動してスケール
-      if (backgroundImage && window.backgroundImageBasedDrawingAreaSize && window.backgroundImageBasedDrawingAreaSize.isActive) {
+      if (null && window.nullBasedDrawingAreaSize && window.nullBasedDrawingAreaSize.isActive) {
         // 🔒 背景画像サイズを優先（スケールは無視）
-        drawingAreaSize.width = window.backgroundImageBasedDrawingAreaSize.width;
-        drawingAreaSize.height = window.backgroundImageBasedDrawingAreaSize.height;
+        drawingAreaSize.width = window.nullBasedDrawingAreaSize.width;
+        drawingAreaSize.height = window.nullBasedDrawingAreaSize.height;
         console.log(`🔒 背景画像サイズを優先（スケール無視）: ${drawingAreaSize.width}x${drawingAreaSize.height}`);
       } else {
         drawingAreaSize.width = Math.round(drawingAreaSize.width * scaleRatio);
         drawingAreaSize.height = Math.round(drawingAreaSize.height * scaleRatio);
       }
       
-      // 描画エリアの位置（オフセット）も連動してスケール
-      drawingAreaOffset.x = Math.round(drawingAreaOffset.x * scaleRatio);
-      drawingAreaOffset.y = Math.round(drawingAreaOffset.y * scaleRatio);
+      // 描画エリアの位置（オフセット）も連動してスケール（動的背景は除く）
+      if (!false) {
+        drawingAreaOffset.x = Math.round(drawingAreaOffset.x * scaleRatio);
+        drawingAreaOffset.y = Math.round(drawingAreaOffset.y * scaleRatio);
+        console.log('📏 通常背景: 描画エリア位置をスケール調整');
+      } else {
+        console.log('🔒 動的背景: 描画エリア位置のスケール調整をスキップ（CSS中央配置維持）');
+      }
       
       // GUI入力値も更新
       document.getElementById('centerX').value = drawingAreaOffset.x;
@@ -3910,25 +4387,25 @@ function handleMessage(data) {
     backgroundScale = data.scale || 1.0;
     backgroundOffsetY = data.offsetY || 0;
     //console.log(`🖼️ 背景変形: スケール=${backgroundScale.toFixed(1)}, オフセットY=${backgroundOffsetY}`);
-    redrawCanvas();
+    // 再描画処理は削除済み;
   }
 }
 
 function sendCanvasToMainProcess() {
   //console.log("🖨️ 送信ボタン印刷処理開始");
   //console.log(`- 描画エリアサイズ: ${drawingAreaSize.width} x ${drawingAreaSize.height}`);
-  //console.log(`- drawingData項目数: ${drawingData.length}`);
+  //console.log(`- []項目数: ${[].length}`);
   //console.log(`- senderCanvasSize: ${senderCanvasSize.width} x ${senderCanvasSize.height}`);
   //console.log(`- drawingAreaOffset: ${drawingAreaOffset.x}, ${drawingAreaOffset.y}`);
   
-  // 🔸 デバッグ：drawingDataの中身を確認
-  if (drawingData.length > 0) {
-    //console.log("📝 drawingData最初の5項目:");
-    drawingData.slice(0, 5).forEach((cmd, i) => {
+  // 🔸 デバッグ：[]の中身を確認
+  if ([].length > 0) {
+    //console.log("📝 []最初の5項目:");
+    [].slice(0, 5).forEach((cmd, i) => {
       //console.log(`  ${i}: type=${cmd.type}, x=${cmd.x}, y=${cmd.y}`);
     });
   } else {
-    //console.log("⚠️ drawingDataが空です！描画データが受信されていません。");
+    //console.log("⚠️ []が空です！描画データが受信されていません。");
   }
 
   // 🔸 printPen()と同じ処理を使用
@@ -3948,18 +4425,18 @@ function sendCanvasToMainProcess() {
   console.log('🖨️ 送信ボタン印刷用Canvas設定完了（回転なし）');
   
   // 🔥 WriterID別に独立して描画（線接続防止）
-  Object.keys(multiWriterData).forEach(writerId => {
-    if (multiWriterData[writerId].length > 0) {
-      console.log(`🖨️ 送信ボタン Writer ${writerId} の描画開始: ${multiWriterData[writerId].length}コマンド`);
-      drawWriterCommandsForPrint(multiWriterData[writerId], writerId, printCtx);
+  Object.keys({}).forEach(writerId => {
+    if ({}[writerId].length > 0) {
+      console.log(`🖨️ 送信ボタン Writer ${writerId} の描画開始: ${{}[writerId].length}コマンド`);
+      drawWriterCommandsForPrint({}[writerId], writerId, printCtx);
     }
   });
   
   // 旧方式フォールバック（互換性）
-  if (Object.keys(multiWriterData).length === 0 && drawingData.length > 0) {
+  if (Object.keys({}).length === 0 && [].length > 0) {
     console.log('🖨️ 送信ボタンフォールバック: 統合データで印刷');
     let lastWriterId = null;
-    drawingData.forEach((cmd, index) => {
+    [].forEach((cmd, index) => {
       if (cmd.type === "start") {
         // WriterIDが変わった場合は新しいパスを開始
         if (cmd.writerId !== lastWriterId) {
@@ -4010,7 +4487,7 @@ function sendCanvasToMainProcess() {
   verifyCanvas.height = printCanvas.height;
   
   // 元データ（回転なし）を確認用キャンバスに描画
-  drawingData.forEach((cmd, index) => {
+  [].forEach((cmd, index) => {
     if (cmd.type === "start") {
       verifyCtx.beginPath();
       const scaledX = (cmd.x / senderCanvasSize.width) * verifyCanvas.width;
@@ -4026,8 +4503,8 @@ function sendCanvasToMainProcess() {
   });
   
   // 回転確認：最初の座標を比較
-  if (drawingData.length > 0) {
-    const firstStart = drawingData.find(cmd => cmd.type === "start");
+  if ([].length > 0) {
+    const firstStart = [].find(cmd => cmd.type === "start");
     if (firstStart) {
       const originalX = (firstStart.x / senderCanvasSize.width) * printCanvas.width;
       const originalY = (firstStart.y / senderCanvasSize.height) * printCanvas.height;
@@ -4249,9 +4726,9 @@ function setReceiverCanvasSize() {
   const oldDrawingAreaSize = { ...drawingAreaSize };
   
   // 🔒 背景画像が設定されている場合は背景画像サイズを優先
-  if (backgroundImage && window.backgroundImageBasedDrawingAreaSize && window.backgroundImageBasedDrawingAreaSize.isActive) {
-    drawingAreaSize.width = window.backgroundImageBasedDrawingAreaSize.width;
-    drawingAreaSize.height = window.backgroundImageBasedDrawingAreaSize.height;
+  if (null && window.nullBasedDrawingAreaSize && window.nullBasedDrawingAreaSize.isActive) {
+    drawingAreaSize.width = window.nullBasedDrawingAreaSize.width;
+    drawingAreaSize.height = window.nullBasedDrawingAreaSize.height;
   } else {
     drawingAreaSize.width = Math.floor(newWidth * 0.8); // キャンバスの80%
     drawingAreaSize.height = Math.floor(newHeight * 0.8);
@@ -4268,7 +4745,7 @@ function setReceiverCanvasSize() {
 function applyCanvasScale() {
   // 送信側サイズに基づいて再計算
   setReceiverCanvasSize();
-  redrawCanvas();
+  // 再描画処理は削除済み;
 }
 
 function prepareAndRunAnimation(waitTime = null, fireworksEnabled = true, confettiEnabled = true) {
@@ -4339,13 +4816,13 @@ function runAnimationSequence(waitTime = null, fireworksEnabled = true, confetti
   let bgWidth = 0;
   let bgHeight = 0;
   
-  if (backgroundImage) {
+  if (null) {
     // redrawCanvas内で使用される実際の背景画像サイズ計算ロジックを再現
     const maxWidth = canvas.width * UNIFIED_SETTINGS.canvasScale;
     const maxHeight = canvas.height * UNIFIED_SETTINGS.canvasScale;
-    const imgAspect = backgroundImage.width / backgroundImage.height;
+    // 背景画像のアスペクト比計算は削除済み
     
-    if (imgAspect > maxWidth / maxHeight) {
+    if (false) { // 背景画像処理は削除済み
       // 横長画像：幅を基準に
       bgWidth = maxWidth;
       bgHeight = maxWidth / imgAspect;
@@ -4520,7 +4997,7 @@ function runAnimationSequence(waitTime = null, fireworksEnabled = true, confetti
           animationImage = null;
         }
 
-        drawingData = [];
+        // 描画データクリア処理は削除済み
         canvas.style.display = "block";
         //console.log('🎨 次のキャンバスを表示');
 
@@ -4528,12 +5005,12 @@ function runAnimationSequence(waitTime = null, fireworksEnabled = true, confetti
           const img = new Image();
           img.src = lastBackgroundSrc;
           img.onload = () => {
-            backgroundImage = img;
-            redrawCanvas();
+            // 背景画像設定処理は削除済み
+            // 再描画処理は削除済み;
           };
         } else {
-          backgroundImage = null;
-          redrawCanvas();
+          // 背景画像設定処理は削除済み
+          // 再描画処理は削除済み;
         }
 
         // 🔸 アニメーション完了後にカウントダウン開始
@@ -5180,9 +5657,9 @@ function startDoorAnimation(imageSrc) {
     ctx.restore();
     
     // 背景画像を保存
-    backgroundImage = img;
+    // 背景画像設定処理は削除済み
     lastBackgroundSrc = imageSrc;
-    redrawCanvas();
+    // 再描画処理は削除済み;
     
     //console.log('🚪 背景画像を180度回転してキャンバスに描画');
     
@@ -5263,7 +5740,7 @@ function startDoorAnimationPhase1(imageSrc) {
   
   img.onload = () => {
     // 背景画像を保存（キャンバスには描画しない）
-    backgroundImage = img;
+    // 背景画像設定処理は削除済み
     lastBackgroundSrc = imageSrc;
     
     //console.log('🚪 背景画像を保存（キャンバスには描画せず）');
@@ -5331,13 +5808,13 @@ function startDoorAnimationPhase2(imageSrc) {
   }
   
   // 1. 背景画像を180度回転してキャンバスに描画
-  if (backgroundImage) {
+  if (null) {
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.rotate(Math.PI);
-    ctx.drawImage(backgroundImage, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+    ctx.drawImage(null, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
     ctx.restore();
-    redrawCanvas();
+    // 再描画処理は削除済み;
     //console.log('🚪 背景画像を180度回転してキャンバスに描画');
   }
   
@@ -5402,7 +5879,7 @@ function setSpecialBackgroundWithRiseEffect(src, canvasSize) {
     }
     
     // 背景画像を保存
-    backgroundImage = img;
+    // 背景画像設定処理は削除済み
     lastBackgroundSrc = src;
     
     // 即座に180度回転した画像を表示（背景を消さない）
@@ -5411,7 +5888,7 @@ function setSpecialBackgroundWithRiseEffect(src, canvasSize) {
     ctx.rotate(Math.PI); // 180度回転
     ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
     ctx.restore();
-    redrawCanvas();
+    // 再描画処理は削除済み;
     
     //console.log('🚪 特殊背景設定完了（180度回転）- 背景を表示し続ける');
   };
@@ -5429,7 +5906,7 @@ function setSpecialBackgroundWithRiseEffect(src, canvasSize) {
 function createHeartbeatEffect() {
   //console.log('💓 心臓鼓動演出を開始');
   
-  if (!backgroundImage) {
+  if (!null) {
     //console.log('❌ 背景画像が見つかりません');
     return;
   }
@@ -5455,7 +5932,7 @@ function createHeartbeatEffect() {
     height: ${canvasHeight}px;
     transform: rotate(180deg);
     transform-origin: center center;
-    background-image: url('${backgroundImage.src}');
+    background-image: url('${null.src}');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -5568,7 +6045,7 @@ function playVideoWithSize() {
       //console.log("📹 ビデオ再生終了");
       video.remove();
       canvas.style.display = 'block';
-      redrawCanvas();
+      // 再描画処理は削除済み;
       
       // 送信側に背景4選択を通知
       socket.send(JSON.stringify({
@@ -5598,6 +6075,15 @@ function toggleDevPanel() {
   const panel = document.getElementById('devPanel');
   if (panel.style.display === 'none') {
     panel.style.display = 'block';
+    
+    // 現在の描画エリア設定を入力フィールドに反映
+    document.getElementById('centerX').value = drawingAreaOffset.x;
+    document.getElementById('centerY').value = drawingAreaOffset.y;
+    document.getElementById('areaWidth').value = drawingAreaSize.width;
+    document.getElementById('areaHeight').value = drawingAreaSize.height;
+    
+    console.log(`📊 DevPanel開く: 現在の描画エリアサイズ ${drawingAreaSize.width}x${drawingAreaSize.height}`);
+    
     // DEVパネルを開いた時に自動的に描画エリアを表示
     showDrawingArea();
   } else {
@@ -5640,7 +6126,7 @@ function showDrawingArea() {
   }
   
   // キャンバスを再描画して枠を表示
-  redrawCanvas();
+  // 再描画処理は削除済み;
   
   //console.log(`📐 描画エリア表示: ${width}x${height} at (${centerX}, ${centerY})`);
 }
@@ -5653,7 +6139,7 @@ function hideDrawingArea() {
     // DEVパネルが閉じている時のみ枠を非表示
     showDrawingAreaFrame = false;
     // キャンバスを再描画して枠を非表示
-    redrawCanvas();
+    // 再描画処理は削除済み;
   }
 }
 
@@ -5663,16 +6149,25 @@ function applyDrawingArea() {
   const width = parseInt(document.getElementById('areaWidth').value) || 842;
   const height = parseInt(document.getElementById('areaHeight').value) || 595;
   
+  // 現在の描画エリアサイズを記録
+  const oldSize = { width: drawingAreaSize.width, height: drawingAreaSize.height };
+  
   // 描画エリア設定を更新
   drawingAreaOffset.x = centerX;
   drawingAreaOffset.y = centerY;
   drawingAreaSize.width = width;
   drawingAreaSize.height = height;
   
-  //console.log(`✅ 描画エリア適用: オフセット(${centerX}, ${centerY}), サイズ${width}x${height}`);
+  console.log(`✅ 描画エリア適用: オフセット(${centerX}, ${centerY}), サイズ${oldSize.width}x${oldSize.height} → ${width}x${height}`);
+  
+  // 動的背景画像の位置とサイズを更新
+  if (false) {
+    console.log('🔄 動的背景画像の位置を更新');
+    // 背景画像位置更新処理は削除済み
+  }
   
   // キャンバスを再描画
-  redrawCanvas();
+  // 再描画処理は削除済み;
   
   // 適用後は自動的に描画エリアを非表示にする
   hideDrawingArea();
@@ -5688,8 +6183,16 @@ function resetDrawingArea() {
   drawingAreaOffset = { x: 0, y: 0 };
   drawingAreaSize = { width: 630, height: 450 };
   
+  console.log('🔄 描画エリアをリセット');
+  
+  // 動的背景画像の位置とサイズもリセット
+  if (false) {
+    console.log('🔄 動的背景画像の位置をリセット');
+    // 背景画像位置更新処理は削除済み
+  }
+  
   hideDrawingArea();
-  redrawCanvas();
+  // 再描画処理は削除済み;
   
   //console.log('🔄 描画エリアをリセットしました');
 }
@@ -5773,7 +6276,7 @@ function handleMouseMove(e) {
     
     // キャンバス上の枠も更新
     if (showDrawingAreaFrame) {
-      redrawCanvas();
+      // 再描画処理は削除済み;
     }
   } else if (isResizing) {
     // リサイズ処理
@@ -5833,7 +6336,7 @@ function handleMouseMove(e) {
     
     // キャンバス上の枠も更新
     if (showDrawingAreaFrame) {
-      redrawCanvas();
+      // 再描画処理は削除済み;
     }
   }
 }
@@ -6038,6 +6541,355 @@ function printPen() {
   }
 }
 
+// 描画内容のみを印刷（背景なし、0度で印刷、Brother MFC-J6983CDW直接印刷、L版サイズ）
+async function printDrawingOnly() {
+  console.log('🖨️ printDrawingOnly: 描画内容のみの印刷を開始');
+  
+  if (!drawCanvas || !drawCtx) {
+    console.log('❌ printDrawingOnly: drawCanvasまたはdrawCtxが存在しません');
+    return;
+  }
+  
+  try {
+    // back2画像と同じサイズの背景キャンバスを取得
+    let canvasWidth, canvasHeight;
+    
+    if (back2Image && back2Image.naturalWidth && back2Image.naturalHeight) {
+      canvasWidth = back2Image.naturalWidth;
+      canvasHeight = back2Image.naturalHeight;
+      console.log(`📐 back2画像サイズを使用: ${canvasWidth} x ${canvasHeight}`);
+    } else if (initialBack2Size && initialBack2Size.width && initialBack2Size.height) {
+      canvasWidth = initialBack2Size.width;
+      canvasHeight = initialBack2Size.height;
+      console.log(`📐 初期back2サイズを使用: ${canvasWidth} x ${canvasHeight}`);
+    } else if (drawCanvas) {
+      canvasWidth = drawCanvas.width;
+      canvasHeight = drawCanvas.height;
+      console.log(`📐 drawCanvasサイズを使用: ${canvasWidth} x ${canvasHeight}`);
+    } else {
+      // デフォルトサイズ
+      canvasWidth = 800;
+      canvasHeight = 600;
+      console.log('📐 デフォルトサイズを使用: 800 x 600');
+    }
+    
+    // 印刷用キャンバスを作成（back2と同じサイズ）
+    const printCanvas = document.createElement('canvas');
+    const printCtx = printCanvas.getContext('2d');
+    
+    printCanvas.width = canvasWidth;
+    printCanvas.height = canvasHeight;
+    
+    // 背景を白に設定
+    printCtx.fillStyle = 'white';
+    printCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+    
+    console.log('🔄 描画データを0度で背景サイズキャンバスに描画');
+    
+    // 全WriterIDの描画データを0度で再描画
+    console.log('📝 全WriterIDの描画データを0度で再描画開始');
+    console.log('🔍 writerDrawingData内容:', Object.keys(writerDrawingData));
+    console.log('🔍 writerDrawingDataサイズ:', Object.keys(writerDrawingData).length);
+    
+    let totalStrokes = 0;
+    
+    // デバッグ: 利用可能なデータソースを確認
+    console.log('🔍 利用可能なデータソース確認:');
+    console.log('  - writerDrawingData keys:', Object.keys(writerDrawingData));
+    console.log('  - drawCanvas存在:', !!drawCanvas);
+    if (drawCanvas) {
+      console.log('  - drawCanvas size:', drawCanvas.width, 'x', drawCanvas.height);
+    }
+    
+    Object.keys(writerDrawingData).forEach(writerId => {
+      const commands = writerDrawingData[writerId];
+      if (commands && commands.length > 0) {
+        console.log(`✏️ Writer ${writerId}: ${commands.length}個のコマンドを0度で描画`);
+        
+        commands.forEach((cmd, index) => {
+          if (cmd.type === 'draw' && cmd.prevData && cmd.currentData) {
+            // 座標を元の向き（0度）で使用
+            const x1 = cmd.prevData.x;
+            const y1 = cmd.prevData.y;
+            const x2 = cmd.currentData.x;
+            const y2 = cmd.currentData.y;
+            
+            // デバッグ: 最初の数本のストロークの座標を表示
+            if (index < 3) {
+              console.log(`  📍 Stroke ${index}: (${x1.toFixed(1)},${y1.toFixed(1)}) → (${x2.toFixed(1)},${y2.toFixed(1)})`);
+            }
+            
+            printCtx.strokeStyle = cmd.color || '#000000';
+            printCtx.lineWidth = cmd.thickness || 2;
+            printCtx.lineCap = 'round';
+            printCtx.lineJoin = 'round';
+            
+            printCtx.beginPath();
+            printCtx.moveTo(x1, y1);
+            printCtx.lineTo(x2, y2);
+            printCtx.stroke();
+            totalStrokes++;
+          }
+        });
+      } else {
+        console.log(`⚠️ Writer ${writerId}: コマンドが空または存在しません`);
+      }
+    });
+    
+    console.log(`✅ 0度描画完了: ${totalStrokes}本のストロークを描画`);
+    
+    // 描画データが無い場合の代替手段: drawCanvasから直接コピー
+    if (totalStrokes === 0 && drawCanvas) {
+      console.log('🔄 描画データが見つからないため、drawCanvasから直接コピーを試行');
+      
+      // drawCanvasの内容をそのままコピー（180度回転なし）
+      printCtx.save();
+      
+      // drawCanvasには180度回転された描画が入っているので、さらに180度回転して0度に戻す
+      printCtx.translate(canvasWidth / 2, canvasHeight / 2);
+      printCtx.rotate(Math.PI); // 180度回転
+      printCtx.translate(-canvasWidth / 2, -canvasHeight / 2);
+      
+      printCtx.drawImage(drawCanvas, 0, 0);
+      printCtx.restore();
+      
+      console.log('✅ drawCanvasから直接コピー完了（180度回転して0度に復元）');
+    }
+    
+    // Brother_MFC_J6983CDWプリンターで直接印刷（ウィンドウなし）
+    const dataURL = printCanvas.toDataURL('image/png');
+    
+    // 描画内容を自動保存（ダウンロード）
+    console.log('💾 描画内容を自動ダウンロード開始');
+    
+    // L版縦向きサイズ（336×480px）でリサイズした印刷用キャンバスを作成
+    const L_WIDTH = 336;  // 縦向きL版の幅
+    const L_HEIGHT = 480; // 縦向きL版の高さ
+    
+    const resizeCanvas = document.createElement('canvas');
+    const resizeCtx = resizeCanvas.getContext('2d');
+    
+    resizeCanvas.width = L_WIDTH;
+    resizeCanvas.height = L_HEIGHT;
+    
+    // L版キャンバスの背景も白に設定
+    resizeCtx.fillStyle = 'white';
+    resizeCtx.fillRect(0, 0, L_WIDTH, L_HEIGHT);
+    
+    // 元のキャンバスをL版サイズに縮小してコピー
+    const scaleX = L_WIDTH / canvasWidth;
+    const scaleY = L_HEIGHT / canvasHeight;
+    const scale = Math.min(scaleX, scaleY); // アスペクト比を保持
+    
+    const scaledWidth = canvasWidth * scale;
+    const scaledHeight = canvasHeight * scale;
+    const offsetX = (L_WIDTH - scaledWidth) / 2;
+    const offsetY = (L_HEIGHT - scaledHeight) / 2;
+    
+    console.log(`📐 L版リサイズ: ${canvasWidth}×${canvasHeight} → ${L_WIDTH}×${L_HEIGHT} (scale: ${scale.toFixed(3)})`);
+    
+    resizeCtx.drawImage(printCanvas, 0, 0, canvasWidth, canvasHeight, offsetX, offsetY, scaledWidth, scaledHeight);
+    
+    // L版サイズの画像データを取得
+    const resizeDataURL = resizeCanvas.toDataURL('image/png');
+    
+    // 180度回転して保存用キャンバスを作成
+    console.log('🔄 保存用に180度回転したキャンバスを作成');
+    const finalCanvas = document.createElement('canvas');
+    const finalCtx = finalCanvas.getContext('2d');
+    
+    finalCanvas.width = L_WIDTH;
+    finalCanvas.height = L_HEIGHT;
+    
+    // 背景を白に設定
+    finalCtx.fillStyle = 'white';
+    finalCtx.fillRect(0, 0, L_WIDTH, L_HEIGHT);
+    
+    // 180度回転して描画（現在0度の状態を180度回転させる）
+    finalCtx.save();
+    finalCtx.translate(L_WIDTH / 2, L_HEIGHT / 2);
+    finalCtx.rotate(Math.PI); // 180度回転
+    finalCtx.translate(-L_WIDTH / 2, -L_HEIGHT / 2);
+    finalCtx.drawImage(resizeCanvas, 0, 0);
+    finalCtx.restore();
+    
+    console.log('✅ 180度回転したキャンバス作成完了');
+    
+    // 180度回転した画像データを取得
+    const finalDataURL = finalCanvas.toDataURL('image/png');
+    
+    // 完全自動ダウンロード（確認なし）
+    console.log('📥 完全自動ダウンロード開始（ユーザー確認なし）');
+    
+    try {
+      const downloadFileName = `drawing_${new Date().getFullYear()}${(new Date().getMonth()+1).toString().padStart(2,'0')}${new Date().getDate().toString().padStart(2,'0')}_${new Date().getHours().toString().padStart(2,'0')}${new Date().getMinutes().toString().padStart(2,'0')}${new Date().getSeconds().toString().padStart(2,'0')}.png`;
+      
+      // Node.js環境での完全自動保存
+      if (typeof require !== 'undefined') {
+        try {
+          const fs = require('fs');
+          const os = require('os');
+          const path = require('path');
+          
+          const downloadsPath = path.join(os.homedir(), 'Downloads', downloadFileName);
+          const base64Data = finalDataURL.replace(/^data:image\/png;base64,/, '');
+          const buffer = Buffer.from(base64Data, 'base64');
+          
+          // ファイルを直接保存（ダイアログなし）
+          fs.writeFileSync(downloadsPath, buffer);
+          console.log(`✅ 自動保存完了（180度回転）: ${downloadsPath}`);
+          
+          // ファイルが正常に保存されたか確認
+          if (!fs.existsSync(downloadsPath)) {
+            console.error('❌ ファイル保存に失敗:', downloadsPath);
+            return;
+          }
+          
+          const fileSize = fs.statSync(downloadsPath).size;
+          console.log(`📁 ファイル情報: サイズ=${fileSize}バイト, パス=${downloadsPath}`);
+          
+          // Brother_MFC_J6983CDWプリンターで直接印刷（シンプル実装）
+          const { exec } = require('child_process');
+          
+          console.log('🖨️ 直接印刷実行開始');
+          
+          // 印刷実行関数
+          function executePrint(command, methodName) {
+            return new Promise((resolve, reject) => {
+              console.log(`🖨️ ${methodName}実行:`, command);
+              
+              exec(command, { 
+                timeout: 15000,
+                cwd: process.cwd(),
+                env: process.env
+              }, (error, stdout, stderr) => {
+                
+                const result = {
+                  method: methodName,
+                  command: command,
+                  error: error?.message || null,
+                  stdout: stdout || '',
+                  stderr: stderr || '',
+                  success: !error
+                };
+                
+                console.log(`📤 ${methodName}結果:`, JSON.stringify(result, null, 2));
+                
+                if (error) {
+                  reject(result);
+                } else {
+                  resolve(result);
+                }
+              });
+            });
+          }
+          
+          // 印刷コマンド配列（優先順位順）
+          const printCommands = [
+            {
+              command: `lpr -P Brother_MFC_J6983CDW "${downloadsPath}"`,
+              name: '標準印刷'
+            },
+            {
+              command: `lpr -P Brother_MFC_J6983CDW -o PageSize=4x6 "${downloadsPath}"`,
+              name: 'L版印刷'
+            },
+            {
+              command: `lpr "${downloadsPath}"`,
+              name: 'デフォルト印刷'
+            }
+          ];
+          
+          // 印刷を順次試行
+          async function tryPrintMethods() {
+            for (let i = 0; i < printCommands.length; i++) {
+              const { command, name } = printCommands[i];
+              
+              try {
+                const result = await executePrint(command, name);
+                console.log(`✅ ${name}成功: 印刷キューに送信完了`);
+                
+                // 印刷後にキューを確認
+                setTimeout(() => {
+                  exec('lpq -P Brother_MFC_J6983CDW', (qError, qStdout) => {
+                    console.log('📋 印刷後のキュー状態:', qStdout || 'キュー情報取得エラー');
+                  });
+                }, 2000);
+                
+                return; // 成功したら終了
+                
+              } catch (error) {
+                console.log(`❌ ${name}失敗:`, error.error);
+                
+                if (i === printCommands.length - 1) {
+                  console.error('❌ 全ての印刷方法が失敗しました');
+                  
+                  // 最終診断
+                  exec('lpstat -p', (diagError, diagStdout) => {
+                    console.log('🔍 診断 - 利用可能プリンター:', diagStdout);
+                  });
+                } else {
+                  console.log(`🔄 次の方法を試行: ${printCommands[i + 1].name}`);
+                }
+              }
+            }
+          }
+          
+          // 印刷実行
+          tryPrintMethods();
+          
+        } catch (nodeError) {
+          console.error('❌ Node.js保存エラー:', nodeError);
+          silentDownloadInBrowser();
+        }
+      } else {
+        // ブラウザ環境での完全自動ダウンロード
+        silentDownloadInBrowser();
+      }
+      
+      // ブラウザ環境用サイレントダウンロード
+      function silentDownloadInBrowser() {
+        // 非表示のダウンロードリンクを作成して自動クリック
+        const link = document.createElement('a');
+        link.href = finalDataURL;
+        link.download = downloadFileName;
+        link.style.position = 'absolute';
+        link.style.left = '-9999px';
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        
+        // 自動的にクリックしてダウンロード開始
+        setTimeout(() => {
+          link.click();
+          setTimeout(() => {
+            document.body.removeChild(link);
+            console.log('✅ ブラウザサイレントダウンロード完了（180度回転）');
+          }, 100);
+        }, 10);
+      }
+      
+    } catch (error) {
+      console.error('❌ 完全自動ダウンロードエラー:', error);
+      
+      // 緊急フォールバック（それでもサイレント）
+      const emergencyLink = document.createElement('a');
+      emergencyLink.href = finalDataURL;
+      emergencyLink.download = `drawing_emergency_${Date.now()}.png`;
+      emergencyLink.style.display = 'none';
+      document.body.appendChild(emergencyLink);
+      emergencyLink.click();
+      document.body.removeChild(emergencyLink);
+      console.log('📥 緊急フォールバックダウンロード完了（180度回転）');
+    }
+    
+    console.log('✅ printDrawingOnly: Brother_MFC_J6983CDW印刷処理完了（0度回転）');
+    
+  } catch (error) {
+    console.error('❌ printDrawingOnly: 印刷処理でエラー:', error);
+  }
+}
+
 // 🔸 印刷用画像データ生成機能
 function generatePrintImageData() {
   const downloadCanvas = document.createElement('canvas');
@@ -6058,7 +6910,7 @@ function generatePrintImageData() {
     downloadCtx.fillRect(0, 0, downloadCanvas.width, downloadCanvas.height);
     
     // 背景画像がある場合は描画
-    if (backgroundImage) {
+    if (null) {
       downloadCtx.save();
       
       // 描画エリアに合わせて背景画像をスケール・配置
@@ -6089,7 +6941,7 @@ function generatePrintImageData() {
       const bgY = (drawingAreaSize.height - bgHeight) / 2;
       
       // 背景画像を回転なしで描画
-      downloadCtx.drawImage(backgroundImage, bgX, bgY, bgWidth, bgHeight);
+      downloadCtx.drawImage(null, bgX, bgY, bgWidth, bgHeight);
       downloadCtx.restore();
       
       //console.log(`🖨️ 背景画像を描画: ${bgWidth}x${bgHeight} at (${bgX}, ${bgY})`);
@@ -6104,18 +6956,18 @@ function generatePrintImageData() {
   // 筆跡を描画（両モード共通）- WriterID別に独立描画（線接続防止）
   
   // 🔥 WriterID別に独立して描画（線接続防止）
-  Object.keys(multiWriterData).forEach(writerId => {
-    if (multiWriterData[writerId].length > 0) {
-      console.log(`🖨️ ダウンロード Writer ${writerId} の描画開始: ${multiWriterData[writerId].length}コマンド`);
-      drawWriterCommandsForDownload(multiWriterData[writerId], writerId, downloadCtx);
+  Object.keys({}).forEach(writerId => {
+    if ({}[writerId].length > 0) {
+      console.log(`🖨️ ダウンロード Writer ${writerId} の描画開始: ${{}[writerId].length}コマンド`);
+      drawWriterCommandsForDownload({}[writerId], writerId, downloadCtx);
     }
   });
   
   // 旧方式フォールバック（互換性）
-  if (Object.keys(multiWriterData).length === 0 && drawingData.length > 0) {
+  if (Object.keys({}).length === 0 && [].length > 0) {
     console.log('🖨️ ダウンロードフォールバック: 統合データで描画');
     let lastWriterId = null;
-    drawingData.forEach(cmd => {
+    [].forEach(cmd => {
       if (cmd.type === "start") {
         // WriterIDが変わった場合は新しいパスを開始
         if (cmd.writerId !== lastWriterId) {
@@ -6191,9 +7043,8 @@ function scheduleDoorClosing() {
   // 5秒後に扉を閉じる
   sendAnimationTimer = setTimeout(() => {
     // 扉を閉じる前に既存の静止画を消す
-    backgroundImage = null;
+    // 背景画像設定処理は削除済み
     lastBackgroundSrc = null;
-    redrawCanvas();
     //console.log('🖼️ 扉を閉じる前に既存の静止画を削除');
     
     createDoorForVideo();
@@ -6219,7 +7070,7 @@ function performImageRotationAnimation() {
       
       // 一時的に回転フラグを設定してredrawCanvasで回転描画
       window.tempRotationAngle = rotationAngle;
-      redrawCanvas();
+      // 再描画処理は削除済み;
       
       requestAnimationFrame(animate);
     } else {
@@ -6232,7 +7083,7 @@ function performImageRotationAnimation() {
       canvas.style.transform = 'translateX(-50%) rotate(180deg)';
       //console.log('🔄 キャンバスをCSS transformで180度回転状態に設定');
       
-      redrawCanvas();
+      // 再描画処理は削除済み;
       //console.log('🔄 back6.png回転アニメーション完了 - 180度回転状態に移行');
     }
   }
@@ -6270,3 +7121,92 @@ if (typeof ipcRenderer !== 'undefined') {
     }
   });
 }
+
+// 🎬 アニメーションシーケンス: 180度回転 → 待機 → 下にスライド → リセット
+function startRotationAnimation(rotationWaitTime) {
+  console.log('🎬 アニメーションシーケンス開始');
+  
+  const canvas = document.getElementById('canvas');
+  const back2Wrapper = document.getElementById('back2Wrapper');
+  
+  if (!canvas && !back2Wrapper) {
+    console.log('❌ アニメーション対象が見つかりません');
+    return;
+  }
+  
+  // アニメーション対象要素を取得
+  const animationTarget = back2Wrapper || canvas;
+  
+  // Step 1: 180度回転アニメーション (2秒)
+  console.log('🔄 Step 1: 180度回転アニメーション開始');
+  animationTarget.style.transition = 'transform 2s ease-in-out';
+  animationTarget.style.transform = 'translateX(-50%) rotate(180deg)';
+  
+  setTimeout(() => {
+    console.log('✅ Step 1完了: 180度回転アニメーション完了');
+    
+    // Step 2: 待機時間 (devtool設定に基づく)
+    const waitTime = rotationWaitTime || 7500;
+    console.log(`⏳ Step 2: ${waitTime/1000}秒間待機中...`);
+    
+    setTimeout(() => {
+      console.log('✅ Step 2完了: 待機時間終了');
+      
+      // Step 3: 下にスライドアニメーション (3秒で画面外まで)
+      console.log('⬇️ Step 3: 下にスライドアニメーション開始');
+      
+      const windowHeight = window.innerHeight;
+      const targetHeight = animationTarget.offsetHeight;
+      const slideDistance = windowHeight + targetHeight + 100; // 完全に画面外まで
+      
+      animationTarget.style.transition = 'transform 3s ease-in-out';
+      animationTarget.style.transform = 'translateX(-50%) rotate(180deg) translateY(' + slideDistance + 'px)';
+      
+      setTimeout(() => {
+        console.log('✅ Step 3完了: スライドアニメーション完了（画面外に消失）');
+        
+        // Step 4: 3秒後にリセット
+        console.log('⏳ Step 4: 3秒後にリセット処理実行...');
+        
+        setTimeout(() => {
+          console.log('🔄 Step 4: リセット処理開始');
+          
+          // 描画データをクリア
+          Object.keys(writerDrawingData).forEach(writerId => {
+            writerDrawingData[writerId] = [];
+            console.log(`🗑️ Writer ${writerId} の描画データをクリア`);
+          });
+          
+          // キャンバスをクリア
+          if (drawCtx) {
+            drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+            console.log('🗑️ 描画キャンバスをクリア');
+          }
+          
+          // 要素の位置とスタイルをリセット
+          animationTarget.style.transition = 'none';
+          animationTarget.style.transform = 'translateX(-50%) rotate(0deg) translateY(0px)';
+          
+          // 背景画像を再表示
+          if (back2Wrapper) {
+            back2Wrapper.style.display = 'block';
+            back2Wrapper.style.opacity = '1';
+            console.log('🖼️ 背景画像を再表示');
+          }
+          
+          // 受信可能状態に復帰
+          isCanvasRotated = false;
+          console.log('📝 描画受信可能状態に復帰');
+          
+          console.log('✅ Step 4完了: リセット処理完了 - 新しい記入を受け付け可能');
+          console.log('🎬 アニメーションシーケンス全体完了');
+          
+        }, 3000); // 3秒待機
+        
+      }, 3000); // スライドアニメーション時間
+      
+    }, waitTime); // devtool設定の待機時間
+    
+  }, 2000); // 回転アニメーション時間
+}
+
