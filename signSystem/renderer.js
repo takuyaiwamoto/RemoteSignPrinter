@@ -7204,23 +7204,26 @@ function startRotationAnimation(rotationWaitTime) {
       setTimeout(() => {
         console.log('✅ Step 3完了: スライドアニメーション完了（画面外に消失）');
         
-        // Step 4: 2秒後にリセット
-        console.log('⏳ Step 4: 2秒後にリセット処理実行...');
+        // Step 4: スライド完了と同時に描画をクリア
+        console.log('🔄 Step 4: 描画クリア処理開始（スライド完了直後）');
+        
+        // 描画データをクリア
+        Object.keys(writerDrawingData).forEach(writerId => {
+          writerDrawingData[writerId] = [];
+          console.log(`🗑️ Writer ${writerId} の描画データをクリア`);
+        });
+        
+        // キャンバスをクリア
+        if (drawCtx) {
+          drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+          console.log('🗑️ 描画キャンバスをクリア');
+        }
+        
+        // Step 5: 2秒後に背景画像復帰とリセット完了
+        console.log('⏳ Step 5: 2秒後に背景画像復帰...');
         
         setTimeout(() => {
-          console.log('🔄 Step 4: リセット処理開始');
-          
-          // 描画データをクリア
-          Object.keys(writerDrawingData).forEach(writerId => {
-            writerDrawingData[writerId] = [];
-            console.log(`🗑️ Writer ${writerId} の描画データをクリア`);
-          });
-          
-          // キャンバスをクリア
-          if (drawCtx) {
-            drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-            console.log('🗑️ 描画キャンバスをクリア');
-          }
+          console.log('🔄 Step 5: 背景画像復帰とリセット完了');
           
           // 要素の位置とスタイルをリセット
           animationTarget.style.transition = 'none';
@@ -7246,7 +7249,7 @@ function startRotationAnimation(rotationWaitTime) {
           isCanvasRotated = false;
           console.log('📝 描画受信可能状態に復帰');
           
-          console.log('✅ Step 4完了: リセット処理完了 - 新しい記入を受け付け可能');
+          console.log('✅ Step 5完了: リセット処理完了 - 新しい記入を受け付け可能');
           console.log('🎬 アニメーションシーケンス全体完了');
           
         }, 2000); // 2秒待機
