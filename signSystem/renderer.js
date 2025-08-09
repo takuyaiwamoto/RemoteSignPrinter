@@ -7157,10 +7157,10 @@ function startRotationAnimation(rotationWaitTime) {
     return;
   }
   
-  // Step 1: 180度回転アニメーション (2秒)
+  // Step 1: 180度回転アニメーション (1秒)
   // back2-wrapperは既に180度回転しているので、さらに180度回転させて0度にする
   console.log('🔄 Step 1: 180度回転アニメーション開始（180度→360度=0度）');
-  animationTarget.style.transition = 'transform 2s ease-in-out';
+  animationTarget.style.transition = 'transform 1s ease-in-out';
   
   if (animationTarget.id === 'back2-wrapper') {
     // back2-wrapperの場合：既に180度回転済みなので360度（0度）に回転
@@ -7182,14 +7182,14 @@ function startRotationAnimation(rotationWaitTime) {
     setTimeout(() => {
       console.log('✅ Step 2完了: 待機時間終了');
       
-      // Step 3: 下にスライドアニメーション (3秒で画面外まで)
+      // Step 3: 下にスライドアニメーション (2秒で画面外まで)
       console.log('⬇️ Step 3: 下にスライドアニメーション開始');
       
       const windowHeight = window.innerHeight;
       const targetHeight = animationTarget.offsetHeight;
       const slideDistance = windowHeight + targetHeight + 100; // 完全に画面外まで
       
-      animationTarget.style.transition = 'transform 3s ease-in-out';
+      animationTarget.style.transition = 'transform 2s ease-in-out';
       
       if (animationTarget.id === 'back2-wrapper') {
         // back2-wrapperの場合：回転なしでスライド
@@ -7204,8 +7204,8 @@ function startRotationAnimation(rotationWaitTime) {
       setTimeout(() => {
         console.log('✅ Step 3完了: スライドアニメーション完了（画面外に消失）');
         
-        // Step 4: 3秒後にリセット
-        console.log('⏳ Step 4: 3秒後にリセット処理実行...');
+        // Step 4: 2秒後にリセット
+        console.log('⏳ Step 4: 2秒後にリセット処理実行...');
         
         setTimeout(() => {
           console.log('🔄 Step 4: リセット処理開始');
@@ -7249,12 +7249,12 @@ function startRotationAnimation(rotationWaitTime) {
           console.log('✅ Step 4完了: リセット処理完了 - 新しい記入を受け付け可能');
           console.log('🎬 アニメーションシーケンス全体完了');
           
-        }, 3000); // 3秒待機
+        }, 2000); // 2秒待機
         
-      }, 3000); // スライドアニメーション時間
+      }, 2000); // スライドアニメーション時間
       
     }, waitTime); // devtool設定の待機時間
     
-  }, 2000); // 回転アニメーション時間
+  }, 1000); // 回転アニメーション時間
 }
 
