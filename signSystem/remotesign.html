@@ -1143,10 +1143,10 @@ function processMessage(data) {
         drawBackgroundImage(ctx, backgroundImage, canvas);
       }
       
-      // 他のWriterの描画データのみクリア（自分の描画は保持）
+      // 🔧【修正】全ての描画データをクリア（自分の描画も含む）
       otherWritersData = {};
-      // drawingCommands = []; // ❌ 自分の描画はクリアしない
-      console.log('🧹 他の書き手データのみクリア（自分の描画は保持）');
+      drawingCommands = []; // ✅ 自分の描画もクリアする
+      console.log('🧹 他の書き手からのクリア指示：全描画データをクリア');
       
       // キャンバスを再描画（背景のみの状態にする）- 遅延実行
       if (window.globalClearRedrawTimeout) {

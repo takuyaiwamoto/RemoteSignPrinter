@@ -987,14 +987,17 @@ let writerCanvasSizes = {};
 
 // 180度回転した描画を実行
 function drawRotatedStroke(x1, y1, x2, y2, color, thickness) {
-  console.log(`🎨 drawRotatedStroke開始: drawCtx=${!!drawCtx}`);
   if (!drawCtx) {
-    console.log(`❌ drawCtx が存在しません`);
     return;
   }
   
-  console.log(`🎨 描画パラメータ: (${x1.toFixed(1)},${y1.toFixed(1)}) → (${x2.toFixed(1)},${y2.toFixed(1)}) color=${color} thickness=${thickness}`);
-  console.log(`🎨 キャンバスサイズ: ${drawCanvas.width}x${drawCanvas.height}`);
+  // 🔍【調査用】座標間距離の計算
+  const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+  const isLongDistance = distance > 10; // 10px以上の距離を長距離と判定
+  
+  if (isLongDistance) {
+    console.log(`📏距離調査: ${distance.toFixed(1)}px | (${x1.toFixed(1)},${y1.toFixed(1)}) → (${x2.toFixed(1)},${y2.toFixed(1)}) | 長距離:${isLongDistance ? '⚠️大きな間隔' : '✅正常'}`);
+  }
   
   drawCtx.save();
   
@@ -1015,7 +1018,6 @@ function drawRotatedStroke(x1, y1, x2, y2, color, thickness) {
   drawCtx.lineTo(x2, y2);
   drawCtx.stroke();
   
-  console.log(`✅ 180度回転描画完了`);
   drawCtx.restore();
 }
 
@@ -1049,59 +1051,79 @@ function redrawAllStrokes() {
 
 // Writer描画データをback2.png上に180度回転で描画
 function processDrawingForBack2(data, writerId) {
-  console.log(`🎨 processDrawingForBack2開始: type=${data.type}, writerId=${writerId}`);
-  console.log(`🎨 状態チェック: drawCtx=${!!drawCtx}, back2Wrapper=${!!back2Wrapper}`);
-  
   if (!drawCtx || !back2Wrapper) {
-    console.log(`❌ 描画不可: drawCtx=${!!drawCtx}, back2Wrapper=${!!back2Wrapper}`);
     return;
   }
   
-  // 描画データを配列に追加
-  drawingData.push(data);
-  console.log(`📝 描画データ追加: 配列サイズ=${drawingData.length}`);
+  // 🔧【修正】Writer別データ管理を使用（既存のwriterDrawingDataを活用）
+  if (!writerDrawingData[writerId]) {
+    writerDrawingData[writerId] = [];
+  }
   
-  // 連続描画の場合のみ線を引く
-  if (data.type === 'draw' && drawingData.length > 1) {
-    const prevData = drawingData[drawingData.length - 2];
+  // Writer別配列に追加
+  writerDrawingData[writerId].push(data);
+  
+  // 🔧【修正】WebSocket順序乱れ対策：タイムスタンプでソート
+  writerDrawingData[writerId].sort((a, b) => a.timestamp - b.timestamp);
+  
+  // 🔧【修正】ソート後に正しい前のデータを取得
+  const currentIndex = writerDrawingData[writerId].findIndex(item => 
+    item.x === data.x && item.y === data.y && item.timestamp === data.timestamp
+  );
+  const prevData = currentIndex > 0 ? writerDrawingData[writerId][currentIndex - 1] : null;
     
-    // 直前がstart or drawで同じwriterの場合に描画
-    if ((prevData.type === 'start' || prevData.type === 'draw') && prevData.writerId === writerId) {
-      // 座標変換: 書き手側座標を受信側キャンバスサイズに合わせて変換
-      const currentCanvasWidth = drawCanvas.width;
-      const currentCanvasHeight = drawCanvas.height;
-      
-      // 書き手側のキャンバスサイズを取得（WebSocketで送信されるcanvasSizeを使用、または標準サイズ）
-      const writerCanvasWidth = data.canvasSize?.width || prevData.canvasSize?.width || initialBack2Size.width;
-      const writerCanvasHeight = data.canvasSize?.height || prevData.canvasSize?.height || initialBack2Size.height;
-      
-      // 書き手側座標を受信側キャンバスサイズにスケール変換
-      const prevX = (prevData.x / writerCanvasWidth) * currentCanvasWidth;
-      const prevY = (prevData.y / writerCanvasHeight) * currentCanvasHeight;
-      const currX = (data.x / writerCanvasWidth) * currentCanvasWidth;
-      const currY = (data.y / writerCanvasHeight) * currentCanvasHeight;
-      
-      // 180度回転を適用
-      const rotatedPrevX = currentCanvasWidth - prevX;
-      const rotatedPrevY = currentCanvasHeight - prevY;
-      const rotatedCurrX = currentCanvasWidth - currX;
-      const rotatedCurrY = currentCanvasHeight - currY;
-      
-      console.log(`🖊️ 描画実行: 書き手(${prevX},${prevY}) → (${currX},${currY}) | 受信側180度回転後(${rotatedPrevX.toFixed(1)},${rotatedPrevY.toFixed(1)}) → (${rotatedCurrX.toFixed(1)},${rotatedCurrY.toFixed(1)})`);
-      
-      drawRotatedStroke(
-        rotatedPrevX, rotatedPrevY,
-        rotatedCurrX, rotatedCurrY,
-        data.color || '#000000',
-        data.thickness || 2
-      );
-      
-      console.log(`✅ 描画完了: 180度回転正常実行`);
-    } else {
-      console.log(`❌ 描画スキップ: prevType=${prevData.type}, prevWriter=${prevData.writerId}, currentWriter=${writerId}`);
+  // 🔍【デバッグ】前データの確認（高精度表示）
+  console.log(`🔍前データ確認: writerId=${writerId}, 配列長=${writerDrawingData[writerId]?.length || 0}, 現在インデックス=${currentIndex}, prevData=${prevData ? `存在(${prevData.x?.toFixed(3)},${prevData.y?.toFixed(3)}) ts:${prevData.timestamp}` : 'null'}, 現在=(${data.x.toFixed(3)},${data.y.toFixed(3)}) ts:${data.timestamp}`);
+  
+  // 後方互換性のため共通配列も更新（他機能で使用される可能性）
+  drawingData.push(data);
+  
+  // 連続描画の場合のみ線を引く - Writer別データで判定
+  if (data.type === 'draw' && prevData && (prevData.type === 'start' || prevData.type === 'draw')) {
+    
+    // 🔍【原因調査】座標変換前の距離計算
+    const originalDistance = Math.sqrt((data.x - prevData.x) ** 2 + (data.y - prevData.y) ** 2);
+    
+    // 🔍【原因調査】タイムスタンプ間隔計算
+    const timeInterval = data.timestamp - prevData.timestamp;
+    const speed = timeInterval > 0 ? (originalDistance / timeInterval * 1000) : 0; // px/秒
+    // 座標変換: 書き手側座標を受信側キャンバスサイズに合わせて変換
+    const currentCanvasWidth = drawCanvas.width;
+    const currentCanvasHeight = drawCanvas.height;
+    
+    // 書き手側のキャンバスサイズを取得（WebSocketで送信されるcanvasSizeを使用、または標準サイズ）
+    const writerCanvasWidth = data.canvasSize?.width || prevData.canvasSize?.width || initialBack2Size.width;
+    const writerCanvasHeight = data.canvasSize?.height || prevData.canvasSize?.height || initialBack2Size.height;
+    
+    // 書き手側座標を受信側キャンバスサイズにスケール変換
+    const prevX = (prevData.x / writerCanvasWidth) * currentCanvasWidth;
+    const prevY = (prevData.y / writerCanvasHeight) * currentCanvasHeight;
+    const currX = (data.x / writerCanvasWidth) * currentCanvasWidth;
+    const currY = (data.y / writerCanvasHeight) * currentCanvasHeight;
+    
+    // 180度回転を適用
+    const rotatedPrevX = currentCanvasWidth - prevX;
+    const rotatedPrevY = currentCanvasHeight - prevY;
+    const rotatedCurrX = currentCanvasWidth - currX;
+    const rotatedCurrY = currentCanvasHeight - currY;
+    
+    // 🔍【原因調査】座標変換後の距離計算
+    const transformedDistance = Math.sqrt((rotatedCurrX - rotatedPrevX) ** 2 + (rotatedCurrY - rotatedPrevY) ** 2);
+    
+    // 🔍【原因調査】点線現象の詳細ログ（条件を緩和して確実に動作確認）
+    console.log(`🎯点線調査: 送信側${originalDistance.toFixed(1)}px → 受信側${transformedDistance.toFixed(1)}px | 時間${timeInterval}ms | 速度${speed.toFixed(1)}px/s | 条件判定:${originalDistance > 5 ? '送信側大' : ''}${transformedDistance > 10 ? '受信側大' : ''}`);
+    
+    // 大きな間隔の場合に詳細座標も出力
+    if (originalDistance > 5 || transformedDistance > 10) {
+      console.log(`🎯詳細: (${data.x.toFixed(1)},${data.y.toFixed(1)}) → 描画(${rotatedPrevX.toFixed(1)},${rotatedPrevY.toFixed(1)})→(${rotatedCurrX.toFixed(1)},${rotatedCurrY.toFixed(1)})`);
     }
-  } else {
-    console.log(`📝 描画データのみ保存: type=${data.type}, 配列サイズ=${drawingData.length}`);
+    
+    drawRotatedStroke(
+      rotatedPrevX, rotatedPrevY,
+      rotatedCurrX, rotatedCurrY,
+      data.color || '#000000',
+      data.thickness || 2
+    );
   }
 }
 function removeDrawRealtimeWriterPath(writerId, currentCmd, prevCmd) {
