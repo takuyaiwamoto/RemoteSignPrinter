@@ -4191,55 +4191,91 @@ canvas.addEventListener("mousemove", (e) => {
   }
 });
 
-// 🔸 スマホ対応：タッチイベントを追加
+// 🔸 タブレット対応：タッチイベント（PC用描画処理と完全統一）
 canvas.addEventListener("touchstart", (e) => {
-  e.preventDefault(); // スクロールを防止
-  
-  // 常に新しい描画を可能にする（hasSentDataチェックを削除）
+  e.preventDefault();
+  console.log('📱 DEBUG: touchstart - PC用処理と統一');
   
   drawing = true;
   const touch = e.touches[0];
   const rect = canvas.getBoundingClientRect();
   
-  // 描画設定を初期化（前の描画設定をクリア）
-  ctx.shadowBlur = 0;
-  ctx.shadowColor = 'transparent';
-  ctx.globalAlpha = 1.0;
-  
-  // スケール調整を考慮した座標計算
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
   const x = (touch.clientX - rect.left) * scaleX;
   const y = (touch.clientY - rect.top) * scaleY;
   
-  // console.log(`📱 タッチ開始座標: clientX=${touch.clientX}, clientY=${touch.clientY}, rect=${rect.left},${rect.top}, scale=${scaleX},${scaleY}, final=${x},${y}`);
+  // 背景画像の範囲内かチェック（PC用と同じ処理）
+  if (!isWithinBackgroundArea(x, y)) {
+    console.log('📱 背景画像範囲外 - 描画中断');
+    drawing = false;
+    return;
+  }
   
-  // WriterID別描画状態をリセット
-  resetWriterDrawingState('self');
-  const selfState = getWriterDrawingState('self');
-  selfState.lastPosition = { x, y };
-  selfState.currentPath = [{ x, y }];
-  selfState.isDrawing = true;
+  // PC用と完全同じ描画処理をコピー
+  isPaintDrawing = true;
+  lastPaintPos = { x, y };
   
-  // 音楽制御は送信側では無効化（受信側のみで音楽再生）
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
+  ctx.globalAlpha = 1.0;
   
-  // Canvas状態を完全に初期化（他WriterIDとの状態混在を防止）
-  ctx.beginPath(); // 重要：他のWriterの未完了パスを完全にクリア
-  ctx.setTransform(1, 0, 0, 1, 0, 0); // 変換行列をリセット
-  ctx.globalCompositeOperation = 'source-over'; // 合成モードをリセット
-  ctx.moveTo(x, y);
+  // PC用と完全同じ描画処理
+  ctx.beginPath();
   
-  // 線の品質を向上させる設定
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
+  let actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : (currentPenColor === 'green' ? '#008000' : (currentPenColor === 'pink' ? '#ff69b4' : currentPenColor)));
   
-  // レガシー変数も更新（後方互換性のため）
-  lastPosition = { x, y }; // 初期位置を記録
-  currentPath = [{ x, y }]; // 新しいパスを開始
+  if (currentPenColor === 'white-red-border') {
+    // 白地赤縁の特別処理（PC版と同じ）
+    ctx.beginPath();
+    ctx.globalAlpha = 0.3;
+    ctx.lineWidth = currentPenThickness + 8;
+    ctx.strokeStyle = '#ffccdd';
+    ctx.shadowColor = '#ffccdd';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + 0.1, y + 0.1);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.globalAlpha = 0.8;
+    ctx.lineWidth = currentPenThickness + 6;
+    ctx.strokeStyle = '#ff88bb';
+    ctx.shadowColor = '#ff88bb';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + 0.1, y + 0.1);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.globalAlpha = 0.9;
+    ctx.lineWidth = Math.max(1, currentPenThickness - 3);
+    ctx.strokeStyle = '#ffffff';
+    ctx.shadowColor = '#ffffff';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + 0.1, y + 0.1);
+    ctx.stroke();
+    
+    ctx.globalAlpha = 1.0;
+  } else {
+    // 通常の色の描画（PC版と同じ）
+    ctx.lineWidth = currentPenThickness;
+    ctx.strokeStyle = actualColor;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.moveTo(x, y);
+    
+    ctx.lineTo(x + 0.1, y + 0.1);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  }
   
-  // 描画コマンドを記録
+  // 自分の描画コマンドとして保存（PC版と同じ）
   const startCmd = {
     type: "start",
     x: x,
@@ -4250,27 +4286,28 @@ canvas.addEventListener("touchstart", (e) => {
   drawingCommands.push(startCmd);
   console.log(`📋 DEBUG: start保存 - 配列数=${drawingCommands.length}件`);
   
-  // Writer IDが未設定の場合は送信しない
-  if (!myWriterId) {
-    console.warn("⚠️ Writer ID未設定のため描画データを送信しません");
-    if (confirm("Writer IDが設定されていません。\n\n🔄 自動で再要求しますか？\n\n「OK」= 自動要求\n「キャンセル」= 手動で右上「ID確認」ボタン")) {
-      requestWriterId();
-    }
-    return;
-  }
-  
-  const touchStartMsg = { 
-    type: "start", 
-    writerId: myWriterId, // Writer ID を追加
-    x, 
-    y,
+  // WebSocket送信（PC版と同じ）
+  const startMsg = {
+    type: "start",
+    x: x,
+    y: y,
     thickness: currentPenThickness,
     color: currentPenColor,
-    starEffect: starEffectEnabled,
-    fairyDustEffect: fairyDustEffectEnabled
+    writerId: myWriterId,
+    timestamp: Date.now()
   };
-  socket.send(JSON.stringify(touchStartMsg));
-  // console.log("📤 送信 touch start:", touchStartMsg);
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify(startMsg));
+    const isValidCoord = x >= 0 && x <= canvas.width && y >= 0 && y <= canvas.height;
+    console.log("📤 タブレット描画開始データ送信:", {
+      type: startMsg.type,
+      writerId: startMsg.writerId,
+      x: Math.round(x),
+      y: Math.round(y),
+      canvasSize: `${canvas.width}x${canvas.height}`,
+      座標妥当性: isValidCoord
+    });
+  }
   
   // 星エフェクトが有効な場合は星を生成
   if (starEffectEnabled) {
@@ -4285,11 +4322,12 @@ canvas.addEventListener("touchstart", (e) => {
 
 canvas.addEventListener("touchend", (e) => {
   e.preventDefault();
-  drawing = false;
+  console.log('📱 DEBUG: touchend - PC用処理と統一');
   
-  // WriterID別描画状態を更新
-  const selfState = getWriterDrawingState('self');
-  selfState.isDrawing = false;
+  // PC用と同じ処理に統一
+  drawing = false;
+  isPaintDrawing = false;
+  lastPaintPos = null;
   
   // 白地赤縁の場合は赤い縁を追加
   if (currentPenColor === 'white-red-border' && currentPath.length > 1) {
@@ -4372,82 +4410,76 @@ let touchAnimationFrame = null;
 let pendingTouchData = null;
 
 canvas.addEventListener("touchmove", (e) => {
-  e.preventDefault(); // スクロールを防止
-  if (!drawing) return;
+  e.preventDefault();
+  if (!isPaintDrawing || !lastPaintPos) return;
   
-  // 常に描画継続を可能にする（hasSentDataチェックを削除）
+  console.log('📱 DEBUG: touchmove - PC用処理と統一');
   
   const touch = e.touches[0];
   const rect = canvas.getBoundingClientRect();
   
-  // スケール調整を考慮した座標計算
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
   const x = (touch.clientX - rect.left) * scaleX;
   const y = (touch.clientY - rect.top) * scaleY;
   
-  // requestAnimationFrameでスムーズな描画
-  pendingTouchData = { x, y };
-  
-  if (!touchAnimationFrame) {
-    touchAnimationFrame = requestAnimationFrame(() => {
-      if (pendingTouchData && drawing) {
-        const { x: pendingX, y: pendingY } = pendingTouchData;
-        
-        // 音楽制御は送信側では無効化（受信側のみで音楽再生）
-        
-        let actualColor = currentPenColor === 'black' ? '#000' : (currentPenColor === 'white' ? '#fff' : (currentPenColor === 'green' ? '#008000' : (currentPenColor === 'pink' ? '#ff69b4' : currentPenColor)));
-        ctx.lineWidth = currentPenThickness;
-        ctx.strokeStyle = actualColor;
-        ctx.shadowBlur = 0;
-        ctx.shadowColor = 'transparent';
-        ctx.globalAlpha = 1.0;
-        
-        drawContinuousLine(pendingX, pendingY);
-        
-        // 描画コマンドを記録
-        const drawCmd = {
-          type: "draw",
-          x: pendingX,
-          y: pendingY,
-          thickness: currentPenThickness,
-          color: actualColor
-        };
-        drawingCommands.push(drawCmd);
-        
-        // 現在の位置を記録
-        lastPosition = { x: pendingX, y: pendingY };
-        
-        // WebSocket送信（Writer IDが設定されている場合）
-        if (myWriterId && socket && socket.readyState === WebSocket.OPEN) {
-          const touchDrawMsg = { 
-            type: "draw", 
-            x: pendingX, 
-            y: pendingY, 
-            thickness: currentPenThickness, 
-            color: actualColor,
-            writerId: myWriterId,
-            timestamp: Date.now()
-          };
-          socket.send(JSON.stringify(touchDrawMsg));
-        }
-        
-        // エフェクト処理（必要に応じて）
-        if (starEffectEnabled) {
-          createStar(pendingX, pendingY);
-        }
-        if (fairyDustEffectEnabled) {
-          createFairyDust(pendingX, pendingY);
-        }
-        if (heartEffectEnabled) {
-          createDrawingHeart(pendingX, pendingY);
-        }
-      }
-      
-      touchAnimationFrame = null;
-      pendingTouchData = null;
-    });
+  // 背景画像の範囲内かチェック（PC用と同じ処理）
+  if (!isWithinBackgroundArea(x, y)) {
+    console.log('📱 背景画像範囲外 - 描画中断');
+    isPaintDrawing = false;
+    lastPaintPos = null;
+    return;
   }
+  
+  // PC用と完全同じ描画処理
+  ctx.lineTo(x, y);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  
+  // 自分の描画コマンドとして保存（PC版と同じ）
+  const actualColor = currentPenColor === 'white-red-border' ? '#ffffff' : 
+                     (currentPenColor === 'black' ? '#000' : 
+                     (currentPenColor === 'white' ? '#fff' : 
+                     (currentPenColor === 'green' ? '#008000' : 
+                     (currentPenColor === 'pink' ? '#ff69b4' : currentPenColor))));
+  const drawCmd = {
+    type: "draw",
+    x: x,
+    y: y,
+    thickness: currentPenThickness,
+    color: actualColor
+  };
+  drawingCommands.push(drawCmd);
+  console.log(`📋 DEBUG: draw保存 - 配列数=${drawingCommands.length}件`);
+  
+  // WebSocket送信（PC版と同じ）
+  const drawMsg = {
+    type: "draw",
+    x: x,
+    y: y,
+    thickness: currentPenThickness,
+    color: currentPenColor,
+    writerId: myWriterId,
+    timestamp: Date.now(),
+    canvasSize: {
+      width: canvas.width,
+      height: canvas.height
+    }
+  };
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify(drawMsg));
+    // 頻度を減らしてログ出力（10回に1回）
+    if (Math.random() < 0.1) {
+      console.log("📤 タブレット描画継続データ送信:", {
+        writerId: drawMsg.writerId,
+        x: Math.round(x),
+        y: Math.round(y)
+      });
+    }
+  }
+  
+  lastPaintPos = { x, y };
 });
 
 // 🔸 ビデオサイズ設定関数
