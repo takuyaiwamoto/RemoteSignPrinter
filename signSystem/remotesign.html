@@ -1120,8 +1120,18 @@ function processMessage(data) {
     }
   } else if (data.type === "clear") {
     // 受信側からの全体クリア
+    console.log('🧹 受信側からのクリア指示でotherWritersDataをクリア');
     otherWritersData = {};
-    redrawCanvasWithOthers();
+    
+    // 遅延実行で重複処理を回避
+    if (window.clearRedrawTimeout) {
+      clearTimeout(window.clearRedrawTimeout);
+    }
+    
+    window.clearRedrawTimeout = setTimeout(() => {
+      redrawCanvasWithOthers();
+      window.clearRedrawTimeout = null;
+    }, 10);
   } else if (data.type === "globalClear") {
     // 他の書き手からの全体クリア（自分が送信者でない場合のみ処理）
     if (data.writerId !== myWriterId) {
@@ -1138,8 +1148,15 @@ function processMessage(data) {
       drawingCommands = [];
       // console.log('🧹 全ての描画データをクリア');
       
-      // キャンバスを再描画（背景のみの状態にする）
-      redrawCanvasWithOthers();
+      // キャンバスを再描画（背景のみの状態にする）- 遅延実行
+      if (window.globalClearRedrawTimeout) {
+        clearTimeout(window.globalClearRedrawTimeout);
+      }
+      
+      window.globalClearRedrawTimeout = setTimeout(() => {
+        redrawCanvasWithOthers();
+        window.globalClearRedrawTimeout = null;
+      }, 10);
       
       // console.log('🧹 他の書き手からのクリア指示で完全クリア完了');
     }
@@ -1191,8 +1208,15 @@ function processMessage(data) {
         // console.log('🧹 drawingCommands配列をクリア:', drawingCommands.length);
         // console.log('🧹 otherWritersData配列をクリア:', Object.keys(otherWritersData).length);
         
-        // キャンバスを再描画
-        redrawCanvasWithOthers();
+        // キャンバスを再描画 - 遅延実行で重複処理を回避
+        if (window.globalSendRedrawTimeout) {
+          clearTimeout(window.globalSendRedrawTimeout);
+        }
+        
+        window.globalSendRedrawTimeout = setTimeout(() => {
+          redrawCanvasWithOthers();
+          window.globalSendRedrawTimeout = null;
+        }, 10);
         
         // console.log('🧹 他の書き手の送信に同期してクリア完了');
       }, 10000);
@@ -1666,9 +1690,18 @@ function handleOtherWriterDrawing(data) {
   otherWritersData[writerId].push(data);
   console.log(`📝 ${writerId}のデータを追加: 合計${otherWritersData[writerId].length}件`);
   
-  // リアルタイムで他執筆者の描画を表示
-  console.log(`🎨 redrawCanvasWithOthers呼び出し`);
-  redrawCanvasWithOthers();
+  // リアルタイムで他執筆者の描画を表示（遅延実行で重複処理を回避）
+  console.log(`🎨 redrawCanvasWithOthers呼び出し（遅延実行）`);
+  
+  // 重複する再描画要求をまとめるため、少し遅延させる
+  if (window.redrawTimeout) {
+    clearTimeout(window.redrawTimeout);
+  }
+  
+  window.redrawTimeout = setTimeout(() => {
+    redrawCanvasWithOthers();
+    window.redrawTimeout = null;
+  }, 10); // 10ms遅延で重複処理をまとめる
 }
 
 // WriterID別パス状態管理（書き手側用）
@@ -1676,12 +1709,18 @@ const senderWriterPathStates = {};
 
 // Writer別に独立した描画関数
 function drawWriterCommands(commands, writerId, isMyself = false) {
+  // データの整合性チェック
+  if (!Array.isArray(commands)) {
+    console.error(`❌ ${writerId}: commands が配列ではありません:`, typeof commands);
+    return;
+  }
+  
   if (commands.length === 0) {
     console.log(`  📝 ${writerId}の描画コマンドが0件のためスキップ`);
     return;
   }
   
-  console.log(`  📝 ${writerId}の描画開始: ${commands.length}件のコマンド`);
+  console.log(`  📝 ${writerId}の描画開始: ${commands.length}件のコマンド (自分: ${isMyself})`);
   
   // このWriterのパス状態を完全にリセット（他Writerとの混在防止）
   senderWriterPathStates[writerId] = {
@@ -1787,17 +1826,31 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
 }
 
 // 自分と他執筆者の描画を統合して再描画
+// 再描画中フラグを追加して重複実行を防止
+let isRedrawing = false;
+
 function redrawCanvasWithOthers() {
+  // 既に再描画中の場合は処理をスキップ
+  if (isRedrawing) {
+    console.log('⏳ 既に再描画処理中のため、この呼び出しをスキップ');
+    return;
+  }
+  
+  isRedrawing = true;
   const redrawStart = performance.now();
-  console.log('🎨 redrawCanvasWithOthers 開始');
+  console.log('🎨 redrawCanvasWithOthers 開始（排他制御適用）');
   console.log(`📊 描画前の状態: drawingCommands=${drawingCommands.length}件, otherWriters=${Object.keys(otherWritersData).length}人`);
   console.log(`📏 キャンバスサイズ: ${canvas.width}x${canvas.height}`);
   
-  // 🔒 送信済みなのにdrawingCommandsにデータがある場合は強制クリア
-  // ※ この処理は削除 - 他の書き手の描画を受信した時に自分の描画が消える原因
-  // if (hasSentData && drawingCommands.length > 0) {
-  //   drawingCommands = [];
-  // }
+  // データの整合性チェック
+  const myDataValid = Array.isArray(drawingCommands);
+  const otherDataValid = typeof otherWritersData === 'object' && otherWritersData !== null;
+  
+  if (!myDataValid || !otherDataValid) {
+    console.error('❌ 描画データの整合性エラー、再描画をスキップ');
+    isRedrawing = false;
+    return;
+  }
   
   // 🔥 現在描画中の場合は、現在の描画状態を保存
   let currentDrawingState = null;
@@ -1883,6 +1936,10 @@ function redrawCanvasWithOthers() {
   if (redrawEnd - redrawStart > 5) {
     console.log(`🎨 redrawCanvasWithOthers slow: ${(redrawEnd - redrawStart).toFixed(2)}ms`);
   }
+  
+  // 処理完了フラグをリセット
+  isRedrawing = false;
+  console.log('✅ redrawCanvasWithOthers 完了（排他制御解除）');
 }
 
 socket.onerror = (error) => console.error("❌ WebSocketエラー（送信側）:", error);
@@ -2544,8 +2601,15 @@ function clearCanvas() {
   // console.log('🧹 drawingCommands配列をクリア:', drawingCommands.length);
   // console.log('🧹 otherWritersData配列をクリア:', Object.keys(otherWritersData).length);
   
-  // キャンバスを再描画（背景のみの状態にする）
-  redrawCanvasWithOthers();
+  // キャンバスを再描画（背景のみの状態にする）- 遅延実行
+  if (window.clearCanvasRedrawTimeout) {
+    clearTimeout(window.clearCanvasRedrawTimeout);
+  }
+  
+  window.clearCanvasRedrawTimeout = setTimeout(() => {
+    redrawCanvasWithOthers();
+    window.clearCanvasRedrawTimeout = null;
+  }, 10);
   
   // 全書き手同期のためのクリア命令を送信
   socket.send(JSON.stringify({ 
@@ -2580,8 +2644,15 @@ function clearMyDrawing() {
     drawBackgroundImage(ctx, backgroundImage, canvas);
   }
   
-  // 他の書き手の描画を再描画
-  redrawCanvasWithOthers();
+  // 他の書き手の描画を再描画 - 遅延実行
+  if (window.clearMyDrawingRedrawTimeout) {
+    clearTimeout(window.clearMyDrawingRedrawTimeout);
+  }
+  
+  window.clearMyDrawingRedrawTimeout = setTimeout(() => {
+    redrawCanvasWithOthers();
+    window.clearMyDrawingRedrawTimeout = null;
+  }, 10);
   
   // 受信側に自分の描画クリア指示を送信
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -4593,8 +4664,15 @@ function saveDoubleRotatedImage() {
     console.log('🧹 otherWritersData遅延クリア:', Object.keys(otherWritersData).length);
     console.log('🧹 drawingCommands遅延クリア:', drawingCommands.length);
     
-    // キャンバスを再描画（空の状態）
-    redrawCanvasWithOthers();
+    // キャンバスを再描画（空の状態）- 遅延実行
+    if (window.saveDoubleRotatedRedrawTimeout) {
+      clearTimeout(window.saveDoubleRotatedRedrawTimeout);
+    }
+    
+    window.saveDoubleRotatedRedrawTimeout = setTimeout(() => {
+      redrawCanvasWithOthers();
+      window.saveDoubleRotatedRedrawTimeout = null;
+    }, 10);
     
     // 全書き手同期のためのクリア命令を送信
     socket.send(JSON.stringify({ 
