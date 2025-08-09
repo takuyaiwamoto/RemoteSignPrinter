@@ -3625,6 +3625,12 @@ function handleMessage(data) {
     // 書き手からの全体クリア指示
     console.log(`🧹 書き手(${data.writerId})から全体クリア指示受信`);
     
+    // アニメーション中はglobalClearを無視
+    if (isAnimationInProgress) {
+      console.log('⏳ アニメーション実行中のため、globalClearを無視します');
+      return;
+    }
+    
     console.log('🧹 受信側：globalClear処理開始');
     
     // 全ての執筆者データを完全クリア
@@ -7122,9 +7128,13 @@ if (typeof ipcRenderer !== 'undefined') {
   });
 }
 
+// アニメーション実行中フラグ
+let isAnimationInProgress = false;
+
 // 🎬 アニメーションシーケンス: 180度回転 → 待機 → 下にスライド → リセット
 function startRotationAnimation(rotationWaitTime) {
   console.log('🎬 アニメーションシーケンス開始');
+  isAnimationInProgress = true; // アニメーション開始フラグ
   
   // 実際に使用されている要素IDを使用
   const drawCanvasElement = document.getElementById('drawCanvas') || document.getElementById('drawCanvas-temp');
@@ -7251,6 +7261,7 @@ function startRotationAnimation(rotationWaitTime) {
           
           console.log('✅ Step 5完了: リセット処理完了 - 新しい記入を受け付け可能');
           console.log('🎬 アニメーションシーケンス全体完了');
+          isAnimationInProgress = false; // アニメーション終了フラグ
           
         }, 2000); // 2秒待機
         

@@ -4583,15 +4583,15 @@ function saveDoubleRotatedImage() {
   console.log('🔓 送信直後: hasSentDataをリセット - 新しい描画と他writerデータ受信を再開');
   
   // 🔄 受信側のアニメーション完了後に送信者側のデータクリアと自動Clear処理を実行
-  const totalAnimationTime = (animationStartWaitTime + 1 + rotationWaitTime) * 1000; // アニメーション開始待機 + 回転1秒 + 回転後待機
-  // console.log(`🔄 送信完了 → ${totalAnimationTime/1000}秒後（アニメーション完了後）に送信者データクリア + 自動Clear処理を実行`);
+  const totalAnimationTime = (animationStartWaitTime + 1 + rotationWaitTime + 2) * 1000; // アニメーション開始待機 + 回転1秒 + 回転後待機 + スライド2秒
+  console.log(`🔄 送信完了 → ${totalAnimationTime/1000}秒後（アニメーション完了後）に送信者データクリア + 自動Clear処理を実行`);
   setTimeout(() => {
     // 🔸 送信者側のデータクリア（アニメーション完了後）
     otherWritersData = {};
     drawingCommands = []; // 🔥 アニメーション完了後に自分の描画コマンドをクリア
-    // console.log('🧹 アニメーション完了後: 全描画データをクリア');
-    // console.log('🧹 otherWritersData遅延クリア:', Object.keys(otherWritersData).length);
-    // console.log('🧹 drawingCommands遅延クリア:', drawingCommands.length);
+    console.log('🧹 アニメーション完了後: 全描画データをクリア');
+    console.log('🧹 otherWritersData遅延クリア:', Object.keys(otherWritersData).length);
+    console.log('🧹 drawingCommands遅延クリア:', drawingCommands.length);
     
     // キャンバスを再描画（空の状態）
     redrawCanvasWithOthers();
@@ -4602,8 +4602,8 @@ function saveDoubleRotatedImage() {
       writerId: myWriterId,
       timestamp: Date.now()
     }));
-    // console.log('📤 自動Clear: 全書き手にクリア指示を送信');
-    // console.log('✅ 自動Clear処理完了（アニメーション完了後）');
+    console.log('📤 自動Clear: 全書き手にクリア指示を送信');
+    console.log('✅ 自動Clear処理完了（アニメーション完了後）');
   }, totalAnimationTime); // アニメーション完了後に自動Clear実行
   
   // 🔸 送信ボタンの視覚的フィードバック
