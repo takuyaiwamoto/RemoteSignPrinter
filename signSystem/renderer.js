@@ -3583,6 +3583,12 @@ function handleMessage(data) {
       console.log(`⚠️ back2未表示のためサイズ更新スキップ`);
     }
   } else if (data.type === "clear") {
+    // アニメーション中はclearを無視
+    if (isAnimationInProgress) {
+      console.log('⏳ アニメーション実行中のため、clearを無視します');
+      return;
+    }
+    
     // 送信ボタン後のクリア前に描画データを0度回転で保存（印刷機能は削除）
     if ([].length > 0) {
       console.log("🔴 送信ボタン → 描画データを0度回転で保存のみ");
@@ -3657,6 +3663,12 @@ function handleMessage(data) {
     console.log('🧹 受信側：globalClear全執筆者データを完全クリア');
     // 再描画処理は削除済み;
   } else if (data.type === "clearWriter") {
+    // アニメーション中はclearWriterを無視
+    if (isAnimationInProgress) {
+      console.log('⏳ アニメーション実行中のため、clearWriterを無視します');
+      return;
+    }
+    
     // 特定の書き手の描画だけをクリア
     const writerId = data.writerId;
     console.log(`🧹 書き手(${writerId})の描画だけクリア指示受信`);
