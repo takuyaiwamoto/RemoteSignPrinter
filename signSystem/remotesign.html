@@ -1676,22 +1676,13 @@ function createWriterStatusDiv() {
 function handleOtherWriterDrawing(data) {
   const writerId = data.writerId;
   
-  console.log(`🖊️ handleOtherWriterDrawing: ${writerId}, データ型: ${data.type}`);
-  console.log(`🔍 現在のotherWritersData内容:`, Object.keys(otherWritersData).map(key => `${key}: ${otherWritersData[key].length}件`));
-  
-  // 他のwriterのデータは常に受信する（送信状態に関係なく）
-  // ※ hasSentDataチェックを削除して、常に他writerの描画を表示可能にする
+  console.log(`📋 DEBUG: 他Writer受信前 - 自分の描画=${drawingCommands.length}件`);
   
   if (!otherWritersData[writerId]) {
     otherWritersData[writerId] = [];
-    console.log(`🆕 ${writerId}の新しい配列を作成`);
   }
   
   otherWritersData[writerId].push(data);
-  console.log(`📝 ${writerId}のデータを追加: 合計${otherWritersData[writerId].length}件`);
-  
-  // リアルタイムで他執筆者の描画を表示（遅延実行で重複処理を回避）
-  console.log(`🎨 redrawCanvasWithOthers呼び出し（遅延実行）`);
   
   // 重複する再描画要求をまとめるため、少し遅延させる
   if (window.redrawTimeout) {
@@ -1699,9 +1690,10 @@ function handleOtherWriterDrawing(data) {
   }
   
   window.redrawTimeout = setTimeout(() => {
+    console.log(`📋 DEBUG: 再描画直前 - 自分の描画=${drawingCommands.length}件`);
     redrawCanvasWithOthers();
     window.redrawTimeout = null;
-  }, 10); // 10ms遅延で重複処理をまとめる
+  }, 10);
 }
 
 // WriterID別パス状態管理（書き手側用）
@@ -1709,18 +1701,13 @@ const senderWriterPathStates = {};
 
 // Writer別に独立した描画関数
 function drawWriterCommands(commands, writerId, isMyself = false) {
-  // データの整合性チェック
-  if (!Array.isArray(commands)) {
-    console.error(`❌ ${writerId}: commands が配列ではありません:`, typeof commands);
+  if (!Array.isArray(commands) || commands.length === 0) {
     return;
   }
   
-  if (commands.length === 0) {
-    console.log(`  📝 ${writerId}の描画コマンドが0件のためスキップ`);
-    return;
+  if (isMyself) {
+    console.log(`📋 DEBUG: 自分の描画実行 - ${commands.length}件`);
   }
-  
-  console.log(`  📝 ${writerId}の描画開始: ${commands.length}件のコマンド (自分: ${isMyself})`);
   
   // このWriterのパス状態を完全にリセット（他Writerとの混在防止）
   senderWriterPathStates[writerId] = {
@@ -1820,7 +1807,9 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
     }
   });
   
-  console.log(`    ✅ 描画完了: start=${startCount}件, draw=${drawCount}件${outOfBoundsCount > 0 ? `, ⚠️画面外=${outOfBoundsCount}件` : ''}`);
+  if (isMyself) {
+    console.log(`📋 DEBUG: 自分の描画完了 - start=${startCount}件, draw=${drawCount}件`);
+  }
   
   ctx.restore();
 }
@@ -1830,24 +1819,14 @@ function drawWriterCommands(commands, writerId, isMyself = false) {
 let isRedrawing = false;
 
 function redrawCanvasWithOthers() {
-  // 既に再描画中の場合は処理をスキップ
   if (isRedrawing) {
-    console.log('⏳ 既に再描画処理中のため、この呼び出しをスキップ');
     return;
   }
   
   isRedrawing = true;
-  const redrawStart = performance.now();
-  console.log('🎨 redrawCanvasWithOthers 開始（排他制御適用）');
-  console.log(`📊 描画前の状態: drawingCommands=${drawingCommands.length}件, otherWriters=${Object.keys(otherWritersData).length}人`);
-  console.log(`📏 キャンバスサイズ: ${canvas.width}x${canvas.height}`);
+  console.log(`📋 DEBUG: 再描画開始 - 自分=${drawingCommands.length}件, 他=${Object.keys(otherWritersData).length}人`);
   
-  // データの整合性チェック
-  const myDataValid = Array.isArray(drawingCommands);
-  const otherDataValid = typeof otherWritersData === 'object' && otherWritersData !== null;
-  
-  if (!myDataValid || !otherDataValid) {
-    console.error('❌ 描画データの整合性エラー、再描画をスキップ');
+  if (!Array.isArray(drawingCommands)) {
     isRedrawing = false;
     return;
   }
@@ -1867,45 +1846,35 @@ function redrawCanvasWithOthers() {
   
   // 背景をクリア
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  console.log('🧹 キャンバスをクリア');
   
   // 背景画像があれば描画
   if (backgroundImage) {
     drawBackgroundImage(ctx, backgroundImage, canvas);
-    console.log('🖼️ 背景画像を描画');
-  } else {
-    console.log('⚠️ 背景画像がnullまたは未定義');
   }
   
   // 自分の描画コマンドを再実行
   ctx.save();
-  ctx.beginPath(); // パス状態をリセット
-  console.log(`✏️ 自分の描画を再実行: ${drawingCommands.length}件`);
+  ctx.beginPath();
+  console.log(`📋 DEBUG: 自分の描画実行開始 - ${drawingCommands.length}件`);
   drawWriterCommands(drawingCommands, myWriterId, true);
   ctx.restore();
   
-  // 他執筆者の描画データを描画（常に表示）
-  console.log(`👥 他の書き手の描画を実行: ${Object.keys(otherWritersData).length}人`);
+  // 他執筆者の描画データを描画
   Object.keys(otherWritersData).forEach(writerId => {
-    // 各Writer描画前にcanvas状態を完全にリセット
     ctx.save();
-    ctx.beginPath(); // 重要：前のWriterのパス状態を完全にクリア
-    ctx.setTransform(1, 0, 0, 1, 0, 0); // 変換行列をリセット
+    ctx.beginPath();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1.0;
     ctx.shadowBlur = 0;
     ctx.shadowColor = 'transparent';
     
-    console.log(`  👤 ${writerId}の描画: ${otherWritersData[writerId].length}件`);
     drawWriterCommands(otherWritersData[writerId], writerId, false);
-    
-    // 各Writer描画後にcanvas状態を復元
     ctx.restore();
   });
   
-  // 🔥 重要：現在描画中だった場合、描画状態を復元
+  // 現在描画中だった場合、描画状態を復元
   if (drawing && currentDrawingState) {
-    // Canvas状態を完全に初期化して、現在の描画を継続可能な状態にリセット
     ctx.beginPath();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
@@ -1915,7 +1884,6 @@ function redrawCanvasWithOthers() {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     
-    // 保存した描画設定を復元
     ctx.lineWidth = currentDrawingState.penThickness;
     if (currentDrawingState.penColor === 'white-red-border') {
       ctx.strokeStyle = '#ffffff';
@@ -1926,20 +1894,11 @@ function redrawCanvasWithOthers() {
       ctx.strokeStyle = actualColor;
     }
     
-    // 最後の位置から新しいパスを開始
     ctx.moveTo(currentDrawingState.lastPosition.x, currentDrawingState.lastPosition.y);
-    
-    console.log(`🔥 描画状態復元: (${currentDrawingState.lastPosition.x}, ${currentDrawingState.lastPosition.y})`);
   }
 
-  const redrawEnd = performance.now();
-  if (redrawEnd - redrawStart > 5) {
-    console.log(`🎨 redrawCanvasWithOthers slow: ${(redrawEnd - redrawStart).toFixed(2)}ms`);
-  }
-  
-  // 処理完了フラグをリセット
+  console.log(`📋 DEBUG: 再描画完了 - 自分=${drawingCommands.length}件`);
   isRedrawing = false;
-  console.log('✅ redrawCanvasWithOthers 完了（排他制御解除）');
 }
 
 socket.onerror = (error) => console.error("❌ WebSocketエラー（送信側）:", error);
@@ -2623,11 +2582,11 @@ function clearCanvas() {
 
 // 自分の描画だけを消去する関数
 function clearMyDrawing() {
-  console.log('🧹 自分だけ消去開始');
+  console.log('📋 DEBUG: clearMyDrawing実行 - クリア前=' + drawingCommands.length + '件');
   
   // 自分の描画コマンドのみをクリア
   drawingCommands = [];
-  console.log('🧹 自分の描画コマンドをクリア:', drawingCommands.length);
+  console.log('📋 DEBUG: clearMyDrawing完了 - クリア後=' + drawingCommands.length + '件');
   
   // WriterID別描画状態をリセット
   if (writerDrawingStates['self']) {
@@ -3658,6 +3617,17 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.beginPath();
         ctx.moveTo(x, y);
         
+        // 自分の描画コマンドとして保存
+        const startCmd = {
+          type: "start",
+          x: x,
+          y: y,
+          thickness: currentPenThickness,
+          color: currentPenColor === 'black' ? '#000' : currentPenColor
+        };
+        drawingCommands.push(startCmd);
+        console.log(`📋 DEBUG: start保存 - 配列数=${drawingCommands.length}件`);
+
         // WebSocketで受信側に描画開始を送信
         const startMsg = {
           type: "start",
@@ -3707,6 +3677,22 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(x, y);
+        
+        // 自分の描画コマンドとして保存
+        const actualColor = currentPenColor === 'white-red-border' ? '#ffffff' : 
+                           (currentPenColor === 'black' ? '#000' : 
+                           (currentPenColor === 'white' ? '#fff' : 
+                           (currentPenColor === 'green' ? '#008000' : 
+                           (currentPenColor === 'pink' ? '#ff69b4' : currentPenColor))));
+        const drawCmd = {
+          type: "draw",
+          x: x,
+          y: y,
+          thickness: currentPenThickness,
+          color: actualColor
+        };
+        drawingCommands.push(drawCmd);
+        console.log(`📋 DEBUG: draw保存 - 配列数=${drawingCommands.length}件`);
         
         // WebSocketで受信側に描画継続データを送信
         const drawMsg = {
@@ -3929,6 +3915,7 @@ canvas.addEventListener("mousedown", (e) => {
     color: currentPenColor === 'black' ? '#000' : currentPenColor
   };
   drawingCommands.push(startCmd);
+  console.log(`📋 DEBUG: start保存 - 配列数=${drawingCommands.length}件`);
   
   // Writer IDが未設定の場合は送信しない
   if (!myWriterId) {
@@ -4141,6 +4128,7 @@ canvas.addEventListener("mousemove", (e) => {
     color: actualColor
   };
   drawingCommands.push(drawCmd);
+  console.log(`📋 DEBUG: draw保存 - 配列数=${drawingCommands.length}件`);
   
   // 現在の位置を記録
   lastPosition = { x, y };
@@ -4260,6 +4248,7 @@ canvas.addEventListener("touchstart", (e) => {
     color: currentPenColor === 'black' ? '#000' : currentPenColor
   };
   drawingCommands.push(startCmd);
+  console.log(`📋 DEBUG: start保存 - 配列数=${drawingCommands.length}件`);
   
   // Writer IDが未設定の場合は送信しない
   if (!myWriterId) {
