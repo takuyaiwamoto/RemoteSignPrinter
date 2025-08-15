@@ -448,7 +448,48 @@
       z-index: 10;
       clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
     }
+    
+    /* 書き手側星エフェクト用CSS */
+    .sender-star {
+      position: fixed;
+      width: 16px;
+      height: 16px;
+      background: gold;
+      pointer-events: none;
+      animation: senderStarTwinkle 1s ease-out forwards;
+      z-index: 10000;
+      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    }
+    
     @keyframes starTwinkle {
+      0% {
+        opacity: 1;
+        transform: scale(0) rotate(0deg) translateX(0px) translateY(0px);
+        filter: blur(0px);
+      }
+      30% {
+        opacity: 1;
+        transform: scale(1.2) rotate(180deg) translateX(10px) translateY(-10px);
+        filter: blur(0px);
+      }
+      60% {
+        opacity: 0.7;
+        transform: scale(1.0) rotate(270deg) translateX(20px) translateY(-20px);
+        filter: blur(1px);
+      }
+      85% {
+        opacity: 0.3;
+        transform: scale(0.6) rotate(330deg) translateX(25px) translateY(-25px);
+        filter: blur(2px);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(0.2) rotate(360deg) translateX(30px) translateY(-30px);
+        filter: blur(3px);
+      }
+    }
+    
+    @keyframes senderStarTwinkle {
       0% {
         opacity: 1;
         transform: scale(0) rotate(0deg) translateX(0px) translateY(0px);
@@ -2995,6 +3036,7 @@ function createDrawingHeart(x, y) {
     heart.style.setProperty('--heart-color', heartColor);
     
     document.body.appendChild(heart);
+    console.log(`💖 ハート ${i + 1} を body に追加しました`);
     
     // アニメーション終了後にハートを削除
     setTimeout(() => {
@@ -3002,6 +3044,36 @@ function createDrawingHeart(x, y) {
         heart.parentNode.removeChild(heart);
       }
     }, 1500);
+  }
+}
+
+// 書き手側星エフェクトを生成する関数
+function createSenderStar(x, y) {
+  // 星の数（1個、たまに2個）
+  const starCount = Math.random() < 0.3 ? 2 : 1;
+  
+  for (let i = 0; i < starCount; i++) {
+    const star = document.createElement('div');
+    star.className = 'sender-star';
+    
+    // ペン先周辺にランダム配置（50px範囲）
+    const offsetX = (Math.random() - 0.5) * 50;
+    const offsetY = (Math.random() - 0.5) * 50;
+    
+    const finalX = x + offsetX;
+    const finalY = y + offsetY;
+    
+    star.style.left = finalX + 'px';
+    star.style.top = finalY + 'px';
+    
+    document.body.appendChild(star);
+    
+    // アニメーション終了後に星を削除
+    setTimeout(() => {
+      if (star.parentNode) {
+        star.parentNode.removeChild(star);
+      }
+    }, 1000);
   }
 }
 
@@ -3748,6 +3820,8 @@ document.addEventListener('DOMContentLoaded', function() {
           color: currentPenColor,
           writerId: myWriterId,
           timestamp: Date.now(),
+          starEffect: starEffectEnabled,
+          fairyDustEffect: fairyDustEffectEnabled,
           canvasSize: {
             width: canvas.width,
             height: canvas.height
@@ -3763,6 +3837,24 @@ document.addEventListener('DOMContentLoaded', function() {
               y: Math.round(y)
             });
           }
+        }
+        
+        // 書き手側エフェクト：キャンバス座標をページ座標に変換
+        const pageX = rect.left + x;
+        const pageY = rect.top + y;
+        // 星エフェクトが有効な場合は星を生成（50%の頻度）
+        if (starEffectEnabled && Math.random() < 0.5) {
+          createSenderStar(pageX, pageY);
+        }
+
+        // 妖精の粉エフェクトが有効な場合は妖精の粉を生成（15回に1回の頻度）
+        if (fairyDustEffectEnabled && Math.random() < 0.067) {
+          createFairyDust(pageX, pageY);
+        }
+        
+        // ハートエフェクトが有効な場合はハートを生成（20回に1回の頻度）
+        if (heartEffectEnabled && Math.random() < 0.05) {
+          createDrawingHeart(pageX, pageY);
         }
         
         lastPaintPos = { x, y };
@@ -3860,6 +3952,8 @@ document.addEventListener('DOMContentLoaded', function() {
           color: currentPenColor,
           writerId: myWriterId,
           timestamp: Date.now(),
+          starEffect: starEffectEnabled,
+          fairyDustEffect: fairyDustEffectEnabled,
           canvasSize: {
             width: canvas.width,
             height: canvas.height
@@ -3980,6 +4074,7 @@ canvas.addEventListener("mousedown", (e) => {
     color: currentPenColor,
     starEffect: starEffectEnabled,
     fairyDustEffect: fairyDustEffectEnabled,
+    heartEffect: heartEffectEnabled,
     canvasSize: { width: canvas.width, height: canvas.height }
   };
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -3989,14 +4084,19 @@ canvas.addEventListener("mousedown", (e) => {
     console.error("❌ WebSocket接続なし - start送信失敗");
   }
   
+  // 書き手側エフェクト：キャンバス座標をページ座標に変換
+  const rect = canvas.getBoundingClientRect();
+  const pageX = rect.left + x;
+  const pageY = rect.top + y;
+
   // 星エフェクトが有効な場合は星を生成
   if (starEffectEnabled) {
-    createStar(x, y);
+    createSenderStar(pageX, pageY);
   }
   
   // 妖精の粉エフェクトが有効な場合は妖精の粉を生成
   if (fairyDustEffectEnabled) {
-    createFairyDust(x, y);
+    createFairyDust(pageX, pageY);
   }
 });
 
@@ -4191,6 +4291,8 @@ canvas.addEventListener("mousemove", (e) => {
     thickness: currentPenThickness,
     color: currentPenColor,
     starEffect: starEffectEnabled,
+    fairyDustEffect: fairyDustEffectEnabled,
+    heartEffect: heartEffectEnabled,
     canvasSize: { width: canvas.width, height: canvas.height }
   };
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -4203,31 +4305,25 @@ canvas.addEventListener("mousemove", (e) => {
   }
   // console.log("📤 送信 draw:", drawMsg, `myWriterId=${myWriterId}`); // パフォーマンスのためコメントアウト
   
-  // 星エフェクトが有効な場合は星を生成（10回に1回の頻度に減らし）
-  if (starEffectEnabled && Math.random() < 0.1) {
-    const effectStart = performance.now();
-    const rect = canvas.getBoundingClientRect();
-    createStar(x + rect.left, y + rect.top);
-    const effectEnd = performance.now();
-    console.log(`⭐ createStar: ${(effectEnd - effectStart).toFixed(2)}ms`);
+  
+  // 書き手側エフェクト：キャンバス座標をページ座標に変換
+  const rect = canvas.getBoundingClientRect();
+  const pageX = rect.left + x;
+  const pageY = rect.top + y;
+
+  // 星エフェクトが有効な場合は星を生成
+  if (starEffectEnabled) {
+    createSenderStar(pageX, pageY);
+  }
+
+  // 妖精の粉エフェクトが有効な場合は妖精の粉を生成
+  if (fairyDustEffectEnabled) {
+    createFairyDust(pageX, pageY);
   }
   
-  // 妖精の粉エフェクトが有効な場合は妖精の粉を生成（15回に1回の頻度に減らし）
-  if (fairyDustEffectEnabled && Math.random() < 0.067) {
-    const effectStart = performance.now();
-    const rect = canvas.getBoundingClientRect();
-    createFairyDust(x + rect.left, y + rect.top);
-    const effectEnd = performance.now();
-    console.log(`✨ createFairyDust: ${(effectEnd - effectStart).toFixed(2)}ms`);
-  }
-  
-  // ハートエフェクトが有効な場合はハートを生成（20回に1回の頻度に減らし）
-  if (heartEffectEnabled && Math.random() < 0.05) {
-    const effectStart = performance.now();
-    const rect = canvas.getBoundingClientRect();
-    createDrawingHeart(x + rect.left, y + rect.top);
-    const effectEnd = performance.now();
-    console.log(`❤️ createDrawingHeart: ${(effectEnd - effectStart).toFixed(2)}ms`);
+  // ハートエフェクトが有効な場合はハートを生成
+  if (heartEffectEnabled) {
+    createDrawingHeart(pageX, pageY);
   }
   
   const mouseMoveEnd = performance.now();
@@ -4354,14 +4450,18 @@ canvas.addEventListener("touchstart", (e) => {
     });
   }
   
+  // 書き手側エフェクト：キャンバス座標をページ座標に変換（既存のrect変数を再利用）
+  const pageX = rect.left + x;
+  const pageY = rect.top + y;
+
   // 星エフェクトが有効な場合は星を生成
   if (starEffectEnabled) {
-    createStar(x, y);
+    createSenderStar(pageX, pageY);
   }
   
   // 妖精の粉エフェクトが有効な場合は妖精の粉を生成
   if (fairyDustEffectEnabled) {
-    createFairyDust(x, y);
+    createFairyDust(pageX, pageY);
   }
 });
 
@@ -4507,6 +4607,8 @@ canvas.addEventListener("touchmove", (e) => {
     color: currentPenColor,
     writerId: myWriterId,
     timestamp: Date.now(),
+    starEffect: starEffectEnabled,
+    fairyDustEffect: fairyDustEffectEnabled,
     canvasSize: {
       width: canvas.width,
       height: canvas.height
@@ -5481,6 +5583,8 @@ function testDrawRightBottom() {
       writerId: myWriterId,
       thickness: 4,
       color: '#FF1493',
+      starEffect: starEffectEnabled,
+      fairyDustEffect: fairyDustEffectEnabled,
       canvasSize: {
         width: canvas.width,
         height: canvas.height
@@ -5497,6 +5601,8 @@ function testDrawRightBottom() {
         writerId: myWriterId,
         thickness: 4,
         color: '#FF1493',
+        starEffect: starEffectEnabled,
+        fairyDustEffect: fairyDustEffectEnabled,
         canvasSize: {
           width: canvas.width,
           height: canvas.height
@@ -5513,6 +5619,8 @@ function testDrawRightBottom() {
           writerId: myWriterId,
           thickness: 4,
           color: '#FF1493',
+          starEffect: starEffectEnabled,
+          fairyDustEffect: fairyDustEffectEnabled,
           canvasSize: {
             width: canvas.width,
             height: canvas.height

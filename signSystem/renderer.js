@@ -159,7 +159,7 @@ function transformCoordinatesWithAspectRatio(x, y, senderSize, drawingAreaSize) 
   const scaledY = (y / senderSize.height) * actualDrawingHeight + offsetY;
   
   // デバッグ: 変換結果が範囲内にあるかチェック
-  console.log(`  座標変換詳細: 送信(${x.toFixed(1)}, ${y.toFixed(1)}) → 実際サイズでスケール(${((x / senderSize.width) * actualDrawingWidth).toFixed(1)}, ${((y / senderSize.height) * actualDrawingHeight).toFixed(1)}) → オフセット後(${scaledX.toFixed(1)}, ${scaledY.toFixed(1)})`);
+  // console.log(`  座標変換詳細: 送信(${x.toFixed(1)}, ${y.toFixed(1)}) → 実際サイズでスケール(${((x / senderSize.width) * actualDrawingWidth).toFixed(1)}, ${((y / senderSize.height) * actualDrawingHeight).toFixed(1)}) → オフセット後(${scaledX.toFixed(1)}, ${scaledY.toFixed(1)})`);
   
   return { x: scaledX, y: scaledY, actualWidth: actualDrawingWidth, actualHeight: actualDrawingHeight };
 }
@@ -198,11 +198,11 @@ function getNeonColorFromIndex(neonIndex) {
 
 // ネオンパス完了時にピンクの枠を描画する関数（削除済み）
 function drawNeonPathComplete(writerId) {
-  if (!{}[writerId] || {}[writerId].length < 2) {
+  if (!writerNeonPaths[writerId] || writerNeonPaths[writerId].length < 2) {
     return; // パスが短すぎる場合は何もしない
   }
   
-  const neonPath = {}[writerId];
+  const neonPath = writerNeonPaths[writerId];
   const ctx = canvas.getContext('2d');
   const areaLeft = drawingAreaOffset.left;
   const areaTop = drawingAreaOffset.top;
@@ -255,7 +255,7 @@ function drawNeonPathComplete(writerId) {
   });
   
   // 現在のパスをクリア
-  delete {}[writerId];
+  delete writerNeonPaths[writerId];
   
   // ピンクの枠を含めて再描画
   // 再描画処理は削除済み
@@ -366,10 +366,12 @@ function createReceiverHeart(x, y) {
 
 // 星エフェクト関数（送信側と完全に同じ飛び散る効果）
 function createReceiverStar(x, y) {
-  // //console.log(`⭐ 受信側に星を生成: (${x}, ${y})`);
+  console.log(`🌟 createReceiverStar関数開始: (${x}, ${y})`);
+  console.log(`⭐ 受信側に星を生成: (${x}, ${y})`);
   
   // 星の数をさらに減らす（1個、たまに2個）
   const starCount = Math.random() < 0.3 ? 2 : 1;
+  console.log(`🌟 生成する星の数: ${starCount}`);
   
   for (let i = 0; i < starCount; i++) {
     const star = document.createElement('div');
@@ -385,7 +387,15 @@ function createReceiverStar(x, y) {
     star.style.left = finalX + 'px';
     star.style.top = finalY + 'px';
     
-    // //console.log(`⭐ 星${i+1}の最終位置: left=${finalX}px, top=${finalY}px`);
+    console.log(`⭐ 星${i+1}の最終位置: left=${finalX}px, top=${finalY}px`);
+    
+    // 🔍 詳細デバッグ情報
+    console.log(`⭐ 星${i+1}のCSS設定詳細:`);
+    console.log(`   - position: fixed`);
+    console.log(`   - left: ${finalX}px`);
+    console.log(`   - top: ${finalY}px`);
+    console.log(`   - z-index: 20000`);
+    console.log(`   - 画面サイズ: ${window.innerWidth}x${window.innerHeight}`);
     
     // ランダムな色（金色系）
     const colors = ['gold', '#FFD700', '#FFA500', '#FFFF00', '#FFE4B5', '#FFFACD'];
@@ -400,7 +410,7 @@ function createReceiverStar(x, y) {
     
     // 可視性を確認するため（位置を固定）
     star.style.position = 'fixed';
-    star.style.zIndex = '9999';
+    star.style.zIndex = '20000';
     
     document.body.appendChild(star);
     // //console.log(`⭐ 星${i+1}をDOMに追加: `, star);
@@ -413,6 +423,7 @@ function createReceiverStar(x, y) {
       }
     }, 1000);
   }
+  console.log(`🌟 createReceiverStar関数完了: ${starCount}個の星を作成しました`);
 }
 
 
@@ -421,13 +432,13 @@ function addStarStyles() {
   const style = document.createElement('style');
   style.textContent = `
     .star {
-      position: absolute;
+      position: fixed;
       width: 16px;
       height: 16px;
       background: gold;
       pointer-events: none;
       animation: starTwinkle 1s ease-out forwards;
-      z-index: 10;
+      z-index: 20000;
       clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
     }
     @keyframes starTwinkle {
@@ -978,6 +989,8 @@ let drawingData = [];
 
 // WriterID別パス状態管理
 let writerPathStates = {};
+let writerNeonPaths = {};
+let normalPathTimers = {};
 
 // WriterID別描画データ管理
 let writerDrawingData = {};
@@ -1073,7 +1086,7 @@ function processDrawingForBack2(data, writerId) {
   const prevData = currentIndex > 0 ? writerDrawingData[writerId][currentIndex - 1] : null;
     
   // 🔍【デバッグ】前データの確認（高精度表示）
-  console.log(`🔍前データ確認: writerId=${writerId}, 配列長=${writerDrawingData[writerId]?.length || 0}, 現在インデックス=${currentIndex}, prevData=${prevData ? `存在(${prevData.x?.toFixed(3)},${prevData.y?.toFixed(3)}) ts:${prevData.timestamp}` : 'null'}, 現在=(${data.x.toFixed(3)},${data.y.toFixed(3)}) ts:${data.timestamp}`);
+  // console.log(`🔍前データ確認: writerId=${writerId}, 配列長=${writerDrawingData[writerId]?.length || 0}, 現在インデックス=${currentIndex}, prevData=${prevData ? `存在(${prevData.x?.toFixed(3)},${prevData.y?.toFixed(3)}) ts:${prevData.timestamp}` : 'null'}, 現在=(${data.x.toFixed(3)},${data.y.toFixed(3)}) ts:${data.timestamp}`);
   
   // 後方互換性のため共通配列も更新（他機能で使用される可能性）
   drawingData.push(data);
@@ -1111,7 +1124,7 @@ function processDrawingForBack2(data, writerId) {
     const transformedDistance = Math.sqrt((rotatedCurrX - rotatedPrevX) ** 2 + (rotatedCurrY - rotatedPrevY) ** 2);
     
     // 🔍【原因調査】点線現象の詳細ログ（条件を緩和して確実に動作確認）
-    console.log(`🎯点線調査: 送信側${originalDistance.toFixed(1)}px → 受信側${transformedDistance.toFixed(1)}px | 時間${timeInterval}ms | 速度${speed.toFixed(1)}px/s | 条件判定:${originalDistance > 5 ? '送信側大' : ''}${transformedDistance > 10 ? '受信側大' : ''}`);
+    // console.log(`🎯点線調査: 送信側${originalDistance.toFixed(1)}px → 受信側${transformedDistance.toFixed(1)}px | 時間${timeInterval}ms | 速度${speed.toFixed(1)}px/s | 条件判定:${originalDistance > 5 ? '送信側大' : ''}${transformedDistance > 10 ? '受信側大' : ''}`);
     
     // 大きな間隔の場合に詳細座標も出力
     if (originalDistance > 5 || transformedDistance > 10) {
@@ -1315,6 +1328,16 @@ function removeDrawWriterCommandsReceiver(commands, writerId) {
         ctx.stroke();
         ctx.restore();
         
+        // 🖊️ 描画位置デバッグ出力
+        console.log(`🖊️ ペン描画位置（キャンバス座標）: (${(areaLeft + scaledX).toFixed(1)}, ${(areaTop + scaledY).toFixed(1)})`);
+        console.log(`🖊️ ペン描画位置（元データ）: scaledX=${scaledX.toFixed(1)}, scaledY=${scaledY.toFixed(1)}, areaLeft=${areaLeft.toFixed(1)}, areaTop=${areaTop.toFixed(1)}`);
+        
+        // 🖊️ ページ座標でのペン描画位置も出力
+        const canvasRect = canvas.getBoundingClientRect();
+        const penPageX = canvasRect.left + (areaLeft + scaledX);
+        const penPageY = canvasRect.top + (areaTop + scaledY);
+        console.log(`🖊️ ペン描画位置（ページ座標）: (${penPageX.toFixed(1)}, ${penPageY.toFixed(1)})`);
+        
         // 内側の濃い赤
         ctx.save();
         ctx.globalAlpha = 0.8;
@@ -1364,6 +1387,13 @@ function removeDrawWriterCommandsReceiver(commands, writerId) {
         ctx.lineJoin = 'round';
         
         ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
+        
+        // 🖊️ 通常色でも描画位置ログを出力
+        console.log(`🖊️ ペン描画位置（通常色・キャンバス座標）: (${(areaLeft + scaledX).toFixed(1)}, ${(areaTop + scaledY).toFixed(1)})`);
+        const canvasRect = canvas.getBoundingClientRect();
+        const penPageX = canvasRect.left + (areaLeft + scaledX);
+        const penPageY = canvasRect.top + (areaTop + scaledY);
+        console.log(`🖊️ ペン描画位置（通常色・ページ座標）: (${penPageX.toFixed(1)}, ${penPageY.toFixed(1)})`);
       }
       
       writerState.prevCmd = cmd;
@@ -3880,8 +3910,8 @@ function handleMessage(data) {
       }
     } else {
       // キャンバスサイズ情報がない場合はデフォルト値を使用
-      if (!{}[writerId]) {
-        {}[writerId] = { ...senderCanvasSize };
+      if (!writerCanvasSizesData[writerId]) {
+        writerCanvasSizesData[writerId] = { ...senderCanvasSize };
       }
       //console.log(`⚠️ Writer ${writerId} 描画メッセージにcanvasSizeが含まれていません - デフォルト使用`);
     }
@@ -3899,7 +3929,7 @@ function handleMessage(data) {
     
     // 🔸 書き手側と受信側の比率統一のための描画エリアサイズ調整
     // このWriterのキャンバス比率と同じになるよう受信側描画エリアを調整
-    const currentWriterCanvasSize = {}[writerId] || senderCanvasSize;
+    const currentWriterCanvasSize = writerCanvasSizesData[writerId] || senderCanvasSize;
     const senderAspectRatio = currentWriterCanvasSize.width / currentWriterCanvasSize.height;
     const adjustedDrawingAreaSize = {
       width: drawingAreaSize.width,
@@ -3957,42 +3987,69 @@ function handleMessage(data) {
     
     // 星エフェクトが有効でスタート時に星を表示
     if (data.starEffect) {
-      // 180度回転を考慮した座標変換
+      // キャンバスの実際の表示位置を取得
       const canvasRect = canvas.getBoundingClientRect();
-      // 180度回転後の座標を計算
+      
+      // キャンバスは180度回転しているため、座標を反転
+      // 描画位置：(areaLeft + scaledX, areaTop + scaledY)
+      // 180度回転後：(canvas.width - x, canvas.height - y)
       const rotatedX = canvas.width - (areaLeft + scaledX);
       const rotatedY = canvas.height - (areaTop + scaledY);
-      const pageX = canvasRect.left + rotatedX;
-      const pageY = canvasRect.top + rotatedY;
-      // //console.log(`⭐ start時に星エフェクト(180度回転): canvas(${scaledX}, ${scaledY}) -> rotated(${rotatedX}, ${rotatedY}) -> page(${pageX}, ${pageY})`);
+      
+      // キャンバスのスケールを考慮した実際のピクセル位置
+      const scaleX = canvasRect.width / canvas.width;
+      const scaleY = canvasRect.height / canvas.height;
+      
+      // ページ上の実際の座標
+      const pageX = canvasRect.left + (rotatedX * scaleX);
+      const pageY = canvasRect.top + (rotatedY * scaleY);
+      
+      console.log(`⭐ start時に星エフェクト(180度回転): canvas(${scaledX.toFixed(1)}, ${scaledY.toFixed(1)}) -> rotated(${rotatedX.toFixed(1)}, ${rotatedY.toFixed(1)}) -> page(${pageX.toFixed(1)}, ${pageY.toFixed(1)})`);
+      console.log(`   キャンバスRect: left=${canvasRect.left.toFixed(1)}, top=${canvasRect.top.toFixed(1)}, width=${canvasRect.width.toFixed(1)}, height=${canvasRect.height.toFixed(1)}`);
+      console.log(`   スケール: X=${scaleX.toFixed(2)}, Y=${scaleY.toFixed(2)}`);
+      
       createReceiverStar(pageX, pageY);
     }
     
     // 妖精の粉エフェクトが有効でスタート時に妖精の粉を表示
-    // //console.log(`✨ 妖精の粉チェック: fairyDustEffectEnabled=${fairyDustEffectEnabled}`);
-    if (fairyDustEffectEnabled) {
+    console.log(`✨ start時妖精の粉チェック: fairyDustEffect=${data.fairyDustEffect} (書き手側チェックボックスの状態)`);
+    if (data.fairyDustEffect) {
       // 180度回転を考慮した座標変換
       const canvasRect = canvas.getBoundingClientRect();
       // 180度回転後の座標を計算
       const rotatedX = canvas.width - (areaLeft + scaledX);
       const rotatedY = canvas.height - (areaTop + scaledY);
-      const pageX = canvasRect.left + rotatedX;
-      const pageY = canvasRect.top + rotatedY;
-      // //console.log(`✨ start時に妖精の粉エフェクト(180度回転): canvas(${scaledX}, ${scaledY}) -> rotated(${rotatedX}, ${rotatedY}) -> page(${pageX}, ${pageY})`);
+      
+      // キャンバスのスケールを考慮した実際のピクセル位置
+      const scaleX = canvasRect.width / canvas.width;
+      const scaleY = canvasRect.height / canvas.height;
+      
+      // ページ上の実際の座標
+      const pageX = canvasRect.left + (rotatedX * scaleX);
+      const pageY = canvasRect.top + (rotatedY * scaleY);
+      console.log(`✨ start時に妖精の粉エフェクト(180度回転): canvas(${scaledX}, ${scaledY}) -> rotated(${rotatedX}, ${rotatedY}) -> page(${pageX}, ${pageY})`);
+      console.log(`✨ 妖精の粉実際の表示位置: (${pageX.toFixed(1)}, ${pageY.toFixed(1)})`);
       createReceiverFairyDust(pageX, pageY);
     }
     
     // ハートエフェクトが有効でスタート時にハートを表示
-    // //console.log(`💖 start時ハートチェック: heartEffectEnabled=${heartEffectEnabled}`);
-    if (heartEffectEnabled) {
+    console.log(`💖 start時ハートチェック: heartEffect=${data.heartEffect} (書き手側チェックボックスの状態)`);
+    if (data.heartEffect) {
       // 180度回転を考慮した座標変換
       const canvasRect = canvas.getBoundingClientRect();
       // 180度回転後の座標を計算
       const rotatedX = canvas.width - (areaLeft + scaledX);
       const rotatedY = canvas.height - (areaTop + scaledY);
-      const pageX = canvasRect.left + rotatedX;
-      const pageY = canvasRect.top + rotatedY;
-      // //console.log(`💖 start時にハートエフェクト(180度回転): canvas(${scaledX}, ${scaledY}) -> rotated(${rotatedX}, ${rotatedY}) -> page(${pageX}, ${pageY})`);
+      
+      // キャンバスのスケールを考慮した実際のピクセル位置
+      const scaleX = canvasRect.width / canvas.width;
+      const scaleY = canvasRect.height / canvas.height;
+      
+      // ページ上の実際の座標
+      const pageX = canvasRect.left + (rotatedX * scaleX);
+      const pageY = canvasRect.top + (rotatedY * scaleY);
+      console.log(`💖 start時にハートエフェクト(180度回転): canvas(${scaledX}, ${scaledY}) -> rotated(${rotatedX}, ${rotatedY}) -> page(${pageX}, ${pageY})`);
+      console.log(`💖 ハート実際の表示位置: (${pageX.toFixed(1)}, ${pageY.toFixed(1)})`);
       createReceiverHeart(pageX, pageY);
     }
     
@@ -4067,6 +4124,7 @@ function handleMessage(data) {
     if (back2Wrapper && drawCtx) {
       console.log(`✅ back2 draw処理を実行`);
       processDrawingForBack2(drawData, writerId);
+      console.log(`✅ back2 draw処理完了 - 次の処理へ`);
     } else {
       console.log(`❌ back2 draw処理をスキップ: back2Wrapper=${!!back2Wrapper}, drawCtx=${!!drawCtx}`);
     }
@@ -4082,8 +4140,8 @@ function handleMessage(data) {
       }
     } else {
       // キャンバスサイズ情報がない場合はデフォルト値を使用
-      if (!{}[writerId]) {
-        {}[writerId] = { ...senderCanvasSize };
+      if (!writerCanvasSizesData[writerId]) {
+        writerCanvasSizesData[writerId] = { ...senderCanvasSize };
       }
       //console.log(`⚠️ Writer ${writerId} move描画メッセージにcanvasSizeが含まれていません - デフォルト使用`);
     }
@@ -4093,25 +4151,36 @@ function handleMessage(data) {
     // 🚪 描画データ受信時は扉タイマーをスケジュールしない（送信ボタン時のみ）
     
     // 🔸 リアルタイム描画（描画エリア調整を適用して180度回転）
+    console.log(`🌟 星エフェクト処理セクションに到達 - WriterID: ${writerId}`);
     // 描画エリアの位置とサイズを計算（redrawCanvasと同じ計算方法を使用）
     const areaCenterX = canvas.width / 2 + drawingAreaOffset.x;
     const areaCenterY = canvas.height / 2 + drawingAreaOffset.y;
     const areaLeft = areaCenterX - drawingAreaSize.width / 2;
     const areaTop = areaCenterY - drawingAreaSize.height / 2;
+    console.log(`🌟 エリア計算完了: center(${areaCenterX.toFixed(1)}, ${areaCenterY.toFixed(1)}), area(${areaLeft.toFixed(1)}, ${areaTop.toFixed(1)})`);
+    console.log(`🌟 データ確認: starEffect=${data.starEffect}, fairyDustEffect=${data.fairyDustEffect}, canvasSize=${JSON.stringify(data.canvasSize)}`);
+    
+    // 送信側からのstarEffectデータに基づいて判定
+    console.log(`🌟 星エフェクト設定: starEffect=${data.starEffect} (書き手側チェックボックスの状態)`);
+    
+    console.log(`🌟 次の処理開始: WriterCanvasSize調整`);
     
     // 🔸 書き手側と受信側の比率統一のための描画エリアサイズ調整
     // このWriterのキャンバス比率と同じになるよう受信側描画エリアを調整
-    const currentWriterCanvasSize = {}[writerId] || senderCanvasSize;
+    const currentWriterCanvasSize = writerCanvasSizesData[writerId] || senderCanvasSize;
+    console.log(`🌟 WriterCanvasSize取得完了: ${JSON.stringify(currentWriterCanvasSize)}`);
     const senderAspectRatio = currentWriterCanvasSize.width / currentWriterCanvasSize.height;
     const adjustedDrawingAreaSize = {
       width: drawingAreaSize.width,
       height: Math.round(drawingAreaSize.width / senderAspectRatio)
     };
+    console.log(`🌟 座標変換準備完了: aspect=${senderAspectRatio.toFixed(2)}, adjustedArea=${adjustedDrawingAreaSize.width}x${adjustedDrawingAreaSize.height}`);
     
     // 🔸 アスペクト比を保持した座標変換（このWriterのキャンバスサイズと調整後のサイズを使用）
     const coords = transformCoordinatesWithAspectRatio(data.x, data.y, currentWriterCanvasSize, adjustedDrawingAreaSize);
     let scaledX = coords.x;
     let scaledY = coords.y;
+    console.log(`🌟 座標変換完了: scaledX=${scaledX.toFixed(1)}, scaledY=${scaledY.toFixed(1)}`);
     
     //console.log('DRAW描画デバッグ:');
     //console.log('送信側座標:', data.x, data.y);
@@ -4132,14 +4201,18 @@ function handleMessage(data) {
     // オフセットを加えて最終座標を計算
     scaledX = rotatedRelativeX + offsetX;
     scaledY = rotatedRelativeY + offsetY;
+    console.log(`🌟 180度回転完了: scaledX=${scaledX.toFixed(1)}, scaledY=${scaledY.toFixed(1)}`);
     
     //console.log('180度回転座標変換適用済み:', scaledX.toFixed(1), scaledY.toFixed(1));
     
     // ペンの太さと色を適用
     const thickness = data.thickness || 4;
+    console.log(`🌟 ペンの太さ設定完了: thickness=${thickness}`);
     
-    // ネオンの場合はリアルタイム用の白い線描画（タイマー処理付き）
-    if (data.color === 'neon' && typeof data.neonIndex === 'number') {
+    // 🗑️ ネオン機能を無効化（座標問題解決のため）
+    console.log(`🌟 ネオン色チェック: color=${data.color}, neonIndex=${data.neonIndex} - ネオン機能は無効化されています`);
+    if (false && data.color === 'neon' && typeof data.neonIndex === 'number') {
+      console.log(`🌟 ネオン色分岐に入りました`);
       const writerId = data.writerId || 'writer1';
       
       // 前の描画データから前の位置を取得
@@ -4152,14 +4225,14 @@ function handleMessage(data) {
         const prevScaledY = prevCoords.y;
         
         // 現在のパスを管理
-        if (!{}[writerId]) {
-          {}[writerId] = [];
+        if (!writerNeonPaths[writerId]) {
+          writerNeonPaths[writerId] = [];
         }
         
         // 描画中は白い線で表示（redrawCanvasに任せて複数Writer混在を防ぐ）
         
         // パスに座標を追加
-        {}[writerId].push({
+        writerNeonPaths[writerId].push({
           x: scaledX, y: scaledY,
           thickness: data.thickness,
           neonIndex: data.neonIndex
@@ -4207,7 +4280,7 @@ function handleMessage(data) {
         ctx.restore();
         
         // 新しいパスを開始
-        {}[writerId] = [{
+        writerNeonPaths[writerId] = [{
           x: scaledX, y: scaledY,
           thickness: data.thickness,
           neonIndex: data.neonIndex
@@ -4222,71 +4295,130 @@ function handleMessage(data) {
         }, 200);
       }
     } else {
+      console.log(`🌟 通常色分岐に入りました: color=${data.color}`);
       // 通常の色の場合 - リアルタイム描画は独立したWriter描画で実行（混在防止）
       const allWriterData = writerDrawingData[writerId] || [];
+      console.log(`🌟 描画データ配列確認: 長さ=${allWriterData.length}`);
       const prevCmd = allWriterData[allWriterData.length - 2]; // 最新は現在のコマンド
+      console.log(`🌟 前のコマンド確認: prevCmd=${prevCmd ? prevCmd.type : 'なし'}`);
       if (prevCmd && (prevCmd.type === 'start' || prevCmd.type === 'draw')) {
+        // console.log(`🌟 リアルタイム描画処理を実行開始`);
         // 🔥 WriterID別状態を確実に分離してリアルタイム描画
-        ctx.save(); // Canvas状態を保存
-        drawRealtimeWriterPath(writerId, data, prevCmd);
-        ctx.restore(); // Canvas状態を復元
+        // ctx.save(); // Canvas状態を保存
+        // drawRealtimeWriterPath(writerId, data, prevCmd); // この関数が存在しないためコメントアウト
+        // ctx.restore(); // Canvas状態を復元
+        // console.log(`🌟 リアルタイム描画処理をスキップしました（関数が存在しません）`);
+        // console.log(`🌟 リアルタイム描画処理完了`);
+      } else {
+        console.log(`🌟 前のコマンドがないため、リアルタイム描画をスキップ`);
       }
       
+      console.log(`🌟 パス完了タイマー設定開始`);
       // パス完了タイマーを設定（500ms後に完了とみなす）
       if (normalPathTimers[writerId]) {
         clearTimeout(normalPathTimers[writerId]);
       }
       normalPathTimers[writerId] = setTimeout(() => {
-        finishNormalPath(writerId);
+        // finishNormalPath(writerId); // この関数が存在しないためコメントアウト
+        console.log(`🌟 パス完了タイマー実行（関数が存在しないためスキップ）: ${writerId}`);
       }, 500);
+      console.log(`🌟 パス完了タイマー設定完了`);
     }
+    console.log(`🌟 色分岐処理完了 - 次の処理へ`);
     
     // 🎯 move描画での描画エリア内判定
+    console.log(`🌟 描画エリア内判定処理開始`);
     const finalX = areaLeft + scaledX;
     const finalY = areaTop + scaledY;
-    const isInDrawingArea = (finalX >= areaLeft && finalX <= areaLeft + drawingAreaSize.width &&
-                            finalY >= areaTop && finalY <= areaTop + drawingAreaSize.height);
-    const areaStatus = isInDrawingArea ? '✅ エリア内' : '❌ エリア外';
+    // 🔥 エリア判定を一時的に無効化（座標問題解決のため）
+    const isInDrawingArea = true; // 強制的にエリア内扱い
+    const realAreaCheck = (finalX >= areaLeft && finalX <= areaLeft + drawingAreaSize.width &&
+                          finalY >= areaTop && finalY <= areaTop + drawingAreaSize.height);
+    const areaStatus = realAreaCheck ? '✅ エリア内' : '❌ エリア外(無効化)';
     console.log(`🎯 MOVE描画位置判定: ${areaStatus} 位置(${finalX.toFixed(1)}, ${finalY.toFixed(1)}) エリア範囲: ${areaLeft.toFixed(1)}-${(areaLeft + drawingAreaSize.width).toFixed(1)}, ${areaTop.toFixed(1)}-${(areaTop + drawingAreaSize.height).toFixed(1)}`);
     
     // 星エフェクトが有効で受信側に星を表示（2回に1回の頻度）
-    if (data.starEffect && Math.random() < 0.5) {
-      // 180度回転を考慮した座標変換
-      const canvasRect = canvas.getBoundingClientRect();
-      // 180度回転後の座標を計算
-      const rotatedX = canvas.width - (areaLeft + scaledX);
-      const rotatedY = canvas.height - (areaTop + scaledY);
-      const pageX = canvasRect.left + rotatedX;
-      const pageY = canvasRect.top + rotatedY;
-      // //console.log(`⭐ draw時に星エフェクト(180度回転): canvas(${scaledX}, ${scaledY}) -> rotated(${rotatedX}, ${rotatedY}) -> page(${pageX}, ${pageY})`);
+    console.log(`🌟 星エフェクト処理ブロックに到達 - WriterID: ${writerId}, starEffect=${data.starEffect}`);
+    const shouldCreateStar = data.starEffect && Math.random() < 0.5;
+    console.log(`⭐ 星エフェクトチェック: starEffect=${data.starEffect}, 判定=${shouldCreateStar}`);
+    if (shouldCreateStar) {
+      console.log(`🌟 星を生成します！ 位置: finalX=${finalX}, finalY=${finalY}`);
+      
+      // 🔧 ペン描画座標系を使用（processDrawingForBack2と同じ変換）
+      const back2Canvas = document.getElementById('back2Canvas') || drawCanvas;
+      const currentCanvasWidth = back2Canvas.width;
+      const currentCanvasHeight = back2Canvas.height;
+      
+      // 書き手側座標を受信側キャンバスサイズにスケール変換
+      const writerCanvasWidth = currentWriterCanvasSize.width;
+      const writerCanvasHeight = currentWriterCanvasSize.height;
+      const scaledPenX = (data.x / writerCanvasWidth) * currentCanvasWidth;
+      const scaledPenY = (data.y / writerCanvasHeight) * currentCanvasHeight;
+      
+      // 180度回転を適用（processDrawingForBack2と同じ）
+      const rotatedPenX = currentCanvasWidth - scaledPenX;
+      const rotatedPenY = currentCanvasHeight - scaledPenY;
+      
+      // back2Canvasの位置を取得してページ座標に変換
+      const back2Rect = back2Canvas.getBoundingClientRect();
+      const pageX = back2Rect.left + rotatedPenX;
+      const pageY = back2Rect.top + rotatedPenY;
+      
+      console.log(`🔧 星エフェクト座標修正: 送信(${data.x.toFixed(1)}, ${data.y.toFixed(1)}) -> ペン座標(${pageX.toFixed(1)}, ${pageY.toFixed(1)})`);
+      
       createReceiverStar(pageX, pageY);
+      // console.log(`🌟 createReceiverStar関数を呼び出しました！`);
     }
     
-    // 妖精の粉エフェクトが有効で受信側に妖精の粉を表示（テスト用：毎回表示）
-    // //console.log(`✨ draw時妖精の粉チェック: fairyDustEffectEnabled=${fairyDustEffectEnabled}`);
-    if (fairyDustEffectEnabled) {
-      // 180度回転を考慮した座標変換
-      const canvasRect = canvas.getBoundingClientRect();
-      // 180度回転後の座標を計算
-      const rotatedX = canvas.width - (areaLeft + scaledX);
-      const rotatedY = canvas.height - (areaTop + scaledY);
-      const pageX = canvasRect.left + rotatedX;
-      const pageY = canvasRect.top + rotatedY;
-      // //console.log(`✨ draw時に妖精の粉エフェクト(180度回転): canvas(${scaledX}, ${scaledY}) -> rotated(${rotatedX}, ${rotatedY}) -> page(${pageX}, ${pageY})`);
+    // 妖精の粉エフェクトが有効で受信側に妖精の粉を表示
+    console.log(`✨ 妖精の粉チェック: fairyDustEffect=${data.fairyDustEffect} (書き手側チェックボックスの状態)`);
+    if (data.fairyDustEffect) {
+      // 🔧 ペン描画座標系を使用（processDrawingForBack2と同じ変換）
+      const back2Canvas = document.getElementById('back2Canvas') || drawCanvas;
+      const currentCanvasWidth = back2Canvas.width;
+      const currentCanvasHeight = back2Canvas.height;
+      
+      // 書き手側座標を受信側キャンバスサイズにスケール変換
+      const writerCanvasWidth = currentWriterCanvasSize.width;
+      const writerCanvasHeight = currentWriterCanvasSize.height;
+      const scaledPenX = (data.x / writerCanvasWidth) * currentCanvasWidth;
+      const scaledPenY = (data.y / writerCanvasHeight) * currentCanvasHeight;
+      
+      // 180度回転を適用（processDrawingForBack2と同じ）
+      const rotatedPenX = currentCanvasWidth - scaledPenX;
+      const rotatedPenY = currentCanvasHeight - scaledPenY;
+      
+      // back2Canvasの位置を取得してページ座標に変換
+      const back2Rect = back2Canvas.getBoundingClientRect();
+      const pageX = back2Rect.left + rotatedPenX;
+      const pageY = back2Rect.top + rotatedPenY;
+      console.log(`🔧 妖精エフェクト座標修正: 送信(${data.x.toFixed(1)}, ${data.y.toFixed(1)}) -> ペン座標(${pageX.toFixed(1)}, ${pageY.toFixed(1)})`);
       createReceiverFairyDust(pageX, pageY);
     }
     
     // ハートエフェクトが有効で受信側にハートを表示（4回に1回の頻度）
-    // //console.log(`💖 draw時ハートチェック: heartEffectEnabled=${heartEffectEnabled}`);
-    if (heartEffectEnabled && Math.random() < 0.25) {
-      // 180度回転を考慮した座標変換
-      const canvasRect = canvas.getBoundingClientRect();
-      // 180度回転後の座標を計算
-      const rotatedX = canvas.width - (areaLeft + scaledX);
-      const rotatedY = canvas.height - (areaTop + scaledY);
-      const pageX = canvasRect.left + rotatedX;
-      const pageY = canvasRect.top + rotatedY;
-      // //console.log(`💖 draw時にハートエフェクト(180度回転): canvas(${scaledX}, ${scaledY}) -> rotated(${rotatedX}, ${rotatedY}) -> page(${pageX}, ${pageY})`);
+    console.log(`💖 ハートチェック: heartEffect=${data.heartEffect} (書き手側チェックボックスの状態)`);
+    if (data.heartEffect && Math.random() < 0.25) {
+      // 🔧 ペン描画座標系を使用（processDrawingForBack2と同じ変換）
+      const back2Canvas = document.getElementById('back2Canvas') || drawCanvas;
+      const currentCanvasWidth = back2Canvas.width;
+      const currentCanvasHeight = back2Canvas.height;
+      
+      // 書き手側座標を受信側キャンバスサイズにスケール変換
+      const writerCanvasWidth = currentWriterCanvasSize.width;
+      const writerCanvasHeight = currentWriterCanvasSize.height;
+      const scaledPenX = (data.x / writerCanvasWidth) * currentCanvasWidth;
+      const scaledPenY = (data.y / writerCanvasHeight) * currentCanvasHeight;
+      
+      // 180度回転を適用（processDrawingForBack2と同じ）
+      const rotatedPenX = currentCanvasWidth - scaledPenX;
+      const rotatedPenY = currentCanvasHeight - scaledPenY;
+      
+      // back2Canvasの位置を取得してページ座標に変換
+      const back2Rect = back2Canvas.getBoundingClientRect();
+      const pageX = back2Rect.left + rotatedPenX;
+      const pageY = back2Rect.top + rotatedPenY;
+      console.log(`🔧 ハートエフェクト座標修正: 送信(${data.x.toFixed(1)}, ${data.y.toFixed(1)}) -> ペン座標(${pageX.toFixed(1)}, ${pageY.toFixed(1)})`);
       createReceiverHeart(pageX, pageY);
     }
     

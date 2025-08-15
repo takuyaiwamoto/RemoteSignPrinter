@@ -239,13 +239,13 @@
     
     /* 受信側星エフェクト用のCSSアニメーション */
     .star {
-      position: absolute;
+      position: fixed;
       width: 16px;
       height: 16px;
       background: gold;
       pointer-events: none;
       animation: starTwinkle 1s ease-out forwards;
-      z-index: 10;
+      z-index: 20000;
       clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
     }
     .receiver-drawing-heart::before,
