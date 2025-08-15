@@ -1160,6 +1160,38 @@ function processMessage(data) {
       
       // console.log('🧹 他の書き手からのクリア指示で完全クリア完了');
     }
+  } else if (data.type === "clearWriter") {
+    // 🔧【追加】特定の書き手の描画だけをクリア
+    const writerId = data.writerId;
+    
+    // 自分が送信者でない場合のみ処理
+    if (writerId !== myWriterId) {
+      console.log(`🧹 書き手(${writerId})の描画クリア指示を受信`);
+      
+      // 該当書き手の描画データをクリア
+      if (otherWritersData[writerId]) {
+        delete otherWritersData[writerId];
+        console.log(`🧹 ${writerId}の描画データを削除`);
+      }
+      
+      // キャンバスを再描画（背景 + 残った描画）
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (backgroundImage) {
+        drawBackgroundImage(ctx, backgroundImage, canvas);
+      }
+      
+      // 再描画（自分の描画 + 他の書き手の描画）
+      if (window.clearWriterRedrawTimeout) {
+        clearTimeout(window.clearWriterRedrawTimeout);
+      }
+      
+      window.clearWriterRedrawTimeout = setTimeout(() => {
+        redrawCanvasWithOthers();
+        window.clearWriterRedrawTimeout = null;
+      }, 10);
+      
+      console.log(`✅ ${writerId}の描画クリア完了`);
+    }
   } else if (data.type === "globalSend") {
     // 他の書き手からの送信実行（自分が送信者でない場合のみ処理）
     if (data.writerId !== myWriterId) {

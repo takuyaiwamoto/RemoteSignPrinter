@@ -3661,8 +3661,17 @@ function handleMessage(data) {
     
     console.log('🧹 受信側：globalClear処理開始');
     
-    // 全ての執筆者データを完全クリア
-    // 描画データクリア処理は削除済み
+    // 🔧【修正】Writer別描画データを完全クリア
+    if (typeof writerDrawingData !== 'undefined') {
+      writerDrawingData = {};
+      console.log('🧹 writerDrawingDataを完全クリア');
+    }
+    
+    // 🔧【修正】共通描画データもクリア
+    if (typeof drawingData !== 'undefined') {
+      drawingData = [];
+      console.log('🧹 drawingDataを完全クリア');
+    }
     
     // writer管理データもクリア
     if (typeof writerLastSeen !== 'undefined') {
@@ -3682,8 +3691,13 @@ function handleMessage(data) {
       console.log('🧹 otherWritersDataクリア');
     }
     
-    console.log('🧹 受信側：globalClear全執筆者データを完全クリア');
-    // 再描画処理は削除済み;
+    // 🔧【修正】実際のキャンバスをクリア
+    if (drawCanvas && drawCtx) {
+      drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      console.log('🧹 描画キャンバスを完全クリア');
+    }
+    
+    console.log('🧹 受信側：globalClear全執筆者データとキャンバスを完全クリア');
   } else if (data.type === "clearWriter") {
     // アニメーション中はclearWriterを無視
     if (isAnimationInProgress) {
@@ -3695,14 +3709,19 @@ function handleMessage(data) {
     const writerId = data.writerId;
     console.log(`🧹 書き手(${writerId})の描画だけクリア指示受信`);
     
-    // 該当WriterIDのデータのみクリア
-    if ({}[writerId]) {
-      {}[writerId] = [];
-      console.log(`🧹 Writer ${writerId} のデータをクリア`);
+    // 🔧【修正】Writer別描画データをクリア
+    if (writerDrawingData[writerId]) {
+      writerDrawingData[writerId] = [];
+      console.log(`🧹 Writer ${writerId} の描画データをクリア`);
     }
     
-    // 統合データからも該当WriterIDのデータを削除（処理は削除済み）
-    console.log(`🧹 統合データから Writer ${writerId} のデータを削除`);
+    // 🔧【修正】共通描画データから該当WriterIDのデータを削除
+    if (drawingData && drawingData.length > 0) {
+      const beforeCount = drawingData.length;
+      drawingData = drawingData.filter(item => item.writerId !== writerId);
+      const removedCount = beforeCount - drawingData.length;
+      console.log(`🧹 共通データから Writer ${writerId} のデータ ${removedCount}件を削除`);
+    }
     
     // WriterID別状態管理もクリア
     if (writerPathStates[writerId]) {
@@ -3714,8 +3733,50 @@ function handleMessage(data) {
       console.log(`🧹 Writer ${writerId} のパス状態をリセット`);
     }
     
-    // キャンバスを再描画
-    // 再描画処理は削除済み;
+    // 🔧【修正】キャンバスを再描画（残った描画のみ表示）
+    if (drawCanvas && drawCtx) {
+      // キャンバスをクリア
+      drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      
+      // 残ったWriterの描画を再描画
+      Object.keys(writerDrawingData).forEach(wid => {
+        if (wid !== writerId && writerDrawingData[wid].length > 0) {
+          // Writer別に描画処理を実行
+          writerDrawingData[wid].forEach((cmd, index) => {
+            if (index > 0 && cmd.type === 'draw') {
+              const prevCmd = writerDrawingData[wid][index - 1];
+              if (prevCmd && (prevCmd.type === 'start' || prevCmd.type === 'draw')) {
+                // 座標変換と描画
+                const currentCanvasWidth = drawCanvas.width;
+                const currentCanvasHeight = drawCanvas.height;
+                const writerCanvasWidth = cmd.canvasSize?.width || initialBack2Size.width;
+                const writerCanvasHeight = cmd.canvasSize?.height || initialBack2Size.height;
+                
+                const prevX = (prevCmd.x / writerCanvasWidth) * currentCanvasWidth;
+                const prevY = (prevCmd.y / writerCanvasHeight) * currentCanvasHeight;
+                const currX = (cmd.x / writerCanvasWidth) * currentCanvasWidth;
+                const currY = (cmd.y / writerCanvasHeight) * currentCanvasHeight;
+                
+                // 180度回転を適用
+                const rotatedPrevX = currentCanvasWidth - prevX;
+                const rotatedPrevY = currentCanvasHeight - prevY;
+                const rotatedCurrX = currentCanvasWidth - currX;
+                const rotatedCurrY = currentCanvasHeight - currY;
+                
+                drawRotatedStroke(
+                  rotatedPrevX, rotatedPrevY,
+                  rotatedCurrX, rotatedCurrY,
+                  cmd.color || '#000000',
+                  cmd.thickness || 2
+                );
+              }
+            }
+          });
+        }
+      });
+      console.log('🔄 キャンバス再描画完了（残った描画のみ）');
+    }
+    
     console.log(`✅ Writer ${writerId} の描画クリア完了`);
   } else if (data.type === "globalSend") {
     // 書き手からの送信指示
