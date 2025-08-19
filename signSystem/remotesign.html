@@ -800,21 +800,22 @@
       
       /* 📱 縦向きタブレット用右サイドバーを横列に変更 */
       .right-sidebar {
-        flex-direction: row !important;
-        gap: 30px !important;
+        flex-direction: column !important;
+        gap: 50px !important; /* 色と太さの間に50pxの間隔 */
         justify-content: center !important;
+        align-items: center !important;
         width: 100% !important;
-        margin-top: 20px !important;
+        margin-top: 30px !important; /* clearボタンから下に30px */
       }
       
       .pen-colors-vertical, .pen-thickness-vertical {
         flex-direction: row !important; /* 縦列から横列に変更 */
         gap: 15px !important;
+        align-items: center !important;
       }
       
       .pen-colors-vertical h4, .pen-thickness-vertical h4 {
-        margin-bottom: 10px !important;
-        margin-right: 15px !important;
+        margin: 0 15px 0 0 !important;
       }
       
       .button-group:has(button[onclick*="setBackground"]) button {
