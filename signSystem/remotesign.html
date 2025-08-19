@@ -1771,7 +1771,7 @@ function createWriterStatusDiv() {
   
   // Version情報を表示
   const versionSpan = document.createElement('span');
-  versionSpan.textContent = 'v3.3-light (Redmi軽量化段階2)';
+  versionSpan.textContent = 'v3.5-light (Redmi軽量化段階4)';
   versionSpan.style.cssText = `
     display: block;
     color: #FFD700;
@@ -4281,7 +4281,8 @@ canvas.addEventListener("mousemove", (e) => {
   
   // 補間処理：前の位置から現在の位置までの距離を計算
   if (lastPosition) {
-    const distance = Math.sqrt(Math.pow(x - lastPosition.x, 2) + Math.pow(y - lastPosition.y, 2));
+    // マンハッタン距離で高速化（描画品質はほぼ同等）
+    const distance = Math.abs(x - lastPosition.x) + Math.abs(y - lastPosition.y);
     
     // 距離が大きい場合は中間点を補間
     if (distance > 3) {
