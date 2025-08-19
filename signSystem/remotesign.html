@@ -1082,22 +1082,23 @@ let performanceOptimizer = {
   lastTouchTime: 0,
   pendingEffects: [],
   effectAnimationId: null,
-  THROTTLE_INTERVAL: 16, // 60fps相当
+  MOUSE_THROTTLE_INTERVAL: 16, // PC用: 60fps相当
+  TOUCH_THROTTLE_INTERVAL: 4,  // Redmi Pad 2用: 360Hz→240Hz相当（250fps）
   
-  // マウスイベントのスロットリングチェック
+  // マウスイベントのスロットリングチェック（PC用）
   shouldProcessMouseEvent() {
     const now = Date.now();
-    if (now - this.lastMouseTime < this.THROTTLE_INTERVAL) {
+    if (now - this.lastMouseTime < this.MOUSE_THROTTLE_INTERVAL) {
       return false;
     }
     this.lastMouseTime = now;
     return true;
   },
   
-  // タッチイベントのスロットリングチェック
+  // タッチイベントのスロットリングチェック（Redmi Pad 2最適化）
   shouldProcessTouchEvent() {
     const now = Date.now();
-    if (now - this.lastTouchTime < this.THROTTLE_INTERVAL) {
+    if (now - this.lastTouchTime < this.TOUCH_THROTTLE_INTERVAL) {
       return false;
     }
     this.lastTouchTime = now;
