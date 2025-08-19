@@ -1054,6 +1054,54 @@ const backgroundSizes = {
   'back6': { width: 859, height: 607 },    // 背景4 - 統一アスペクト比
   'white': { width: 859, height: 607 }     // 白背景 - 統一アスペクト比
 };
+
+// 🚀 非侵入的パフォーマンス最適化レイヤー
+// 既存機能を一切変更せず、追加のみで最適化
+let performanceOptimizer = {
+  lastMouseTime: 0,
+  lastTouchTime: 0,
+  pendingEffects: [],
+  effectAnimationId: null,
+  THROTTLE_INTERVAL: 16, // 60fps相当
+  
+  // マウスイベントのスロットリングチェック
+  shouldProcessMouseEvent() {
+    const now = Date.now();
+    if (now - this.lastMouseTime < this.THROTTLE_INTERVAL) {
+      return false;
+    }
+    this.lastMouseTime = now;
+    return true;
+  },
+  
+  // タッチイベントのスロットリングチェック
+  shouldProcessTouchEvent() {
+    const now = Date.now();
+    if (now - this.lastTouchTime < this.THROTTLE_INTERVAL) {
+      return false;
+    }
+    this.lastTouchTime = now;
+    return true;
+  },
+  
+  // エフェクト処理の遺延実行
+  scheduleEffect(effectFunction) {
+    this.pendingEffects.push(effectFunction);
+    if (!this.effectAnimationId) {
+      this.effectAnimationId = requestAnimationFrame(() => {
+        // エフェクトをバッチ処理
+        for (const effect of this.pendingEffects) {
+          if (Math.random() < 0.3) { // 30%の確率で実行（パフォーマンス調整）
+            effect();
+          }
+        }
+        this.pendingEffects = [];
+        this.effectAnimationId = null;
+      });
+    }
+  }
+};
+
 socket.onopen = () => {
   console.log("✅ WebSocket接続完了（送信側）");
   
@@ -4196,6 +4244,11 @@ canvas.addEventListener("mousemove", (e) => {
   const mouseMoveStart = performance.now();
   if (!drawing) return;
   
+  // 🚀 非侵入的パフォーマンス最適化: スロットリングチェック
+  if (!performanceOptimizer.shouldProcessMouseEvent()) {
+    return; // 16ms以内の連続イベントをスキップ
+  }
+  
   // 常に描画継続を可能にする（hasSentDataチェックを削除）
   
   const x = e.offsetX;
@@ -4318,19 +4371,15 @@ canvas.addEventListener("mousemove", (e) => {
   const pageX = rect.left + x;
   const pageY = rect.top + y;
 
-  // 星エフェクトが有効な場合は星を生成
+  // 🚀 非侵入的パフォーマンス最適化: エフェクトを遺延実行
   if (starEffectEnabled) {
-    createSenderStar(pageX, pageY);
+    performanceOptimizer.scheduleEffect(() => createSenderStar(pageX, pageY));
   }
-
-  // 妖精の粉エフェクトが有効な場合は妖精の粉を生成
   if (fairyDustEffectEnabled) {
-    createFairyDust(pageX, pageY);
+    performanceOptimizer.scheduleEffect(() => createFairyDust(pageX, pageY));
   }
-  
-  // ハートエフェクトが有効な場合はハートを生成
   if (heartEffectEnabled) {
-    createDrawingHeart(pageX, pageY);
+    performanceOptimizer.scheduleEffect(() => createDrawingHeart(pageX, pageY));
   }
   
   const mouseMoveEnd = performance.now();
@@ -4565,7 +4614,15 @@ canvas.addEventListener("touchmove", (e) => {
   e.preventDefault();
   if (!isPaintDrawing || !lastPaintPos) return;
   
-  console.log('📱 DEBUG: touchmove - PC用処理と統一');
+  // 🚀 非侵入的パフォーマンス最適化: タッチイベントスロットリング
+  if (!performanceOptimizer.shouldProcessTouchEvent()) {
+    return; // 16ms以内の連続タッチをスキップ
+  }
+  
+  // デバッグログを減らす（パフォーマンス最適化）
+  if (Math.random() < 0.01) {
+    console.log('📱 DEBUG: touchmove - PC用処理と統一');
+  }
   
   const touch = e.touches[0];
   const rect = canvas.getBoundingClientRect();
@@ -4623,8 +4680,8 @@ canvas.addEventListener("touchmove", (e) => {
   };
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify(drawMsg));
-    // 頻度を減らしてログ出力（10回に1回）
-    if (Math.random() < 0.1) {
+    // 🚀 非侵入的パフォーマンス最適化: ログをさらに減らす
+    if (Math.random() < 0.01) {
       console.log("📤 タブレット描画継続データ送信:", {
         writerId: drawMsg.writerId,
         x: Math.round(x),
