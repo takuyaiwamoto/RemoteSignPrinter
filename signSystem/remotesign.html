@@ -1083,7 +1083,7 @@ let performanceOptimizer = {
   pendingEffects: [],
   effectAnimationId: null,
   MOUSE_THROTTLE_INTERVAL: 16, // PC用: 60fps相当
-  TOUCH_THROTTLE_INTERVAL: 4,  // Redmi Pad 2用: 360Hz→240Hz相当（250fps）
+  TOUCH_THROTTLE_INTERVAL: 8,  // Redmi Pad 2軽量化: 360Hz→120Hz相当（125fps）
   
   // マウスイベントのスロットリングチェック（PC用）
   shouldProcessMouseEvent() {
