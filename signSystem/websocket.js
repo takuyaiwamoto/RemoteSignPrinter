@@ -216,7 +216,9 @@ function processMessage(data) {
     }
   } else if (data.type === "heartEffect") {
     // ハートエフェクト指示受信
-    createHeart();
+    if (heartEffectEnabled) {
+      createHeart();
+    }
   } else if (data.type === "specialHeartEffect") {
     // 特別ハートエフェクト指示受信
     createSpecialHeart();
@@ -399,7 +401,7 @@ function createWriterStatusDiv() {
   
   // Version情報を表示
   const versionSpan = document.createElement('span');
-  versionSpan.textContent = 'v3.8-quiet (描画ログ削除版)';
+  versionSpan.textContent = 'v3.8-integrated (統合最適化版)';
   versionSpan.style.cssText = `
     display: block;
     color: #FFD700;

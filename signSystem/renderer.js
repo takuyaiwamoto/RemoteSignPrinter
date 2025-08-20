@@ -811,8 +811,10 @@ document.addEventListener('keydown', function(event) {
       triggerSpecialEffect();
       lKeyPressCount = 0; // カウントリセット
     } else {
-      // 通常のハートエフェクト
-      createHeart();
+      // 通常のハートエフェクト（チェックボックスがONの場合のみ）
+      if (heartEffectEnabled) {
+        createHeart();
+      }
       
       // 🎵 poyo.mp3を再生
       const poyoAudio = new Audio('./poyo.mp3');

@@ -1,0 +1,42 @@
+/* ===================================
+   基本レイアウト・共通スタイル
+   =================================== */
+
+/* ベース設定 */
+body {
+  margin: 0;
+  padding: 0;
+  background: #f0f0f0;
+  font-family: Arial, sans-serif;
+}
+
+#container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* キャンバス設定 */
+canvas {
+  display: block;
+  margin: auto;
+  max-width: 90vw;
+  max-height: 75vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+/* バージョン情報表示 */
+#versionInfo {
+  position: fixed;
+  top: 10px;
+  right: 120px;
+  z-index: 15000;
+  background: rgba(0,0,0,0.8);
+  color: #FFD700;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+}

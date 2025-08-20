@@ -100,6 +100,14 @@ window.addEventListener('DOMContentLoaded', () => {
     }, 2000);
     
   }, 500); // WebSocket接続を待つため少し遅延
+  
+  // 🎨 描画エンジンの初期化
+  if (typeof initializeDrawingEngine === 'function') {
+    initializeDrawingEngine();
+    console.log('✅ 描画エンジンが初期化されました');
+  } else {
+    console.error('❌ 描画エンジンが読み込まれていません');
+  }
 });
 
 // ==========================================
