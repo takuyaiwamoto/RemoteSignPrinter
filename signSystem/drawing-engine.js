@@ -301,9 +301,11 @@ function initializeDrawingEngine() {
   const canvasElement = document.getElementById('drawCanvas');
   
   if (!canvasElement) {
-    console.error('描画キャンバスが見つかりません');
+    console.error('❌ 描画キャンバスが見つかりません');
     return false;
   }
+  
+  console.log('🎨 描画エンジン初期化開始:', canvasElement);
 
   // マウスイベントリスナー
   canvasElement.addEventListener('mousedown', (e) => {
@@ -375,6 +377,20 @@ function initializeDrawingEngine() {
     handleDrawingEnd();
   });
 
-  console.log('描画エンジンが初期化されました');
+  console.log('✅ 描画エンジンが初期化されました (タッチ/マウス対応)');
   return true;
+}
+
+// ページ読み込み完了時に自動初期化
+if (typeof window !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('🚀 DOMContentLoaded: 描画エンジン自動初期化');
+      initializeDrawingEngine();
+    });
+  } else {
+    // 既にDOMが読み込まれている場合
+    console.log('🚀 DOM Ready: 描画エンジン即座に初期化');
+    initializeDrawingEngine();
+  }
 }
