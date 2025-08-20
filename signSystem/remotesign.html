@@ -118,9 +118,9 @@
   
   <div class="button-group">
     <label>エフェクト:</label>
-    <input type="checkbox" id="starEffect" checked onchange="toggleStarEffect()">
+    <input type="checkbox" id="starEffect" onchange="toggleStarEffect()">
     <label for="starEffect">星</label>
-    <input type="checkbox" id="fairyDustEffect" onchange="toggleFairyDustEffect()" checked>
+    <input type="checkbox" id="fairyDustEffect" onchange="toggleFairyDustEffect()">
     <label for="fairyDustEffect">妖精の粉</label>
     <input type="checkbox" id="heartEffect" onchange="toggleHeartEffect()">
     <label for="heartEffect">💖 ハート</label>
@@ -210,8 +210,8 @@ let currentPath = []; // 現在のストロークのポイント配列
 // ベジェ曲線補間用の点履歴
 let pointHistory = []; // 最新3点を保持してベジェ曲線を描画
 const MAX_POINT_HISTORY = 3; // 保持する点の最大数
-let starEffectEnabled = true; // 星エフェクトの有効/無効（標準でON）
-let fairyDustEffectEnabled = true; // 妖精の粉エフェクトの有効/無効（標準でON）
+let starEffectEnabled = false; // 星エフェクトの有効/無効（標準でOFF）
+let fairyDustEffectEnabled = false; // 妖精の粉エフェクトの有効/無効（標準でOFF）
 let heartEffectEnabled = false; // ハートエフェクトの有効/無効（標準でOFF）
 let penSoundEnabled = false; // ペン音の有効/無効（標準でOFF）
 let specialBackgroundState = 'ready'; // 'ready', 'door_shown', 'door_opened'
