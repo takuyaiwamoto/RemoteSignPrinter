@@ -1,0 +1,224 @@
+// print-save.js - 印刷・保存関連の機能を分離
+// 元ファイル: remotesign.html
+// 分離日: 2025-08-20
+
+// ==========================================
+// 画像保存関数群
+// ==========================================
+
+// 🖼️ 180度回転画像保存関数
+function saveRotatedImage() {
+  
+  try {
+    // 最終的な画像用のcanvasを作成
+    const finalCanvas = document.createElement('canvas');
+    const finalCtx = finalCanvas.getContext('2d');
+    finalCanvas.width = canvas.width;
+    finalCanvas.height = canvas.height;
+    
+    // 1. 背景を先に描画（回転させない）
+    if (backgroundImage) {
+      finalCtx.drawImage(backgroundImage, 0, 0, finalCanvas.width, finalCanvas.height);
+    } else {
+      // 白背景で塗りつぶし
+      finalCtx.fillStyle = '#ffffff';
+      finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+    }
+    
+    // 2. ペイントデータのみを180度回転させて描画
+    if (drawingCommands.length > 0) {
+      
+      // 180度回転変換を適用
+      finalCtx.save();
+      finalCtx.translate(finalCanvas.width, finalCanvas.height);
+      finalCtx.rotate(Math.PI);
+      
+      // 描画コマンドを実行（座標は元のまま、キャンバスが回転している）
+      drawingCommands.forEach(cmd => {
+        if (cmd.type === 'start') {
+          finalCtx.beginPath();
+          finalCtx.moveTo(cmd.x, cmd.y);
+        } else if (cmd.type === 'draw') {
+          finalCtx.lineWidth = cmd.thickness || 8;
+          finalCtx.strokeStyle = cmd.color || 'black';
+          finalCtx.lineTo(cmd.x, cmd.y);
+          finalCtx.stroke();
+        }
+      });
+      
+      finalCtx.restore();
+    } else {
+      alert('保存できる描画がありません');
+      return;
+    }
+    
+    // ファイル名に現在時刻を含める
+    const now = new Date();
+    const timestamp = now.toISOString().slice(0, 19).replace(/[:-]/g, '').replace('T', '_');
+    const filename = `rotated_drawing_${timestamp}.png`;
+    
+    // 保存処理
+    finalCanvas.toBlob(function(blob) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      alert(`180度回転画像を ${filename} として保存しました`);
+    }, 'image/png');
+    
+  } catch (error) {
+    console.error('❌ 180度回転画像保存エラー:', error);
+    alert('画像の保存に失敗しました: ' + error.message);
+  }
+}
+
+// 🖼️ 360度回転画像保存関数
+function saveDoubleRotatedImage() {
+  
+  try {
+    // 最終的な画像用のcanvasを作成
+    const finalCanvas = document.createElement('canvas');
+    const finalCtx = finalCanvas.getContext('2d');
+    finalCanvas.width = canvas.width;
+    finalCanvas.height = canvas.height;
+    
+    // 1. 背景を先に描画（回転させない）
+    if (backgroundImage) {
+      finalCtx.drawImage(backgroundImage, 0, 0, finalCanvas.width, finalCanvas.height);
+    } else {
+      // 白背景で塗りつぶし
+      finalCtx.fillStyle = '#ffffff';
+      finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+    }
+    
+    // 2. ペイントデータのみを360度回転させて描画（つまり元の向き）
+    if (drawingCommands.length > 0) {
+      
+      // 360度回転 = 元の向きなので、変換なしで描画
+      drawingCommands.forEach(cmd => {
+        if (cmd.type === 'start') {
+          finalCtx.beginPath();
+          finalCtx.moveTo(cmd.x, cmd.y);
+        } else if (cmd.type === 'draw') {
+          finalCtx.lineWidth = cmd.thickness || 8;
+          finalCtx.strokeStyle = cmd.color || 'black';
+          finalCtx.lineTo(cmd.x, cmd.y);
+          finalCtx.stroke();
+        }
+      });
+      
+    } else {
+      alert('保存できる描画がありません');
+      return;
+    }
+    
+    // ファイル名に現在時刻を含める
+    const now = new Date();
+    const timestamp = now.toISOString().slice(0, 19).replace(/[:-]/g, '').replace('T', '_');
+    const filename = `normal_drawing_${timestamp}.png`;
+    
+    // 保存処理
+    finalCanvas.toBlob(function(blob) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      alert(`通常向き画像を ${filename} として保存しました`);
+    }, 'image/png');
+    
+  } catch (error) {
+    console.error('❌ 通常向き画像保存エラー:', error);
+    alert('画像の保存に失敗しました: ' + error.message);
+  }
+}
+
+// ==========================================
+// 印刷処理関数群
+// ==========================================
+
+// 🖨️ 実際の印刷処理関数
+function actualPrintProcess() {
+  try {
+    // 新しいcanvasを作成（taintedにならないように）
+    const cleanCanvas = document.createElement('canvas');
+    const cleanCtx = cleanCanvas.getContext('2d');
+    cleanCanvas.width = canvas.width;
+    cleanCanvas.height = canvas.height;
+    
+    // 白背景で塗りつぶし（背景画像は使わない）
+    cleanCtx.fillStyle = '#ffffff';
+    cleanCtx.fillRect(0, 0, cleanCanvas.width, cleanCanvas.height);
+    
+    // 保存された描画コマンドを再実行（360度回転 = 元の向き）
+    if (drawingCommands.length > 0) {
+      
+      // 描画コマンドを実行（回転なし = 元の向き）
+      drawingCommands.forEach(cmd => {
+        if (cmd.type === 'start') {
+          cleanCtx.beginPath();
+          cleanCtx.moveTo(cmd.x, cmd.y);
+        } else if (cmd.type === 'draw') {
+          cleanCtx.lineWidth = cmd.thickness || 8;
+          cleanCtx.strokeStyle = cmd.color || 'black';
+          cleanCtx.lineTo(cmd.x, cmd.y);
+          cleanCtx.stroke();
+        }
+      });
+      
+    } else {
+      alert('印刷できる描画がありません');
+      return;
+    }
+    
+    // 印刷用の新しいウィンドウを作成
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>印刷用画像</title>
+          <style>
+            body { margin: 0; text-align: center; }
+            img { max-width: 100%; height: auto; }
+            @media print {
+              body { margin: 0; }
+              img { max-width: 100%; height: auto; }
+            }
+          </style>
+        </head>
+        <body>
+          <img src="${cleanCanvas.toDataURL()}" alt="描画画像"/>
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    
+    // ウィンドウが完全に読み込まれてから印刷ダイアログを表示
+    printWindow.onload = function() {
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    };
+    
+    alert('印刷ダイアログが開きます');
+    
+  } catch (error) {
+    console.error('❌ 印刷処理エラー:', error);
+    alert('印刷処理に失敗しました: ' + error.message);
+  }
+}
+
+// ==========================================
+// デバッグ用：ファイルが正しく読み込まれたことを確認
+// ==========================================
+console.log('✅ print-save.js loaded successfully');
