@@ -5,6 +5,296 @@ const crypto = require("crypto");
 // 🔸 拡大率を設定 (デフォルト4.0倍、ポスター時は2.4倍=A4の60%)
 let SCALE_FACTOR = 4.0;
 
+// 🎬 背景5用動画再生システム
+let videoZIndex = 5;          // 動画のz-index（文字の下）
+let textZIndex = 10;          // 文字のz-index（動画の上）
+let currentVideoElement = null; // 現在再生中の動画要素
+let videoPattern = 1;         // 動画パターン（1:回転, 2:フェード）
+let currentMusicElement = null; // 現在再生中の音楽要素
+let musicVolume = 0.5;        // 音楽のボリューム（0.0〜1.0）
+
+// 🎵 背景5用音楽再生
+function playBackgroundMusic() {
+  if (!window.isDevWhiteBackground) {
+    console.log('🎵 背景5以外では音楽再生しません');
+    return;
+  }
+  
+  // 既存の音楽要素があれば削除
+  if (currentMusicElement) {
+    currentMusicElement.pause();
+    currentMusicElement.remove();
+    currentMusicElement = null;
+  }
+  
+  // 音楽要素を作成
+  const music = document.createElement('audio');
+  music.src = './enoguMusic.mp4';
+  music.volume = musicVolume;
+  music.loop = false; // 1回のみ再生
+  
+  console.log(`🎵 音楽再生開始: enoguMusic.mp4, 音量: ${musicVolume}`);
+  
+  // 音楽再生開始
+  music.play().catch(error => {
+    console.error('🎵 音楽再生失敗:', error);
+  });
+  
+  currentMusicElement = music;
+  
+  // 音楽終了時のログ
+  music.addEventListener('ended', () => {
+    console.log('🎵 音楽再生終了');
+  });
+  
+  return music;
+}
+
+// 🎬 背景5用動画要素を作成
+function createVideoElement() {
+  // 既存の動画要素があれば削除
+  if (currentVideoElement) {
+    currentVideoElement.remove();
+    currentVideoElement = null;
+  }
+  
+  // 白背景キャンバスが表示されているかチェック
+  if (!window.isDevWhiteBackground || !back2Wrapper || !drawCanvas) {
+    console.log('🎬 背景5以外では動画を作成しません');
+    return null;
+  }
+  
+  // 動画要素を作成
+  const video = document.createElement('video');
+  video.src = './backVideo.mp4';
+  video.muted = true; // 音声なしで自動再生を許可
+  video.loop = false; // 1回のみ再生
+  video.preload = 'auto';
+  
+  // 動画のサイズを白背景キャンバスに合わせる
+  const canvasRect = drawCanvas.getBoundingClientRect();
+  video.style.cssText = `
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    z-index: ${videoZIndex} !important;
+    pointer-events: none !important;
+  `;
+  
+  console.log(`🎬 動画要素作成: サイズ${canvasRect.width}x${canvasRect.height}, z-index=${videoZIndex}`);
+  
+  // back2Wrapperに追加（文字の下、背景の上）
+  back2Wrapper.appendChild(video);
+  currentVideoElement = video;
+  
+  // 描画キャンバスのz-indexを最上位に設定
+  if (drawCanvas) {
+    drawCanvas.style.zIndex = textZIndex + 5; // 確実に最上位
+    console.log(`🎬 描画キャンバスz-index調整: ${textZIndex + 5} (最上位)`);
+  }
+  
+  return video;
+}
+
+// 🎬 動画再生を開始
+function startVideoPlayback() {
+  if (!window.isDevWhiteBackground) {
+    console.log('🎬 背景5以外では動画再生しません');
+    return Promise.resolve();
+  }
+  
+  const video = createVideoElement();
+  if (!video) {
+    console.log('🎬 動画要素作成失敗');
+    return Promise.resolve();
+  }
+  
+  console.log('🎬 動画再生開始');
+  
+  return new Promise((resolve) => {
+    // 動画終了時の処理
+    video.addEventListener('ended', () => {
+      console.log('🎬 動画再生終了検出 - 0.5秒待機後に次の処理へ');
+      
+      // 動画の最後のフレームが確実に表示されるよう少し待機
+      setTimeout(() => {
+        console.log('🎬 動画再生完全終了 - 最後のフレームで静止');
+        // 動画は削除せず、最後のフレームで静止
+        resolve();
+      }, 500); // 0.5秒の遅延を追加
+    });
+    
+    // 動画再生エラー時の処理
+    video.addEventListener('error', (e) => {
+      console.error('🎬 動画再生エラー:', e);
+      resolve();
+    });
+    
+    // 動画再生開始
+    video.play().catch(error => {
+      console.error('🎬 動画再生失敗:', error);
+      resolve();
+    });
+  });
+}
+
+// 🎬 パターン2: 描画フェードアウト + 動画フェードイン処理
+function startPattern2FadeInOut() {
+  console.log('🎬 パターン2: フェードアニメーション開始');
+  
+  if (!window.isDevWhiteBackground || !drawCanvas) {
+    console.log('🎬 背景5以外ではフェードアニメーションを実行しません');
+    return Promise.resolve();
+  }
+  
+  return new Promise((resolve) => {
+    // 動画要素を作成
+    const video = createVideoElement();
+    if (!video) {
+      console.log('🎬 動画要素作成失敗');
+      resolve();
+      return;
+    }
+    
+    // 動画を最初は透明に設定
+    video.style.opacity = '0';
+    video.style.transition = 'opacity 0.5s ease-in';
+    
+    console.log('🎬 Step 1: 描画フェードアウト + 動画フェードイン（同時実行）');
+    
+    // デバッグ: すべての描画関連要素を確認
+    console.log('🔍 描画要素debug info:');
+    console.log('  - drawCanvas:', drawCanvas);
+    console.log('  - drawCanvas.id:', drawCanvas ? drawCanvas.id : 'null');
+    
+    // back2Wrapper内のすべてのcanvas要素を取得してフェードアウト
+    const allCanvases = back2Wrapper.querySelectorAll('canvas');
+    console.log('🔍 back2Wrapper内のcanvas要素数:', allCanvases.length);
+    
+    allCanvases.forEach((canvas, index) => {
+      console.log(`  - Canvas ${index}: id="${canvas.id}", opacity="${canvas.style.opacity}"`);
+      
+      // 描画関連のキャンバス（動画以外）をフェードアウト
+      if (canvas.id !== 'backgroundVideo') {
+        canvas.style.transition = 'opacity 1s ease-out';
+        canvas.style.opacity = '0';
+        console.log(`🎬 Canvas ${index} (${canvas.id}) フェードアウト開始`);
+      }
+    });
+    
+    // メインのdrawCanvasもフェードアウト（念のため）
+    if (drawCanvas) {
+      drawCanvas.style.transition = 'opacity 1s ease-out';
+      drawCanvas.style.opacity = '0';
+      console.log(`🎬 メインdrawCanvasフェードアウト開始: opacity ${drawCanvas.style.opacity}`);
+    }
+    
+    // 同時に動画をフェードイン
+    setTimeout(() => {
+      video.style.opacity = '1';
+      console.log('🎬 動画フェードイン開始');
+      
+      // 動画再生開始
+      video.play().catch(error => {
+        console.error('🎬 動画再生失敗:', error);
+        resolve();
+      });
+      
+      // 動画の長さを取得して2秒前からフェードイン開始
+      const checkAndStartFadeIn = () => {
+        // 既にメタデータが読み込まれているか確認
+        if (video.readyState >= 1) {
+          const videoDuration = video.duration;
+          const fadeInStartTime = Math.max(0, videoDuration - 4); // 動画終了4秒前に変更（より早く開始）
+          
+          console.log(`🎬 動画時長: ${videoDuration}秒, フェードイン開始: ${fadeInStartTime}秒後`);
+          
+          setTimeout(() => {
+            console.log('🎬 パターン2: 描画フェードイン開始（動画終了4秒前）');
+            
+            // デバッグ：現在の状態を確認
+            console.log('🔍 フェードイン前の状態:');
+            console.log('  - back2Wrapper:', back2Wrapper);
+            console.log('  - drawCanvas:', drawCanvas);
+            
+            // すべての描画キャンバスをゆっくりフェードイン（2秒）
+            const allCanvases = back2Wrapper.querySelectorAll('canvas');
+            console.log(`🔍 フェードイン対象canvas数: ${allCanvases.length}`);
+            
+            allCanvases.forEach((canvas, index) => {
+              console.log(`🔍 Canvas ${index}:`, {
+                id: canvas.id,
+                currentOpacity: canvas.style.opacity,
+                display: canvas.style.display,
+                visibility: canvas.style.visibility,
+                zIndex: canvas.style.zIndex
+              });
+              
+              if (canvas.id !== 'backgroundVideo') {
+                // 強制的に表示を確実にする
+                canvas.style.display = 'block';
+                canvas.style.visibility = 'visible';
+                canvas.style.transition = 'opacity 1s ease-in';  // 2秒から1秒に短縮
+                canvas.style.opacity = '1';
+                console.log(`🎬 Canvas ${index} (${canvas.id}) 早期フェードイン開始 - opacity設定後: ${canvas.style.opacity}`);
+              }
+            });
+            
+            // メインのdrawCanvasも早期フェードイン
+            if (drawCanvas) {
+              drawCanvas.style.display = 'block';
+              drawCanvas.style.visibility = 'visible';
+              drawCanvas.style.transition = 'opacity 1s ease-in';  // 2秒から1秒に短縮
+              drawCanvas.style.opacity = '1';
+              console.log('🎬 メインdrawCanvas 早期フェードイン開始 - opacity設定後:', drawCanvas.style.opacity);
+            }
+            
+            // 1秒後に最終状態を確認
+            setTimeout(() => {
+              console.log('🔍 フェードイン完了後の状態:');
+              allCanvases.forEach((canvas, index) => {
+                console.log(`  - Canvas ${index} (${canvas.id}): opacity=${canvas.style.opacity}`);
+              });
+              if (drawCanvas) {
+                console.log(`  - メインdrawCanvas: opacity=${drawCanvas.style.opacity}`);
+              }
+            }, 1000);
+          }, fadeInStartTime * 1000);
+        } else {
+          // メタデータがまだの場合はイベントリスナーを追加
+          video.addEventListener('loadedmetadata', () => {
+            checkAndStartFadeIn();
+          }, { once: true });
+        }
+      };
+      
+      // メタデータチェックを実行
+      checkAndStartFadeIn();
+    }, 50);
+    
+    // 動画終了時の処理（フェードインは既に完了している）
+    video.addEventListener('ended', () => {
+      console.log('🎬 パターン2: 動画再生終了検出 - 0.5秒待機後に次の処理へ');
+      
+      // 動画の最後のフレームが確実に表示されるよう少し待機
+      setTimeout(() => {
+        console.log('🎬 パターン2: 動画再生完全終了 - フェードインは既に完了');
+        // 動画終了後、そのまま待機・スライド処理へ
+        resolve();
+      }, 500); // 0.5秒の遅延を追加
+    });
+    
+    // 動画再生エラー時の処理
+    video.addEventListener('error', (e) => {
+      console.error('🎬 動画再生エラー:', e);
+      resolve();
+    });
+  });
+}
+
 // 送信側のcanvasScaleと同期（受信側は常に送信側の設定を使用）
 // senderCanvasScaleはUNIFIED_SETTINGS.canvasScaleで管理
 
@@ -922,15 +1212,30 @@ function createBack2Display() {
     pointer-events: none !important;
   `;
   
-  // 画像要素を作成
-  const imgElement = document.createElement('img');
-  imgElement.src = './back2.png';
-  imgElement.style.cssText = `
-    width: 100% !important;
-    height: 100% !important;
-    display: block !important;
-    object-fit: contain !important;
-  `;
+  // 背景要素を作成（画像または白背景）
+  let backgroundElement;
+  if (window.isDevWhiteBackground) {
+    // 白背景の場合
+    backgroundElement = document.createElement('div');
+    backgroundElement.style.cssText = `
+      width: 100% !important;
+      height: 100% !important;
+      background: #ffffff !important;
+      border: 2px solid #ccc !important;
+      box-sizing: border-box !important;
+    `;
+    console.log('🔧 白背景要素を作成');
+  } else {
+    // 画像の場合
+    backgroundElement = document.createElement('img');
+    backgroundElement.src = './back2.png';
+    backgroundElement.style.cssText = `
+      width: 100% !important;
+      height: 100% !important;
+      display: block !important;
+      object-fit: contain !important;
+    `;
+  }
   
   // キャンバスを作成（描画用）
   drawCanvas = document.createElement('canvas');
@@ -951,7 +1256,7 @@ function createBack2Display() {
   drawCtx = drawCanvas.getContext('2d');
   
   // 構造を組み立て
-  back2Wrapper.appendChild(imgElement);
+  back2Wrapper.appendChild(backgroundElement);
   back2Wrapper.appendChild(drawCanvas);
   document.body.appendChild(back2Wrapper);
   
@@ -1001,6 +1306,68 @@ let writerDrawingData = {};
 let writerCanvasSizes = {};
 
 // 180度回転した描画を実行
+// ベジェ曲線で滑らかに描画する関数
+function drawRotatedCurve(x0, y0, x1, y1, x2, y2, color, thickness) {
+  if (!drawCtx) return;
+  
+  drawCtx.save();
+  
+  // キャンバスの中心に移動して180度回転
+  drawCtx.translate(drawCanvas.width / 2, drawCanvas.height / 2);
+  drawCtx.rotate(Math.PI);
+  drawCtx.translate(-drawCanvas.width / 2, -drawCanvas.height / 2);
+  
+  // 基本設定
+  drawCtx.lineCap = 'round';
+  drawCtx.lineJoin = 'round';
+  
+  // 中間点を計算（より滑らかな曲線のため）
+  const midPoint1 = {
+    x: (x0 + x1) / 2,
+    y: (y0 + y1) / 2
+  };
+  const midPoint2 = {
+    x: (x1 + x2) / 2,
+    y: (y1 + y2) / 2
+  };
+  
+  // white-red-border特別処理
+  if (color === 'white-red-border') {
+    const layers = [
+      { thickness: (thickness || 8) + 13, alpha: 0.2, color: '#ffccdd' },
+      { thickness: (thickness || 8) + 10, alpha: 0.5, color: '#ffaacc' },
+      { thickness: (thickness || 8) + 8, alpha: 0.8, color: '#ff88bb' },
+      { thickness: Math.max(1, (thickness || 8) - 4), alpha: 0.9, color: '#ffffff' }
+    ];
+    
+    layers.forEach(layer => {
+      drawCtx.globalAlpha = layer.alpha;
+      drawCtx.strokeStyle = layer.color;
+      drawCtx.lineWidth = layer.thickness;
+      
+      drawCtx.beginPath();
+      drawCtx.moveTo(midPoint1.x, midPoint1.y);
+      // 2次ベジェ曲線で滑らかに接続
+      drawCtx.quadraticCurveTo(x1, y1, midPoint2.x, midPoint2.y);
+      drawCtx.stroke();
+    });
+    
+    drawCtx.globalAlpha = 1.0;
+  } else {
+    // 通常色の描画
+    drawCtx.strokeStyle = color || '#000000';
+    drawCtx.lineWidth = thickness || 2;
+    
+    drawCtx.beginPath();
+    drawCtx.moveTo(midPoint1.x, midPoint1.y);
+    // 2次ベジェ曲線で滑らかに接続
+    drawCtx.quadraticCurveTo(x1, y1, midPoint2.x, midPoint2.y);
+    drawCtx.stroke();
+  }
+  
+  drawCtx.restore();
+}
+
 function drawRotatedStroke(x1, y1, x2, y2, color, thickness) {
   if (!drawCtx) {
     return;
@@ -1022,16 +1389,45 @@ function drawRotatedStroke(x1, y1, x2, y2, color, thickness) {
   drawCtx.translate(-drawCanvas.width / 2, -drawCanvas.height / 2);
   
   // 基本設定
-  drawCtx.strokeStyle = color || '#000000';
-  drawCtx.lineWidth = thickness || 2;
   drawCtx.lineCap = 'round';
   drawCtx.lineJoin = 'round';
   
-  // 180度回転した描画
-  drawCtx.beginPath();
-  drawCtx.moveTo(x1, y1);
-  drawCtx.lineTo(x2, y2);
-  drawCtx.stroke();
+  // 🔴 white-red-border特別処理
+  if (color === 'white-red-border') {
+    console.log('🔴 drawRotatedStroke: white-red-border特別処理実行中');
+    
+    // ピンク色のグラデーション効果（送信側と同じ）
+    const layers = [
+      { thickness: (thickness || 8) + 13, alpha: 0.2, color: '#ffccdd' },
+      { thickness: (thickness || 8) + 10, alpha: 0.5, color: '#ffaacc' },
+      { thickness: (thickness || 8) + 8, alpha: 0.8, color: '#ff88bb' },
+      { thickness: Math.max(1, (thickness || 8) - 4), alpha: 0.9, color: '#ffffff' }
+    ];
+    
+    // 各レイヤーを描画（外側から内側へ）
+    layers.forEach(layer => {
+      drawCtx.globalAlpha = layer.alpha;
+      drawCtx.strokeStyle = layer.color;
+      drawCtx.lineWidth = layer.thickness;
+      
+      drawCtx.beginPath();
+      drawCtx.moveTo(x1, y1);
+      drawCtx.lineTo(x2, y2);
+      drawCtx.stroke();
+    });
+    
+    // アルファ値を元に戻す
+    drawCtx.globalAlpha = 1.0;
+    
+  } else {
+    // 通常色の描画
+    drawCtx.strokeStyle = color || '#000000';
+    drawCtx.lineWidth = thickness || 2;
+    drawCtx.beginPath();
+    drawCtx.moveTo(x1, y1);
+    drawCtx.lineTo(x2, y2);
+    drawCtx.stroke();
+  }
   
   drawCtx.restore();
 }
@@ -1048,18 +1444,43 @@ function redrawAllStrokes() {
   
   clearDrawCanvas();
   
+  // ベジェ曲線で滑らかに描画（送信側と同じアルゴリズム）
   for (let i = 1; i < drawingData.length; i++) {
     const current = drawingData[i];
     const previous = drawingData[i - 1];
     
     // 連続する描画のみ線を引く
     if (current.type === 'draw' && previous.type === 'draw') {
-      drawRotatedStroke(
-        previous.x, previous.y,
-        current.x, current.y,
-        current.color,
-        current.thickness
-      );
+      // 3点以上ある場合は曲線補間
+      if (i >= 2) {
+        const beforePrevious = drawingData[i - 2];
+        if (beforePrevious.type === 'draw') {
+          // ベジェ曲線で滑らかに接続
+          drawRotatedCurve(
+            beforePrevious.x, beforePrevious.y,
+            previous.x, previous.y,
+            current.x, current.y,
+            current.color,
+            current.thickness
+          );
+        } else {
+          // 直線描画
+          drawRotatedStroke(
+            previous.x, previous.y,
+            current.x, current.y,
+            current.color,
+            current.thickness
+          );
+        }
+      } else {
+        // 最初の2点は直線
+        drawRotatedStroke(
+          previous.x, previous.y,
+          current.x, current.y,
+          current.color,
+          current.thickness
+        );
+      }
     }
   }
 }
@@ -1307,6 +1728,7 @@ function removeDrawWriterCommandsReceiver(commands, writerId) {
       }
       
       if (cmd.color === 'white-red-border') {
+        console.log('🔴 white-red-border特別処理実行中:', cmd);
         // 白地赤縁の特別処理
         if (writerState.isInPath) {
           ctx.stroke(); // 現在のパスを完了
@@ -1365,6 +1787,7 @@ function removeDrawWriterCommandsReceiver(commands, writerId) {
         ctx.restore();
         
       } else {
+        console.log('🔵 通常色描画処理:', cmd.color, cmd);
         // 通常の色の描画
         if (!writerState.isInPath) {
           const prevCoords = transformCoordinatesWithAspectRatio(writerState.prevCmd.x, writerState.prevCmd.y, senderCanvasSize, drawingAreaSize);
@@ -1378,12 +1801,45 @@ function removeDrawWriterCommandsReceiver(commands, writerId) {
         // 線の設定
         ctx.lineWidth = scaledThickness;
         const whiteColor = isVideoBackgroundActive ? '#f0f0f0' : '#fff';
-        ctx.strokeStyle = cmd.color === 'black' ? '#000' : 
-                         (cmd.color === 'white' ? whiteColor : 
-                         (cmd.color === 'red' ? '#ff0000' : 
-                         (cmd.color === 'blue' ? '#0000ff' : 
-                         (cmd.color === 'green' ? '#008000' : 
-                         (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))))));
+        if (cmd.color === 'white-red-border') {
+          // white-red-border の特別処理（3層グラデーション効果）
+          const currentThickness = cmd.thickness || 4;
+          const scaledThickness = currentThickness * (drawingAreaSize.width / senderCanvasSize.width);
+          
+          // 外側の薄い赤
+          ctx.save();
+          ctx.globalAlpha = 0.2;
+          ctx.lineWidth = scaledThickness + 10;
+          ctx.strokeStyle = '#ffccdd';
+          ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
+          ctx.stroke();
+          ctx.restore();
+          
+          // 中間の赤
+          ctx.save();
+          ctx.globalAlpha = 0.5;
+          ctx.lineWidth = scaledThickness + 6;
+          ctx.strokeStyle = '#ff88bb';
+          ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
+          ctx.stroke();
+          ctx.restore();
+          
+          // 内側の白
+          ctx.save();
+          ctx.globalAlpha = 0.9;
+          ctx.lineWidth = Math.max(1, scaledThickness - 3);
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineTo(areaLeft + scaledX, areaTop + scaledY);
+          ctx.stroke();
+          ctx.restore();
+        } else {
+          ctx.strokeStyle = cmd.color === 'black' ? '#000' : 
+                           (cmd.color === 'white' ? whiteColor : 
+                           (cmd.color === 'red' ? '#ff0000' : 
+                           (cmd.color === 'blue' ? '#0000ff' : 
+                           (cmd.color === 'green' ? '#008000' : 
+                           (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))))));
+        }
         ctx.shadowBlur = 0;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -1496,12 +1952,13 @@ function removeDrawWriterCommandsForPrint(commands, writerId, printCtx) {
         return; // 通常の描画処理をスキップ
       } else {
         // 通常の色
-        const actualColor = cmd.color === 'black' ? '#000' : 
+        const actualColor = cmd.color === 'white-red-border' ? '#ffffff' : 
+                           (cmd.color === 'black' ? '#000' : 
                            (cmd.color === 'white' ? '#fff' : 
                            (cmd.color === 'red' ? '#ff0000' : 
                            (cmd.color === 'blue' ? '#0000ff' : 
                            (cmd.color === 'green' ? '#008000' : 
-                           (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))))));
+                           (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000')))))));
         printCtx.strokeStyle = actualColor;
         printCtx.shadowBlur = 0;
       }
@@ -1581,10 +2038,11 @@ function removeDrawSinglePath(pathCommands, ctx) {
     } else if (cmd.type === "draw") {
       const thickness = cmd.thickness || 4;
       ctx.lineWidth = thickness * (drawingAreaSize.width / senderCanvasSize.width);
-      ctx.strokeStyle = cmd.color === 'black' ? '#000' : 
+      ctx.strokeStyle = cmd.color === 'white-red-border' ? '#ffffff' :
+                       (cmd.color === 'black' ? '#000' : 
                        (cmd.color === 'white' ? '#fff' : 
                        (cmd.color === 'green' ? '#008000' : 
-                       (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000'))));
+                       (cmd.color === 'pink' ? '#ff69b4' : (cmd.color || '#000')))));
       ctx.lineTo(scaledX, scaledY);
     }
   });
@@ -3327,9 +3785,39 @@ function handleMessage(data) {
     //console.log("受信データ詳細:", data);
   }
 
+  // 背景5(dev)モードの特別処理
+  if (data.type === "background-dev") {
+    const writerId = data.writerId || 'default';
+    console.log(`🔧 背景5(dev)メッセージ受信 - 白背景を表示 (WriterID: ${writerId})`);
+    
+    // スケール情報があれば適用
+    if (data.canvasSize && data.canvasSize.scale) {
+      currentScale = data.canvasSize.scale;
+      console.log(`🎯 書き手側のスケール適用: ${currentScale}`);
+    }
+    
+    // canvasSize情報を保存
+    if (data.canvasSize) {
+      writerCanvasSizesData[writerId] = data.canvasSize;
+      senderCanvasSize = data.canvasSize;
+    }
+    
+    // 白背景フラグを設定
+    window.isDevWhiteBackground = true;
+    
+    // back2.pngと全く同じ処理を実行（位置・アニメーション共通）
+    displayBack2Image();
+    
+    console.log(`✅ 背景5(dev): back2共通処理で白背景表示完了`);
+    return;
+  }
+  
   if (data.type === "background") {
     // 背景変更メッセージを受信（180度回転で表示）
     const writerId = data.writerId || 'default';
+    
+    // 白背景フラグをリセット
+    window.isDevWhiteBackground = false;
     console.log(`📨 背景変更メッセージ受信: ${data.src} (WriterID: ${writerId})`);
     console.log(`📨 背景メッセージ詳細:`, data);
     console.log(`📨 back6.png含まれているか:`, data.src ? data.src.includes('back6.png') : 'srcなし');
@@ -3816,6 +4304,17 @@ function handleMessage(data) {
     console.log(`⏱️ アニメーション待機時間: ${data.animationStartWaitTime}秒`);
     console.log(`⏱️ 回転後待機時間: ${data.rotationWaitTime}秒`);
     
+    // 音楽ボリューム設定を受信
+    if (data.musicVolume !== undefined) {
+      musicVolume = data.musicVolume;
+      console.log(`🎵 音楽ボリューム設定: ${musicVolume}`);
+    }
+    
+    // 背景5の時に音楽再生開始
+    if (window.isDevWhiteBackground) {
+      playBackgroundMusic();
+    }
+    
     // 送信前に描画データを保存
     if ([].length > 0) {
       console.log("🔴 globalSend → 描画データを0度回転で保存");
@@ -3839,6 +4338,12 @@ function handleMessage(data) {
     // アニメーション開始までの待機時間後にアニメーションを実行
     const animationStartDelay = (data.animationStartWaitTime || 3.3) * 1000;
     const rotationWaitTime = (data.rotationWaitTime || 7.5) * 1000;
+    
+    // videoPatternを受信データから更新
+    if (data.videoPattern !== undefined) {
+      videoPattern = data.videoPattern;
+      console.log(`🎬 globalSendでvideoPattern更新: ${videoPattern}`);
+    }
     
     console.log(`🎬 ${animationStartDelay/1000}秒後にアニメーションを開始`);
     
@@ -4512,7 +5017,8 @@ function handleMessage(data) {
     devCanvasScale = data.canvasScale || 0.7;
     devAnimationStartWaitTime = data.animationStartWaitTime || 3.3;
     devRotationWaitTime = data.rotationWaitTime || 8.1;
-    console.log(`🔧 Dev設定受信: scale=${devCanvasScale}, animationWait=${devAnimationStartWaitTime}, rotationWait=${devRotationWaitTime}`);
+    videoPattern = data.videoPattern || 1;
+    console.log(`🔧 Dev設定受信: scale=${devCanvasScale}, animationWait=${devAnimationStartWaitTime}, rotationWait=${devRotationWaitTime}, videoPattern=${videoPattern}`);
     
     // 🔸 back2.pngのサイズ更新
     if (back2Wrapper && back2Image) {
@@ -7363,6 +7869,7 @@ let isAnimationInProgress = false;
 // 🎬 アニメーションシーケンス: 180度回転 → 待機 → 下にスライド → リセット
 function startRotationAnimation(rotationWaitTime) {
   console.log('🎬 アニメーションシーケンス開始');
+  console.log(`🔍 startRotationAnimation受信: rotationWaitTime = ${rotationWaitTime}ms (${rotationWaitTime/1000}秒)`);
   isAnimationInProgress = true; // アニメーション開始フラグ
   
   // 実際に使用されている要素IDを使用
@@ -7414,37 +7921,99 @@ function startRotationAnimation(rotationWaitTime) {
   setTimeout(() => {
     console.log('✅ Step 1完了: 180度回転アニメーション完了');
     
-    // Step 2: 待機時間 (devtool設定に基づく)
-    const waitTime = rotationWaitTime || 7500;
-    console.log(`⏳ Step 2: ${waitTime/1000}秒間待機中...`);
-    
-    setTimeout(() => {
-      console.log('✅ Step 2完了: 待機時間終了');
-      
-      // Step 3: 下にスライドアニメーション (2秒で画面外まで)
-      console.log('⬇️ Step 3: 下にスライドアニメーション開始');
-      
-      const windowHeight = window.innerHeight;
-      const targetHeight = animationTarget.offsetHeight;
-      const slideDistance = windowHeight + targetHeight + 100; // 完全に画面外まで
-      
-      animationTarget.style.transition = 'transform 2s ease-in-out';
-      
-      if (animationTarget.id === 'back2-wrapper') {
-        // back2-wrapperの場合：回転なしでスライド
-        animationTarget.style.transform = 'rotate(360deg) translateY(' + slideDistance + 'px)';
-        console.log(`🔄 back2-wrapper: ${slideDistance}px下にスライド`);
+    // 背景5の場合はパターンに応じて処理分岐
+    if (window.isDevWhiteBackground) {
+      if (videoPattern === 2) {
+        console.log('🎬 背景5 パターン2: 描画フェードアウト・動画フェードイン開始');
+        // パターン2: 描画フェードアウト + 動画フェードイン
+        startPattern2FadeInOut().then(() => {
+          console.log('🎬 パターン2 動画再生終了: 待機時間開始');
+          performWaitAndSlide(rotationWaitTime);
+        });
       } else {
-        // その他の要素の場合：回転付きでスライド
-        animationTarget.style.transform = 'translateX(-50%) rotate(180deg) translateY(' + slideDistance + 'px)';
-        console.log(`🔄 その他要素: ${slideDistance}px下にスライド`);
+        console.log('🎬 背景5 パターン1: 回転後動画再生開始');
+        startVideoPlayback().then(() => {
+          console.log('🎬 動画再生終了: 待機時間開始');
+          // 動画終了後に待機時間を開始
+          performWaitAndSlide(rotationWaitTime);
+        });
       }
+    } else {
+      // 背景5以外では従来通り即座に待機時間開始
+      console.log('🎬 背景5以外: 従来通りの待機時間開始');
+      performWaitAndSlide(rotationWaitTime);
+    }
+  }, 1000); // 回転アニメーション時間
+}
+
+// 🎬 待機とスライドアニメーション処理（動画対応版）
+function performWaitAndSlide(rotationWaitTime) {
+  console.log(`🔍 performWaitAndSlide受信: rotationWaitTime = ${rotationWaitTime}ms`);
+  
+  // Step 2: 待機時間 (devtool設定に基づく)
+  const waitTime = rotationWaitTime || 7500;
+  console.log(`🔍 実際の待機時間: waitTime = ${waitTime}ms (${waitTime/1000}秒)`);
+  console.log(`⏳ Step 2: ${waitTime/1000}秒間待機中...`);
+  
+  // 実際に使用されている要素IDを使用
+  const drawCanvasElement = document.getElementById('drawCanvas') || document.getElementById('drawCanvas-temp');
+  const back2WrapperElement = document.getElementById('back2-wrapper');
+  const containerElement = document.getElementById('container');
+  
+  // 複数の候補から適切な要素を選択
+  let animationTarget = null;
+  
+  if (back2WrapperElement) {
+    animationTarget = back2WrapperElement;
+  } else if (drawCanvasElement) {
+    animationTarget = drawCanvasElement;
+  } else if (containerElement) {
+    animationTarget = containerElement;
+  } else {
+    console.log('❌ アニメーション対象が見つかりません');
+    return;
+  }
+  
+  setTimeout(() => {
+    console.log('✅ Step 2完了: 待機時間終了');
+      
+    // Step 3: 下にスライドアニメーション (2秒で画面外まで)
+    console.log('⬇️ Step 3: 下にスライドアニメーション開始');
+    
+    const windowHeight = window.innerHeight;
+    const targetHeight = animationTarget.offsetHeight;
+    const slideDistance = windowHeight + targetHeight + 100; // 完全に画面外まで
+    
+    animationTarget.style.transition = 'transform 2s ease-in-out';
+    
+    // 背景5の場合は動画も一緒に移動
+    if (window.isDevWhiteBackground && currentVideoElement) {
+      console.log('🎬 背景5: 動画も一緒に下移動');
+      // 動画は既にback2Wrapper内にあるので、親要素と一緒に移動する
+    }
+    
+    if (animationTarget.id === 'back2-wrapper') {
+      // back2-wrapperの場合：回転なしでスライド
+      animationTarget.style.transform = 'rotate(360deg) translateY(' + slideDistance + 'px)';
+      console.log(`🔄 back2-wrapper: ${slideDistance}px下にスライド`);
+    } else {
+      // その他の要素の場合：回転付きでスライド
+      animationTarget.style.transform = 'translateX(-50%) rotate(180deg) translateY(' + slideDistance + 'px)';
+      console.log(`🔄 その他要素: ${slideDistance}px下にスライド`);
+    }
       
       setTimeout(() => {
         console.log('✅ Step 3完了: スライドアニメーション完了（画面外に消失）');
         
         // Step 4: スライド完了と同時に描画をクリア
         console.log('🔄 Step 4: 描画クリア処理開始（スライド完了直後）');
+        
+        // 背景5の場合は動画要素も削除
+        if (window.isDevWhiteBackground && currentVideoElement) {
+          console.log('🎬 背景5: 動画要素を削除');
+          currentVideoElement.remove();
+          currentVideoElement = null;
+        }
         
         // 描画データをクリア
         Object.keys(writerDrawingData).forEach(writerId => {
@@ -7484,6 +8053,13 @@ function startRotationAnimation(rotationWaitTime) {
             console.log('🖼️ 背景画像を再表示');
           }
           
+          // 描画キャンバスの透明度を確実にリセット
+          if (drawCanvas) {
+            drawCanvas.style.transition = 'none';
+            drawCanvas.style.opacity = '1';
+            console.log('🎬 最終リセット: 描画キャンバス透明度を1に設定');
+          }
+          
           // 受信可能状態に復帰
           isCanvasRotated = false;
           console.log('📝 描画受信可能状態に復帰');
@@ -7497,7 +8073,5 @@ function startRotationAnimation(rotationWaitTime) {
       }, 2000); // スライドアニメーション時間
       
     }, waitTime); // devtool設定の待機時間
-    
-  }, 1000); // 回転アニメーション時間
 }
 

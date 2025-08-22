@@ -55,6 +55,37 @@ function updateRotationWait(value) {
   document.getElementById("rotationWaitValue").textContent = value + "秒";
 }
 
+// 🔧 音楽ボリューム更新関数
+function updateMusicVolume(value) {
+  const volume = parseFloat(value);
+  const percentage = Math.round(volume * 100);
+  document.getElementById("musicVolumeValue").textContent = percentage + "%";
+  console.log(`🎵 音楽ボリューム設定: ${percentage}%`);
+}
+
+// 🔧 動画パターン設定関数
+function setVideoPattern(pattern) {
+  currentVideoPattern = pattern;
+  
+  // ボタンの見た目を更新
+  const pattern1Btn = document.getElementById("pattern1Btn");
+  const pattern2Btn = document.getElementById("pattern2Btn");
+  
+  if (pattern === 1) {
+    pattern1Btn.classList.add("selected");
+    pattern2Btn.classList.remove("selected");
+    pattern1Btn.style.background = "#4CAF50";
+    pattern2Btn.style.background = "#2196F3";
+    console.log("🎬 動画パターン1(回転)に設定");
+  } else {
+    pattern1Btn.classList.remove("selected");
+    pattern2Btn.classList.add("selected");
+    pattern1Btn.style.background = "#4CAF50";
+    pattern2Btn.style.background = "#FF5722";
+    console.log("🎬 動画パターン2(フェード)に設定");
+  }
+}
+
 // ==========================================
 // Dev設定送信関数群
 // ==========================================
@@ -66,7 +97,8 @@ function sendDevSettings() {
       type: "devSettings",
       canvasScale: canvasScale,
       animationStartWaitTime: animationStartWaitTime,
-      rotationWaitTime: rotationWaitTime
+      rotationWaitTime: rotationWaitTime,
+      videoPattern: currentVideoPattern
     }));
   } else {
     console.error("❌ WebSocket接続なし");

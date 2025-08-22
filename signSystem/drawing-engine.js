@@ -49,9 +49,9 @@ function drawSmoothLine(ctx, points) {
     const p1 = points[i];
     const p2 = points[i + 1];
     
-    // 制御点を計算（前後の点から滑らかな曲線を作成）
-    const cp1x = p1.x + (p2.x - p0.x) * 0.1;
-    const cp1y = p1.y + (p2.y - p0.y) * 0.1;
+    // 制御点を計算（滑らかさを向上、品質重視）
+    const cp1x = p1.x + (p2.x - p0.x) * 0.15;
+    const cp1y = p1.y + (p2.y - p0.y) * 0.15;
     
     ctx.quadraticCurveTo(cp1x, cp1y, p2.x, p2.y);
   }
@@ -63,6 +63,11 @@ function setupDrawingContext() {
   ctx.lineWidth = currentPenThickness || 8;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  
+  // 描画品質向上設定（座標系に影響なし）
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.globalCompositeOperation = 'source-over';
 }
 
 // 描画開始メッセージ作成
@@ -174,23 +179,40 @@ function handleDrawingMove(x, y) {
     pointHistory.shift(); // 古い点を削除
   }
 
-  // 滑らかな曲線を描画（3点以上の場合のみ）
+  // 滑らかな曲線を描画
   if (pointHistory.length >= 3) {
-    // 最新の3点で曲線を描画
+    // ベジェ曲線で滑らかに描画
     const len = pointHistory.length;
-    const p0 = pointHistory[len - 3];
-    const p1 = pointHistory[len - 2];
-    const p2 = pointHistory[len - 1];
     
-    // 制御点を計算
-    const cp1x = p1.x + (p2.x - p0.x) * 0.1;
-    const cp1y = p1.y + (p2.y - p0.y) * 0.1;
+    // 最後から2番目の点を中間点として使用
+    const lastPoint = pointHistory[len - 1];
+    const secondLastPoint = pointHistory[len - 2];
     
-    // 前の点から曲線で接続
-    ctx.quadraticCurveTo(cp1x, cp1y, p2.x, p2.y);
+    // 中間点を計算（2点の中点）
+    const midPoint = {
+      x: (lastPaintPos.x + lastPoint.x) / 2,
+      y: (lastPaintPos.y + lastPoint.y) / 2
+    };
+    
+    // 2次ベジェ曲線で滑らかに接続
+    ctx.quadraticCurveTo(lastPaintPos.x, lastPaintPos.y, midPoint.x, midPoint.y);
     ctx.stroke();
+    
+    // beginPathを使わずに連続的に描画
+    ctx.beginPath();
+    ctx.moveTo(midPoint.x, midPoint.y);
   } else if (pointHistory.length === 2) {
-    // 2点目の場合は直線で接続
+    // 2点目も滑らかに接続
+    const midPoint = {
+      x: (lastPaintPos.x + x) / 2,
+      y: (lastPaintPos.y + y) / 2
+    };
+    ctx.quadraticCurveTo(lastPaintPos.x, lastPaintPos.y, midPoint.x, midPoint.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(midPoint.x, midPoint.y);
+  } else {
+    // 最初の点
     ctx.lineTo(x, y);
     ctx.stroke();
   }
@@ -216,7 +238,7 @@ function handleDrawingMove(x, y) {
     type: 'draw',
     x: x,
     y: y,
-    color: currentPenColor === 'black' ? '#000' : currentPenColor,
+    color: currentPenColor,
     thickness: currentPenThickness,
     timestamp: Date.now(),
     writerId: myWriterId
@@ -262,6 +284,9 @@ function handleDrawingEnd() {
     stopPenSound();
   }
 
+  // 描画終了後に即座に高品質化
+  renderSmoothDrawing();
+
   return true;
 }
 
@@ -282,11 +307,13 @@ function drawWhiteRedBorderEffect() {
   const originalLineWidth = ctx.lineWidth;
   const originalGlobalAlpha = ctx.globalAlpha;
 
-  // 各レイヤーを効率的に描画
+  // 各レイヤーを高品質描画
   layers.forEach(layer => {
     ctx.strokeStyle = layer.color;
     ctx.lineWidth = layer.thickness;
     ctx.globalAlpha = layer.alpha;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.stroke();
   });
 
@@ -294,6 +321,139 @@ function drawWhiteRedBorderEffect() {
   ctx.strokeStyle = originalStrokeStyle;
   ctx.lineWidth = originalLineWidth;
   ctx.globalAlpha = originalGlobalAlpha;
+}
+
+// 高品質再描画システム
+function renderSmoothDrawing() {
+  if (!drawingCommands || drawingCommands.length === 0) return;
+  
+  console.log('🎨 高品質再描画開始:', drawingCommands.length, 'コマンド');
+  
+  // 高解像度一時キャンバス作成（1.3倍サイズ）
+  const smoothCanvas = document.createElement('canvas');
+  smoothCanvas.width = Math.round(canvas.width * 1.3);
+  smoothCanvas.height = Math.round(canvas.height * 1.3);
+  const smoothCtx = smoothCanvas.getContext('2d');
+  
+  // 高品質描画設定
+  smoothCtx.imageSmoothingEnabled = true;
+  smoothCtx.imageSmoothingQuality = 'high';
+  smoothCtx.lineCap = 'round';
+  smoothCtx.lineJoin = 'round';
+  
+  // 描画コマンドをグループ化（writerID別、ストローク別）
+  const strokes = [];
+  let currentStroke = null;
+  
+  drawingCommands.forEach(cmd => {
+    if (cmd.type === 'start') {
+      if (currentStroke) strokes.push(currentStroke);
+      currentStroke = {
+        points: [{ x: cmd.x * 1.3, y: cmd.y * 1.3 }],
+        color: cmd.color || 'black',
+        thickness: (cmd.thickness || 8) * 1.3,
+        isSpecialColor: cmd.color === 'white-red-border'
+      };
+    } else if (cmd.type === 'draw' && currentStroke) {
+      currentStroke.points.push({ x: cmd.x * 1.3, y: cmd.y * 1.3 });
+    }
+  });
+  
+  if (currentStroke) strokes.push(currentStroke);
+  
+  // 各ストロークを高品質で再描画
+  strokes.forEach(stroke => {
+    if (stroke.points.length < 2) return;
+    
+    // white-red-border の場合は特別処理
+    if (stroke.isSpecialColor) {
+      renderWhiteRedBorderStroke(smoothCtx, stroke);
+      return;
+    }
+    
+    smoothCtx.strokeStyle = stroke.color;
+    smoothCtx.lineWidth = stroke.thickness;
+    smoothCtx.beginPath();
+    smoothCtx.moveTo(stroke.points[0].x, stroke.points[0].y);
+    
+    if (stroke.points.length === 2) {
+      // 2点の場合は直線
+      smoothCtx.lineTo(stroke.points[1].x, stroke.points[1].y);
+    } else {
+      // 3点以上の場合は滑らかなベジェ曲線
+      for (let i = 1; i < stroke.points.length - 1; i++) {
+        const p0 = stroke.points[i - 1];
+        const p1 = stroke.points[i];
+        const p2 = stroke.points[i + 1];
+        
+        // より滑らかな制御点計算
+        const cp1x = p1.x + (p2.x - p0.x) * 0.2;
+        const cp1y = p1.y + (p2.y - p0.y) * 0.2;
+        
+        smoothCtx.quadraticCurveTo(cp1x, cp1y, p2.x, p2.y);
+      }
+    }
+    
+    smoothCtx.stroke();
+  });
+  
+  // 元キャンバスをクリアして高品質版を描画
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(smoothCanvas, 0, 0, canvas.width, canvas.height);
+  
+  console.log('✅ 高品質再描画完了');
+}
+
+// white-red-borderストロークの高品質レンダリング
+function renderWhiteRedBorderStroke(ctx, stroke) {
+  if (stroke.points.length < 2) return;
+  
+  // 白赤ボーダー効果のレイヤー定義（高解像度対応）
+  const layers = [
+    { thickness: stroke.thickness + 13, alpha: 0.2, color: '#ffccdd' },
+    { thickness: stroke.thickness + 10, alpha: 0.5, color: '#ffaacc' },
+    { thickness: stroke.thickness + 8, alpha: 0.8, color: '#ff88bb' },
+    { thickness: Math.max(1, stroke.thickness - 4), alpha: 0.9, color: '#ffffff' }
+  ];
+  
+  // 各レイヤーを描画
+  layers.forEach(layer => {
+    ctx.strokeStyle = layer.color;
+    ctx.lineWidth = layer.thickness;
+    ctx.globalAlpha = layer.alpha;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    // ストロークパスを描画
+    ctx.beginPath();
+    ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+    
+    if (stroke.points.length === 2) {
+      ctx.lineTo(stroke.points[1].x, stroke.points[1].y);
+    } else {
+      for (let i = 1; i < stroke.points.length - 1; i++) {
+        const p0 = stroke.points[i - 1];
+        const p1 = stroke.points[i];
+        const p2 = stroke.points[i + 1];
+        
+        const cp1x = p1.x + (p2.x - p0.x) * 0.2;
+        const cp1y = p1.y + (p2.y - p0.y) * 0.2;
+        
+        ctx.quadraticCurveTo(cp1x, cp1y, p2.x, p2.y);
+      }
+    }
+    
+    ctx.stroke();
+  });
+  
+  // アルファを復元
+  ctx.globalAlpha = 1.0;
+}
+
+// 手動高品質化のグローバル関数（デバッグ用）
+function enhanceDrawingQuality() {
+  console.log('🎨 手動高品質化実行');
+  renderSmoothDrawing();
 }
 
 // 描画エンジンの初期化

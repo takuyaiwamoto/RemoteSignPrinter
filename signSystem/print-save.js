@@ -10,14 +10,30 @@ function saveDoubleRotatedImage() {
   
   // 🔸 まず受信側に印刷指示を送信（データが残っている状態で）
   console.log('📤📤📤 受信側にglobalSend指示を送信中... 📤📤📤');
-  socket.send(JSON.stringify({
+  
+  // 音楽ボリュームを取得（スライダーがあれば）
+  const musicVolumeSlider = document.getElementById('musicVolume');
+  const currentMusicVolume = musicVolumeSlider ? parseFloat(musicVolumeSlider.value) : 0.5;
+  
+  const sendData = {
     type: "globalSend",
     writerId: myWriterId,
     timestamp: Date.now(),
     animationStartWaitTime: animationStartWaitTime,
-    rotationWaitTime: rotationWaitTime
-  }));
+    rotationWaitTime: rotationWaitTime,
+    videoPattern: currentVideoPattern,
+    musicVolume: currentMusicVolume
+  };
+  
+  console.log('🔍 送信データ詳細:');
+  console.log(`  - animationStartWaitTime: ${animationStartWaitTime}秒`);
+  console.log(`  - rotationWaitTime: ${rotationWaitTime}秒`);
+  console.log(`  - videoPattern: ${currentVideoPattern}`);
+  console.log(`  - musicVolume: ${currentMusicVolume}`);
+  
+  socket.send(JSON.stringify(sendData));
   console.log('✅✅✅ 受信側へのglobalSend指示送信完了 ✅✅✅');
+  console.log(`🎵 音楽ボリューム: ${currentMusicVolume}`);
   
   // 🔸 少し待ってから送信側の印刷処理のみ実行
   setTimeout(() => {

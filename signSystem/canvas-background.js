@@ -624,6 +624,33 @@ function testDrawRightBottom() {
   console.log('✅ 右下描画テスト完了');
 }
 
+// 背景5(dev)用の特別な関数
+function setBackgroundDev() {
+  console.log('🔧 背景5(dev)モード起動');
+  
+  // 書き手側にback2.pngを表示
+  setBackground('./back2.png');
+  
+  // 受信側に白背景を送信するための特別なメッセージ
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    // 少し遅延を入れて背景設定後に上書き送信
+    setTimeout(() => {
+      socket.send(JSON.stringify({ 
+        type: "background-dev", 
+        src: null, // 受信側は白背景
+        writerId: myWriterId,
+        canvasSize: { 
+          width: canvas.width,
+          height: canvas.height 
+        },
+        scale: canvasScale
+      }));
+      
+      console.log('📡 背景5(dev): 書き手=back2.png, 受信側=白背景');
+    }, 100);
+  }
+}
+
 // ==========================================
 // デバッグ用：ファイルが正しく読み込まれたことを確認
 // ==========================================
