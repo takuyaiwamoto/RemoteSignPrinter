@@ -80,7 +80,12 @@ function processMessage(data) {
       console.log("❌ 自分の描画のため無視");
     }
   } else if (data.type === "clear") {
-    // 受信側からの全体クリア
+    // 受信側からの全体クリア（送信者自身は除外）
+    if (data.fromSender && data.senderWriterId === myWriterId) {
+      console.log('🧹 自分が送信者のため、clearメッセージを無視');
+      return;
+    }
+    
     console.log('🧹 受信側からのクリア指示でotherWritersDataをクリア');
     otherWritersData = {};
     
@@ -96,7 +101,7 @@ function processMessage(data) {
   } else if (data.type === "globalClear") {
     // 他の書き手からの全体クリア（自分が送信者でない場合のみ処理）
     if (data.writerId !== myWriterId) {
-      // console.log(`🧹 他の書き手(${data.writerId})からクリア指示を受信`);
+      console.log(`🧹 他の書き手(${data.writerId})からクリア指示を受信`);
       
       // キャンバスを完全にクリア
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -104,22 +109,33 @@ function processMessage(data) {
         drawBackgroundImage(ctx, backgroundImage, canvas);
       }
       
-      // 🔧【修正】全ての描画データをクリア（自分の描画も含む）
+      // 🔧【強化】全ての描画データを完全クリア
       otherWritersData = {};
-      drawingCommands = []; // ✅ 自分の描画もクリアする
-      console.log('🧹 他の書き手からのクリア指示：全描画データをクリア');
+      drawingCommands = [];
       
-      // キャンバスを再描画（背景のみの状態にする）- 遅延実行
-      if (window.globalClearRedrawTimeout) {
-        clearTimeout(window.globalClearRedrawTimeout);
+      // 🔧【追加】描画エンジンの状態もクリア
+      if (typeof pointHistory !== 'undefined') {
+        pointHistory = [];
+      }
+      if (typeof lastPaintPos !== 'undefined') {
+        lastPaintPos = null;
+      }
+      if (typeof isPaintDrawing !== 'undefined') {
+        isPaintDrawing = false;
+      }
+      if (typeof writerDrawingStates !== 'undefined') {
+        // constオブジェクトは再代入不可のため、プロパティを削除
+        Object.keys(writerDrawingStates).forEach(key => {
+          delete writerDrawingStates[key];
+        });
       }
       
-      window.globalClearRedrawTimeout = setTimeout(() => {
-        redrawCanvasWithOthers();
-        window.globalClearRedrawTimeout = null;
-      }, 10);
+      console.log('🧹 全描画データと状態を完全クリア');
       
-      // console.log('🧹 他の書き手からのクリア指示で完全クリア完了');
+      // キャンバス再描画は不要（もうデータが無いため）
+      // 遅延実行も削除
+      
+      console.log('✅ 他の書き手からのクリア指示で完全クリア完了');
     }
   } else if (data.type === "clearWriter") {
     // 🔧【追加】特定の書き手の描画だけをクリア
@@ -456,151 +472,192 @@ function createWriterStatusDiv() {
 // ==========================================
 
 // 🔸 他の執筆者の描画データを処理
+// 🔧【改善】再描画頻度の最適化
+let pendingRedrawWriters = new Set();
+const REDRAW_BATCH_DELAY = 16; // 16ms (約60fps)
+
 function handleOtherWriterDrawing(data) {
   const writerId = data.writerId;
-  
-  console.log(`📋 DEBUG: 他Writer受信前 - 自分の描画=${drawingCommands.length}件`);
   
   if (!otherWritersData[writerId]) {
     otherWritersData[writerId] = [];
   }
   
   otherWritersData[writerId].push(data);
+  pendingRedrawWriters.add(writerId);
   
-  // 重複する再描画要求をまとめるため、少し遅延させる
+  // 🔧 フレームレート制限付きバッチ再描画
   if (window.redrawTimeout) {
     clearTimeout(window.redrawTimeout);
   }
   
   window.redrawTimeout = setTimeout(() => {
-    console.log(`📋 DEBUG: 再描画直前 - 自分の描画=${drawingCommands.length}件`);
-    redrawCanvasWithOthers();
+    if (pendingRedrawWriters.size > 0) {
+      console.log(`🎨 バッチ再描画: ${pendingRedrawWriters.size}人のWriter`);
+      redrawCanvasWithOthers();
+      pendingRedrawWriters.clear();
+    }
     window.redrawTimeout = null;
-  }, 10);
+  }, REDRAW_BATCH_DELAY);
 }
 
 // WriterID別パス状態管理（書き手側用）
 const senderWriterPathStates = {};
 
+// 🔧【新機能】描画コマンドをパス単位でグループ化
+function groupCommandsByPath(commands) {
+  const pathGroups = [];
+  let currentPath = null;
+  
+  commands.forEach(cmd => {
+    if (cmd.type === "start") {
+      // 新しいパス開始
+      if (currentPath) {
+        pathGroups.push(currentPath);
+      }
+      currentPath = {
+        color: cmd.color,
+        thickness: cmd.thickness,
+        points: [{ x: cmd.x, y: cmd.y }]
+      };
+    } else if (cmd.type === "draw" && currentPath) {
+      // 既存パスに点を追加
+      currentPath.points.push({ x: cmd.x, y: cmd.y });
+    }
+  });
+  
+  // 最後のパスを追加
+  if (currentPath) {
+    pathGroups.push(currentPath);
+  }
+  
+  return pathGroups;
+}
+
+// 🔧【新機能】通常色のパス描画（ベジェ曲線滑らか版）
+function drawNormalColorPath(pathGroup, isMyself) {
+  if (!pathGroup.points || pathGroup.points.length < 2) return;
+  
+  ctx.beginPath();
+  ctx.strokeStyle = pathGroup.color || (isMyself ? currentPenColor : 'black');
+  ctx.lineWidth = pathGroup.thickness || (isMyself ? currentPenThickness : 4);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  
+  const points = pathGroup.points;
+  ctx.moveTo(points[0].x, points[0].y);
+  
+  if (points.length === 2) {
+    // 2点の場合は直線
+    ctx.lineTo(points[1].x, points[1].y);
+  } else if (points.length >= 3) {
+    // 3点以上の場合はベジェ曲線で滑らかに描画
+    for (let i = 1; i < points.length - 1; i++) {
+      const p0 = points[i - 1];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      
+      // Catmull-Rom スプライン係数での制御点計算
+      const tension = 0.25;
+      const cp1x = p1.x + (p2.x - p0.x) * tension;
+      const cp1y = p1.y + (p2.y - p0.y) * tension;
+      
+      ctx.quadraticCurveTo(cp1x, cp1y, p2.x, p2.y);
+    }
+  }
+  
+  ctx.stroke();
+}
+
+// 🔧【新機能】白赤ボーダーパス描画（最適化版）
+function drawWhiteRedBorderPath(pathGroup, isMyself) {
+  if (!pathGroup.points || pathGroup.points.length < 2) return;
+  
+  const baseThickness = pathGroup.thickness || (isMyself ? currentPenThickness : 4);
+  const points = pathGroup.points;
+  
+  // 3層を一度に描画（効率化）
+  const layers = [
+    { thickness: baseThickness + 8, color: '#ffccdd', alpha: isMyself ? 0.3 : 0.2 },
+    { thickness: baseThickness + 6, color: '#ff88bb', alpha: isMyself ? 0.8 : 0.6 },
+    { thickness: Math.max(1, baseThickness - 3), color: '#ffffff', alpha: isMyself ? 0.9 : 0.7 }
+  ];
+  
+  layers.forEach(layer => {
+    ctx.beginPath();
+    ctx.strokeStyle = layer.color;
+    ctx.lineWidth = layer.thickness;
+    ctx.globalAlpha = layer.alpha;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    ctx.moveTo(points[0].x, points[0].y);
+    
+    if (points.length === 2) {
+      // 2点の場合は直線
+      ctx.lineTo(points[1].x, points[1].y);
+    } else if (points.length >= 3) {
+      // 3点以上の場合はベジェ曲線で滑らかに描画
+      for (let i = 1; i < points.length - 1; i++) {
+        const p0 = points[i - 1];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        
+        // Catmull-Rom スプライン係数での制御点計算
+        const tension = 0.25;
+        const cp1x = p1.x + (p2.x - p0.x) * tension;
+        const cp1y = p1.y + (p2.y - p0.y) * tension;
+        
+        ctx.quadraticCurveTo(cp1x, cp1y, p2.x, p2.y);
+      }
+    }
+    
+    ctx.stroke();
+  });
+  
+  // アルファ値を元に戻す
+  ctx.globalAlpha = isMyself ? 1.0 : 0.7;
+}
+
 // 🔸 Writer別に独立した描画関数
+// 🔧【大幅改善】描画コマンドのバッチ処理と最適化
 function drawWriterCommands(commands, writerId, isMyself = false) {
   if (!Array.isArray(commands) || commands.length === 0) {
     return;
   }
   
-  if (isMyself) {
-    console.log(`📋 DEBUG: 自分の描画実行 - ${commands.length}件`);
-  }
+  // 🎯 パフォーマンス計測
+  const startTime = performance.now();
   
-  // このWriterのパス状態を完全にリセット（他Writerとの混在防止）
-  senderWriterPathStates[writerId] = {
-    prevCmd: null
-  };
-  
-  const writerState = senderWriterPathStates[writerId];
-  
+  // Canvas状態を1回だけ設定（毎回のリセットを削除）
   ctx.save();
   
-  // Canvas状態を完全にクリア（他WriterIDとの状態混在を防止）
-  ctx.beginPath(); // 重要：前のパスをクリア
-  ctx.setTransform(1, 0, 0, 1, 0, 0); // 変換行列をリセット
-  
-  // デフォルト描画設定を完全にリセット
+  // 基本設定（一度だけ）
   ctx.globalAlpha = isMyself ? 1.0 : 0.7;
-  ctx.shadowBlur = 0;
-  ctx.shadowColor = 'transparent';
   ctx.globalCompositeOperation = 'source-over';
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  let startCount = 0;
-  let drawCount = 0;
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
   
-  commands.forEach((cmd, index) => {
-    if (cmd.type === "start") {
-      startCount++;
-      // startコマンド時にこのWriterのパス状態を完全にリセット
-      ctx.beginPath(); // 前のパスをクリア
-      ctx.moveTo(cmd.x, cmd.y); // 開始点を設定
-      writerState.prevCmd = cmd;
-      
-      if (index === 0) {
-        const isValid = cmd.x >= 0 && cmd.x <= canvas.width && cmd.y >= 0 && cmd.y <= canvas.height;
-        console.log(`    🎯 最初のstart: x=${cmd.x}, y=${cmd.y} (canvas: ${canvas.width}x${canvas.height}) 範囲内？${isValid}`);
-      }
-    } else if (cmd.type === "draw" && writerState.prevCmd) {
-      drawCount++;
-      if (cmd.color === 'white-red-border') {
-        // 白地赤縁の特別処理
-        if (writerState.prevCmd) {
-          // 外側の薄い赤を描画
-          ctx.beginPath();
-          ctx.moveTo(writerState.prevCmd.x, writerState.prevCmd.y);
-          ctx.lineWidth = (cmd.thickness || (isMyself ? currentPenThickness : 4)) + 8;
-          ctx.globalAlpha = isMyself ? 0.3 : 0.2;
-          ctx.strokeStyle = '#ffccdd';
-          ctx.shadowColor = '#ffccdd';
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          ctx.lineTo(cmd.x, cmd.y);
-          ctx.stroke();
-          ctx.closePath(); // パス終了
-          
-          // 内側の濃い赤を描画
-          ctx.beginPath();
-          ctx.moveTo(writerState.prevCmd.x, writerState.prevCmd.y);
-          ctx.lineWidth = (cmd.thickness || (isMyself ? currentPenThickness : 4)) + 6;
-          ctx.globalAlpha = isMyself ? 0.8 : 0.6;
-          ctx.strokeStyle = '#ff88bb';
-          ctx.shadowColor = '#ff88bb';
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          ctx.lineTo(cmd.x, cmd.y);
-          ctx.stroke();
-          ctx.closePath(); // パス終了
-          
-          // 白い中心を描画（グロー効果付き）
-          ctx.beginPath();
-          ctx.moveTo(writerState.prevCmd.x, writerState.prevCmd.y);
-          ctx.globalAlpha = isMyself ? 0.9 : 0.7;
-          ctx.lineWidth = Math.max(1, (cmd.thickness || (isMyself ? currentPenThickness : 4)) - 3);
-          ctx.strokeStyle = '#ffffff';
-          ctx.shadowColor = '#ffffff';
-          ctx.lineTo(cmd.x, cmd.y);
-          ctx.stroke();
-          ctx.closePath(); // パス終了
-          ctx.globalAlpha = isMyself ? 1.0 : 0.7; // 透明度をリセット
-        }
-      } else {
-        // 通常の色の描画（各線分を完全独立して描画）
-        ctx.beginPath(); // 必須：新しいパスを開始
-        ctx.moveTo(writerState.prevCmd.x, writerState.prevCmd.y);
-        ctx.lineWidth = cmd.thickness || (isMyself ? currentPenThickness : 4);
-        ctx.strokeStyle = cmd.color || (isMyself ? currentPenColor : 'black');
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.lineTo(cmd.x, cmd.y);
-        ctx.stroke(); // 各線分を即座に描画
-        ctx.closePath(); // 重要：パスを完全に終了してWriter間の混在を防止
-      }
-      writerState.prevCmd = cmd;
+  // 🔧 描画パスをグループ化してバッチ処理
+  const pathGroups = groupCommandsByPath(commands);
+  
+  pathGroups.forEach(pathGroup => {
+    if (pathGroup.color === 'white-red-border') {
+      drawWhiteRedBorderPath(pathGroup, isMyself);
+    } else {
+      drawNormalColorPath(pathGroup, isMyself);
     }
   });
   
-  // 画面外描画の警告チェック
-  let outOfBoundsCount = 0;
-  commands.forEach(cmd => {
-    if (cmd.x < 0 || cmd.x > canvas.width || cmd.y < 0 || cmd.y > canvas.height) {
-      outOfBoundsCount++;
-    }
-  });
-  
-  if (isMyself) {
-    console.log(`📋 DEBUG: 自分の描画完了 - start=${startCount}件, draw=${drawCount}件`);
-  }
-  
-  // Canvas状態を完全にクリア（次のWriter描画との混在防止）
-  ctx.beginPath(); // 重要：このWriterのパスを完全終了
   ctx.restore();
+  
+  // パフォーマンス計測結果
+  const endTime = performance.now();
+  if (isMyself) {
+    console.log(`🎨 描画完了: ${commands.length}件 (${(endTime - startTime).toFixed(2)}ms)`);
+  }
 }
 
 // 再描画中フラグを追加して重複実行を防止
@@ -696,6 +753,40 @@ function redrawCanvasWithOthers() {
   // 再描画完了
   isRedrawing = false;
   console.log(`📋 DEBUG: 再描画完了`);
+}
+
+// ==========================================
+// グローバルWebSocket送信関数群
+// ==========================================
+
+// 🔧【新機能】WebSocketメッセージ送信用グローバル関数
+function sendWebSocketMessage(message) {
+  if (typeof socket !== 'undefined' && socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify(message));
+    console.log('📡 WebSocketメッセージ送信:', message.type);
+    return true;
+  } else {
+    console.warn('⚠️ WebSocket未接続のため送信失敗:', message.type);
+    return false;
+  }
+}
+
+// 🔧【新機能】グローバルクリア通知専用関数
+function sendGlobalClearMessage() {
+  return sendWebSocketMessage({
+    type: "globalClear",
+    writerId: myWriterId,
+    timestamp: Date.now()
+  });
+}
+
+// 🔧【新機能】個人クリア通知専用関数
+function sendClearWriterMessage() {
+  return sendWebSocketMessage({
+    type: "clearWriter", 
+    writerId: myWriterId,
+    timestamp: Date.now()
+  });
 }
 
 // ==========================================

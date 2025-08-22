@@ -2,30 +2,67 @@
 // Drawing Engine - 描画処理専用モジュール
 // ==========================================
 
-// 描画座標変換ユーティリティ
-function getCanvasCoordinates(event, element) {
-  const rect = element.getBoundingClientRect();
+// 🔧【統合改善】座標変換の統一とパフォーマンス最適化
+let cachedCanvasRect = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 100; // 100msキャッシュ
+
+// 統一座標変換関数（マウス・タッチ・ポインター対応）
+function getUnifiedCanvasCoordinates(event, element) {
+  // キャッシュチェック（パフォーマンス最適化）
+  const now = performance.now();
+  if (!cachedCanvasRect || (now - cacheTimestamp) > CACHE_DURATION) {
+    cachedCanvasRect = element.getBoundingClientRect();
+    cacheTimestamp = now;
+  }
+  
+  const rect = cachedCanvasRect;
   const scaleX = element.width / rect.width;
   const scaleY = element.height / rect.height;
-  const x = (event.clientX - rect.left) * scaleX;
-  const y = (event.clientY - rect.top) * scaleY;
+  
+  // イベントタイプに応じて座標を取得
+  let clientX, clientY;
+  
+  if (event.touches && event.touches.length > 0) {
+    // タッチイベント
+    clientX = event.touches[0].clientX;
+    clientY = event.touches[0].clientY;
+  } else {
+    // マウス・ポインターイベント
+    clientX = event.clientX;
+    clientY = event.clientY;
+  }
+  
+  const x = (clientX - rect.left) * scaleX;
+  const y = (clientY - rect.top) * scaleY;
   return { x, y };
 }
 
-// タッチイベント用座標変換
+// 後方互換性のため既存関数を残す
+function getCanvasCoordinates(event, element) {
+  return getUnifiedCanvasCoordinates(event, element);
+}
+
 function getTouchCanvasCoordinates(event, element) {
-  const touch = event.touches[0];
-  const rect = element.getBoundingClientRect();
-  const scaleX = element.width / rect.width;
-  const scaleY = element.height / rect.height;
-  const x = (touch.clientX - rect.left) * scaleX;
-  const y = (touch.clientY - rect.top) * scaleY;
-  return { x, y };
+  return getUnifiedCanvasCoordinates(event, element);
+}
+
+// キャッシュ無効化機能（ウィンドウリサイズ時など）
+function invalidateCanvasCache() {
+  cachedCanvasRect = null;
+  cacheTimestamp = 0;
 }
 
 // キャンバス座標をページ座標に変換（エフェクト表示用）
 function canvasToPageCoordinates(canvasX, canvasY, canvasElement) {
-  const rect = canvasElement.getBoundingClientRect();
+  // 🔧【改善】こちらもキャッシュを使用
+  const now = performance.now();
+  if (!cachedCanvasRect || (now - cacheTimestamp) > CACHE_DURATION) {
+    cachedCanvasRect = canvasElement.getBoundingClientRect();
+    cacheTimestamp = now;
+  }
+  
+  const rect = cachedCanvasRect;
   const scaleX = rect.width / canvasElement.width;
   const scaleY = rect.height / canvasElement.height;
   const pageX = rect.left + (canvasX * scaleX);
@@ -63,6 +100,9 @@ function setupDrawingContext() {
   ctx.lineWidth = currentPenThickness || 8;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  
+  // 🔧【修正】自分の描画は完全不透明に設定（他Writerの透明度設定をリセット）
+  ctx.globalAlpha = 1.0;
   
   // 描画品質向上設定（座標系に影響なし）
   ctx.imageSmoothingEnabled = true;
@@ -127,8 +167,12 @@ function handleDrawingStart(x, y) {
   // コンテキスト初期化と描画設定を統合
   setupDrawingContext();
 
-  // 描画開始（最適化：1回のbeginPath()で処理）
-  ctx.beginPath();
+  // 🔧【安全な修正】他の書き手が描画中でない場合のみbeginPath()を呼ぶ
+  // 他の書き手のデータが存在する場合は、現在のパスを保持
+  if (Object.keys(otherWritersData).length === 0) {
+    // 他の書き手がいない場合は、通常通りbeginPath()で新しいパス開始
+    ctx.beginPath();
+  }
   ctx.moveTo(x, y);
 
   // 描画コマンドを記録
@@ -172,6 +216,15 @@ function handleDrawingStart(x, y) {
 function handleDrawingMove(x, y) {
   if (!isPaintDrawing || !lastPaintPos) return false;
   if (!isWithinBackgroundArea(x, y)) return false;
+  
+  // 🔍【デバッグ】Canvas状態と他Writer状況を確認
+  console.log(`🎨 描画前Canvas状態:`, {
+    globalAlpha: ctx.globalAlpha,
+    globalCompositeOperation: ctx.globalCompositeOperation,
+    strokeStyle: ctx.strokeStyle,
+    lineWidth: ctx.lineWidth,
+    otherWritersCount: Object.keys(otherWritersData).length
+  });
 
   // 点履歴を更新
   pointHistory.push({ x, y });
@@ -179,37 +232,64 @@ function handleDrawingMove(x, y) {
     pointHistory.shift(); // 古い点を削除
   }
 
-  // 滑らかな曲線を描画
-  if (pointHistory.length >= 3) {
-    // ベジェ曲線で滑らかに描画
+  // 🎨 高品質ベジェ曲線で滑らかな描画
+  if (pointHistory.length >= 4) {
+    // 3次ベジェ曲線での超滑らか描画（4点以上で使用）
     const len = pointHistory.length;
+    const p0 = pointHistory[len - 4];
+    const p1 = pointHistory[len - 3];  
+    const p2 = pointHistory[len - 2];
+    const p3 = pointHistory[len - 1];
     
-    // 最後から2番目の点を中間点として使用
-    const lastPoint = pointHistory[len - 1];
-    const secondLastPoint = pointHistory[len - 2];
+    // Catmull-Rom スプライン係数で制御点を計算
+    const tension = 0.3; // 曲線の張り具合（0.1-0.5が適切）
     
-    // 中間点を計算（2点の中点）
-    const midPoint = {
-      x: (lastPaintPos.x + lastPoint.x) / 2,
-      y: (lastPaintPos.y + lastPoint.y) / 2
-    };
+    const cp1x = p1.x + (p2.x - p0.x) * tension;
+    const cp1y = p1.y + (p2.y - p0.y) * tension;
+    const cp2x = p2.x - (p3.x - p1.x) * tension;
+    const cp2y = p2.y - (p3.y - p1.y) * tension;
     
-    // 2次ベジェ曲線で滑らかに接続
-    ctx.quadraticCurveTo(lastPaintPos.x, lastPaintPos.y, midPoint.x, midPoint.y);
+    // 3次ベジェ曲線で描画
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
     ctx.stroke();
     
-    // beginPathを使わずに連続的に描画
-    ctx.beginPath();
-    ctx.moveTo(midPoint.x, midPoint.y);
+    // 🔧【安全な修正】他の書き手がいない場合のみパスをリセット
+    if (Object.keys(otherWritersData).length === 0) {
+      ctx.beginPath();
+    }
+    ctx.moveTo(p2.x, p2.y);
+  } else if (pointHistory.length >= 3) {
+    // 2次ベジェ曲線で滑らかに描画（3点の場合）
+    const len = pointHistory.length;
+    const p0 = pointHistory[len - 3];
+    const p1 = pointHistory[len - 2];
+    const p2 = pointHistory[len - 1];
+    
+    // 制御点を計算（中点ベース）
+    const cp1x = p0.x + (p1.x - p0.x) * 0.5;
+    const cp1y = p0.y + (p1.y - p0.y) * 0.5;
+    
+    ctx.quadraticCurveTo(cp1x, cp1y, p1.x, p1.y);
+    ctx.stroke();
+    
+    // 🔧【安全な修正】他の書き手がいない場合のみパスをリセット  
+    if (Object.keys(otherWritersData).length === 0) {
+      ctx.beginPath();
+    }
+    ctx.moveTo(p1.x, p1.y);
   } else if (pointHistory.length === 2) {
-    // 2点目も滑らかに接続
+    // 2点目は線形補間で滑らかに
     const midPoint = {
       x: (lastPaintPos.x + x) / 2,
       y: (lastPaintPos.y + y) / 2
     };
     ctx.quadraticCurveTo(lastPaintPos.x, lastPaintPos.y, midPoint.x, midPoint.y);
     ctx.stroke();
-    ctx.beginPath();
+    
+    // 🔧【安全な修正】他の書き手がいない場合のみパスをリセット
+    if (Object.keys(otherWritersData).length === 0) {
+      ctx.beginPath();
+    }
     ctx.moveTo(midPoint.x, midPoint.y);
   } else {
     // 最初の点
@@ -257,6 +337,14 @@ function handleDrawingMove(x, y) {
 
   // 位置更新
   lastPaintPos = { x, y };
+  
+  // 🔍【デバッグ】描画後のCanvas状態確認
+  console.log(`🎨 描画後Canvas状態:`, {
+    globalAlpha: ctx.globalAlpha,
+    globalCompositeOperation: ctx.globalCompositeOperation,
+    strokeStyle: ctx.strokeStyle,
+    lineWidth: ctx.lineWidth
+  });
 
   // エフェクト生成（ハートチェックボックスがONの場合のみ）
   if (typeof createDrawingHeart === 'function' && heartEffectEnabled) {
@@ -284,8 +372,8 @@ function handleDrawingEnd() {
     stopPenSound();
   }
 
-  // 描画終了後に即座に高品質化
-  renderSmoothDrawing();
+  // 高品質化は他のライターの描画を消すため無効化
+  // renderSmoothDrawing(); // 🚫 この関数はキャンバス全体をクリアして自分の描画のみ再描画するため他者の描画が消える
 
   return true;
 }
@@ -468,61 +556,53 @@ function initializeDrawingEngine() {
   console.log('🎨 描画エンジン初期化開始:', canvasElement);
 
   // マウスイベントリスナー
-  canvasElement.addEventListener('mousedown', (e) => {
+  // 🔧【統合改善】イベントハンドラーの統合と最適化
+  
+  // 統一イベントハンドラー関数
+  function handleUnifiedInputStart(e) {
     e.preventDefault();
-    const { x, y } = getCanvasCoordinates(e, canvasElement);
+    // マルチタッチを防止（描画は1本指のみ）
+    if (e.touches && e.touches.length > 1) return;
+    
+    const { x, y } = getUnifiedCanvasCoordinates(e, canvasElement);
     handleDrawingStart(x, y);
-  });
-
-  canvasElement.addEventListener('mousemove', (e) => {
+  }
+  
+  function handleUnifiedInputMove(e) {
     e.preventDefault();
-    const { x, y } = getCanvasCoordinates(e, canvasElement);
+    // マルチタッチを防止
+    if (e.touches && e.touches.length > 1) return;
+    
+    const { x, y } = getUnifiedCanvasCoordinates(e, canvasElement);
     handleDrawingMove(x, y);
-  });
-
-  canvasElement.addEventListener('mouseup', (e) => {
+  }
+  
+  function handleUnifiedInputEnd(e) {
     e.preventDefault();
     handleDrawingEnd();
-  });
-
-  // タッチイベントリスナー
-  canvasElement.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    const { x, y } = getTouchCanvasCoordinates(e, canvasElement);
-    handleDrawingStart(x, y);
-  });
-
-  canvasElement.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-    if (e.touches.length > 0) {
-      const { x, y } = getTouchCanvasCoordinates(e, canvasElement);
-      handleDrawingMove(x, y);
-    }
-  });
-
-  canvasElement.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    handleDrawingEnd();
-  });
-
-  // ポインターイベントリスナー（現代ブラウザ用）
+  }
+  
+  // Pointer Events を優先使用（モダンブラウザ対応）
   if ('PointerEvent' in window) {
-    canvasElement.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      const { x, y } = getCanvasCoordinates(e, canvasElement);
-      handleDrawingStart(x, y);
-    });
-
-    canvasElement.addEventListener('pointermove', (e) => {
-      e.preventDefault();
-      const { x, y } = getCanvasCoordinates(e, canvasElement);
-      handleDrawingMove(x, y);
-    });
-
-    canvasElement.addEventListener('pointerup', (e) => {
-      e.preventDefault();
-      handleDrawingEnd();
-    });
+    console.log('🖱️ Pointer Events使用（モダンブラウザ対応）');
+    canvasElement.addEventListener('pointerdown', handleUnifiedInputStart);
+    canvasElement.addEventListener('pointermove', handleUnifiedInputMove);
+    canvasElement.addEventListener('pointerup', handleUnifiedInputEnd);
+    canvasElement.addEventListener('pointercancel', handleUnifiedInputEnd);
+  } else {
+    // フォールバック：従来のマウス・タッチイベント
+    console.log('🖱️ マウス・タッチイベント使用（レガシーブラウザ対応）');
+    
+    // マウスイベント
+    canvasElement.addEventListener('mousedown', handleUnifiedInputStart);
+    canvasElement.addEventListener('mousemove', handleUnifiedInputMove);
+    canvasElement.addEventListener('mouseup', handleUnifiedInputEnd);
+    
+    // タッチイベント
+    canvasElement.addEventListener('touchstart', handleUnifiedInputStart, { passive: false });
+    canvasElement.addEventListener('touchmove', handleUnifiedInputMove, { passive: false });
+    canvasElement.addEventListener('touchend', handleUnifiedInputEnd, { passive: false });
+    canvasElement.addEventListener('touchcancel', handleUnifiedInputEnd, { passive: false });
   }
 
   // mouseleaveで描画を終了（一般的なペイントツールの動作）
@@ -537,7 +617,11 @@ function initializeDrawingEngine() {
     handleDrawingEnd();
   });
 
-  console.log('✅ 描画エンジンが初期化されました (タッチ/マウス対応)');
+  // ウィンドウリサイズ時にキャッシュを無効化
+  window.addEventListener('resize', invalidateCanvasCache);
+  window.addEventListener('orientationchange', invalidateCanvasCache);
+  
+  console.log('✅ 描画エンジンが初期化されました (統合入力システム)');
   return true;
 }
 

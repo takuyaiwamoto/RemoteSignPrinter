@@ -409,8 +409,9 @@ function setSpecialBackgroundToggle() {
 
 // 🔸 キャンバス全体をクリアする関数
 function clearCanvas() {
-  // console.log('🧹 キャンバス全体をクリア');
+  console.log('🧹 キャンバス全体をクリア開始');
   
+  // キャンバスを完全にクリア
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
   // 背景画像があれば再描画
@@ -418,20 +419,42 @@ function clearCanvas() {
     drawBackgroundImage(ctx, backgroundImage, canvas);
   }
   
-  // 全ての描画データをクリア
+  // 🔧【修正】全ての描画データを完全クリア
   drawingCommands = [];
-  
-  // 受信側に全体クリアを通知
-  if (socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({
-      type: "globalClear",
-      writerId: myWriterId,
-      timestamp: Date.now()
-    }));
-    console.log('📡 全体クリアを受信側に送信');
+  if (typeof otherWritersData !== 'undefined') {
+    otherWritersData = {};
   }
   
-  console.log('✅ 全体クリア完了');
+  // 🔧【追加】描画エンジンの状態もクリア
+  if (typeof pointHistory !== 'undefined') {
+    pointHistory = [];
+  }
+  if (typeof lastPaintPos !== 'undefined') {
+    lastPaintPos = null;
+  }
+  if (typeof isPaintDrawing !== 'undefined') {
+    isPaintDrawing = false;
+  }
+  if (typeof writerDrawingStates !== 'undefined') {
+    // constオブジェクトは再代入不可のため、プロパティを削除
+    Object.keys(writerDrawingStates).forEach(key => {
+      delete writerDrawingStates[key];
+    });
+  }
+  
+  // 🔧【修正】グローバル関数を使用してWebSocket送信
+  if (typeof sendGlobalClearMessage === 'function') {
+    const success = sendGlobalClearMessage();
+    if (success) {
+      console.log('📡 全体クリアを受信側に送信');
+    } else {
+      console.warn('⚠️ 全体クリア送信失敗');
+    }
+  } else {
+    console.error('❌ sendGlobalClearMessage関数が見つかりません');
+  }
+  
+  console.log('✅ 全体クリア完了 - 全描画データと状態をクリア');
 }
 
 // 🔸 自分の描画のみをクリアする関数
@@ -447,14 +470,16 @@ function clearMyDrawing() {
     drawBackgroundImage(ctx, backgroundImage, canvas);
   }
   
-  // 受信側に自分の描画クリアを通知
-  if (socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({
-      type: "clearWriter",
-      writerId: myWriterId,
-      timestamp: Date.now()
-    }));
-    console.log('📡 自分の描画クリアを受信側に送信');
+  // 🔧【修正】グローバル関数を使用してWebSocket送信
+  if (typeof sendClearWriterMessage === 'function') {
+    const success = sendClearWriterMessage();
+    if (success) {
+      console.log('📡 自分の描画クリアを受信側に送信');
+    } else {
+      console.warn('⚠️ 自分の描画クリア送信失敗');
+    }
+  } else {
+    console.error('❌ sendClearWriterMessage関数が見つかりません');
   }
   
   console.log('✅ 自分の描画クリア完了');
