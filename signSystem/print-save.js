@@ -50,6 +50,7 @@ function saveDoubleRotatedImage() {
   console.log(`🔄 送信完了 → ${totalAnimationTime/1000}秒後（アニメーション完了後）に送信者データクリア + 自動Clear処理を実行`);
   setTimeout(() => {
     // 🔸 送信者側のデータクリア（アニメーション完了後）
+    // ✅ アニメーション完了後は全データクリア（仕様通り）
     otherWritersData = {};
     drawingCommands = []; // 🔥 アニメーション完了後に自分の描画コマンドをクリア
     console.log('🧹 アニメーション完了後: 全描画データをクリア');
@@ -142,9 +143,13 @@ function saveDoubleRotatedImage() {
     drawingCommands = [];
     otherWritersData = {};
     
-    // 受信側にもクリア指示を送信
+    // 受信側にもクリア指示を送信（送信者自身は除外）
     if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: "clear" }));
+      socket.send(JSON.stringify({ 
+        type: "clear",
+        fromSender: true,  // 送信者からのクリア指示であることを明示
+        senderWriterId: myWriterId
+      }));
     }
     
   }, 10000); // 送信ボタン押下から10秒後にクリア

@@ -24,10 +24,8 @@
   <button onclick="saveDoubleRotatedImage()" style="background-color: #4CAF50; color: white; font-size: 18px; padding: 12px 24px; font-weight: bold;">渡す</button>
 </div>
 
-</div>
-
-<!-- 右サイドバー: ペンの色と太さを並べて配置 -->
-<div class="right-sidebar" style="display: flex; gap: 15px; margin-top: 20px;">
+<!-- 右サイドバー: ペンの色と太さを並べて配置 （Clearボタンの直下に移動） -->
+<div class="right-sidebar" style="display: flex; gap: 15px; margin-top: 5px;">
   <!-- 左列: 色 -->
   <div class="pen-colors-vertical" style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
     <h4 style="margin: 0; font-size: 16px; color: #333;">色</h4>
@@ -571,6 +569,7 @@ socket.onclose = (event) => {
 // 背景画像の変形パラメータ
 let backgroundScale = 1.0; // スケール（大きさ）
 let backgroundOffsetY = 0; // 垂直オフセット
+
 
 // 🎯 イベントハンドラー・初期化処理 (キーボードイベント, DOMContentLoaded, タッチイベント) はevent-handlers.jsに移動しました
 </script>

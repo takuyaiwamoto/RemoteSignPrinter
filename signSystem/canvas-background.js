@@ -459,15 +459,34 @@ function clearCanvas() {
 
 // 🔸 自分の描画のみをクリアする関数
 function clearMyDrawing() {
-  // console.log('🧹 自分の描画のみをクリア');
+  console.log('🧹 自分の描画のみをクリア開始');
   
-  // 自分の描画データのみをクリア
+  // 🔧【修正】自分の描画データのみをクリア
   drawingCommands = [];
   
-  // キャンバスをクリアして背景を再描画
+  // 🔧【修正】描画エンジンの自分の状態のみクリア
+  if (typeof pointHistory !== 'undefined') {
+    pointHistory = [];
+  }
+  if (typeof lastPaintPos !== 'undefined') {
+    lastPaintPos = null;
+  }
+  if (typeof isPaintDrawing !== 'undefined') {
+    isPaintDrawing = false;
+  }
+  if (typeof writerDrawingStates !== 'undefined' && myWriterId) {
+    delete writerDrawingStates[myWriterId];
+  }
+  
+  // 🔧【重要】キャンバス全体をクリアして再描画（自分の分だけ除外）
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (backgroundImage) {
     drawBackgroundImage(ctx, backgroundImage, canvas);
+  }
+  
+  // 🔧【重要】他の人の描画を再描画（自分の描画は除外済み）
+  if (typeof redrawCanvasWithOthers === 'function') {
+    redrawCanvasWithOthers();
   }
   
   // 🔧【修正】グローバル関数を使用してWebSocket送信
@@ -482,7 +501,7 @@ function clearMyDrawing() {
     console.error('❌ sendClearWriterMessage関数が見つかりません');
   }
   
-  console.log('✅ 自分の描画クリア完了');
+  console.log('✅ 自分の描画クリア完了 - 他の人の描画は保持');
 }
 
 // ==========================================

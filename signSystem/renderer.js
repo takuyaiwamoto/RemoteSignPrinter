@@ -115,6 +115,29 @@ function startVideoPlayback() {
   console.log('🎬 動画再生開始');
   
   return new Promise((resolve) => {
+    // 🔧【フェードイン完了イベント】動画終了時にイベント発火（パターン1）
+    let fadeInCompleteEventFired = false;
+    video.addEventListener('timeupdate', () => {
+      if (video.duration && video.currentTime && !fadeInCompleteEventFired) {
+        const remainingTime = video.duration - video.currentTime;
+        // パターン1は動画終了時にフェードイン完了とする
+        if (remainingTime <= 0.5 && remainingTime > 0.1) {
+          fadeInCompleteEventFired = true;
+          console.log(`🎬【パターン1】フェードイン完了 - スライドアニメーション待機時間開始`);
+          console.log(`⏰ フェードイン完了時の動画残り時間: ${remainingTime.toFixed(2)}秒`);
+          
+          
+          window.dispatchEvent(new CustomEvent('fadeInComplete', {
+            detail: { 
+              timestamp: Date.now(),
+              pattern: 1,
+              remainingTime: remainingTime
+            }
+          }));
+        }
+      }
+    });
+
     // 動画終了時の処理
     video.addEventListener('ended', () => {
       console.log('🎬 動画再生終了検出 - 0.5秒待機後に次の処理へ');
@@ -122,6 +145,17 @@ function startVideoPlayback() {
       // 動画の最後のフレームが確実に表示されるよう少し待機
       setTimeout(() => {
         console.log('🎬 動画再生完全終了 - 最後のフレームで静止');
+        
+        // 🔧【パターン1】動画終了時の処理
+        if (!fadeInCompleteEventFired) {
+          console.log('🎬 パターン1動画終了 - フェードイン完了イベント発火（バックアップ）');
+          window.dispatchEvent(new CustomEvent('fadeInComplete', {
+            detail: { timestamp: Date.now(), pattern: 1 }
+          }));
+        } else {
+          console.log('🎬 パターン1動画終了 - フェードイン完了イベントは既に発火済み');
+        }
+        
         // 動画は削除せず、最後のフレームで静止
         resolve();
       }, 500); // 0.5秒の遅延を追加
@@ -215,6 +249,43 @@ function startPattern2FadeInOut() {
           setTimeout(() => {
             console.log('🎬 パターン2: 描画フェードイン開始（動画終了4秒前）');
             
+            
+            // フェードイン開始時間を記録（グローバル変数として保存）
+            const newTimestamp = performance.now();
+            const previousTimestamp = window.fadeInStartTimestamp;
+            
+            // 🔧 確実にクリーンな状態で開始
+            window.fadeInStartTimestamp = newTimestamp;
+            console.log(`⏱️ フェードイン開始時間記録: ${newTimestamp.toFixed(2)}ms (前回: ${previousTimestamp ? previousTimestamp.toFixed(2) + 'ms' : 'なし'})`);
+            
+            // 前回の値が残っている場合の警告
+            if (previousTimestamp && (newTimestamp - previousTimestamp) > 30000) {
+              console.warn('⚠️ 前回のフェードイン開始時間が30秒以上古い値でした - 適切にクリアされていない可能性');
+            }
+            
+            // 🔧 フェードイン開始と同時にタイマーを設定（より確実なタイミング制御）
+            setTimeout(() => {
+              if (!fadeInCompleteEventFired) {
+                fadeInCompleteEventFired = true;
+                const fadeInElapsed = performance.now() - window.fadeInStartTimestamp;
+                const currentTime = video.currentTime || 0;
+                const remainingTime = video.duration ? video.duration - currentTime : 0;
+                
+                console.log(`🎬【パターン2】フェードイン完了（タイマーベース） - スライドアニメーション待機時間開始`);
+                console.log(`⏱️ フェードイン実行時間: ${fadeInElapsed.toFixed(2)}ms (${(fadeInElapsed/1000).toFixed(2)}秒)`);
+                console.log(`⏰ フェードイン完了時の動画残り時間: ${remainingTime.toFixed(2)}秒`);
+                
+                window.dispatchEvent(new CustomEvent('fadeInComplete', {
+                  detail: { 
+                    timestamp: Date.now(),
+                    pattern: 2,
+                    remainingTime: remainingTime,
+                    fadeInDuration: fadeInElapsed
+                  }
+                }));
+              }
+            }, 1200); // CSSの1s + マージン0.2s
+            
             // デバッグ：現在の状態を確認
             console.log('🔍 フェードイン前の状態:');
             console.log('  - back2Wrapper:', back2Wrapper);
@@ -252,7 +323,7 @@ function startPattern2FadeInOut() {
               console.log('🎬 メインdrawCanvas 早期フェードイン開始 - opacity設定後:', drawCanvas.style.opacity);
             }
             
-            // 1秒後に最終状態を確認
+            // 1秒後に最終状態を確認（イベント発火は動画終了時に移動）
             setTimeout(() => {
               console.log('🔍 フェードイン完了後の状態:');
               allCanvases.forEach((canvas, index) => {
@@ -275,13 +346,32 @@ function startPattern2FadeInOut() {
       checkAndStartFadeIn();
     }, 50);
     
+    // 🔧【フェードイン完了イベント】実際のフェードイン開始後に設定されるタイマー方式
+    let fadeInCompleteEventFired = false;
+    let fadeInCheckInterval = null;
+    
     // 動画終了時の処理（フェードインは既に完了している）
     video.addEventListener('ended', () => {
       console.log('🎬 パターン2: 動画再生終了検出 - 0.5秒待機後に次の処理へ');
       
+      // タイマーをクリアして確実にクリーンアップ（setTimeoutの場合は自動的にクリアされる）
+      console.log('🔄 パターン2動画終了時のクリーンアップ完了');
+      
       // 動画の最後のフレームが確実に表示されるよう少し待機
       setTimeout(() => {
         console.log('🎬 パターン2: 動画再生完全終了 - フェードインは既に完了');
+        
+        // 🔧【パターン2】動画終了時の処理
+        if (!fadeInCompleteEventFired) {
+          console.log('🎬 パターン2動画終了 - フェードイン完了イベント発火（バックアップ）');
+          console.log('⚠️ 実時間ベースでフェードイン完了が検出されなかったため、バックアップイベントを発火');
+          window.dispatchEvent(new CustomEvent('fadeInComplete', {
+            detail: { timestamp: Date.now(), pattern: 2, isBackup: true }
+          }));
+        } else {
+          console.log('🎬 パターン2動画終了 - フェードイン完了イベントは実時間ベースで発火済み');
+        }
+        
         // 動画終了後、そのまま待機・スライド処理へ
         resolve();
       }, 500); // 0.5秒の遅延を追加
@@ -1306,7 +1396,7 @@ let writerDrawingData = {};
 let writerCanvasSizes = {};
 
 // 180度回転した描画を実行
-// ベジェ曲線で滑らかに描画する関数
+// ベジェ曲線で滑らかに描画する関数（連続版）
 function drawRotatedCurve(x0, y0, x1, y1, x2, y2, color, thickness) {
   if (!drawCtx) return;
   
@@ -1321,15 +1411,14 @@ function drawRotatedCurve(x0, y0, x1, y1, x2, y2, color, thickness) {
   drawCtx.lineCap = 'round';
   drawCtx.lineJoin = 'round';
   
-  // 中間点を計算（より滑らかな曲線のため）
-  const midPoint1 = {
-    x: (x0 + x1) / 2,
-    y: (y0 + y1) / 2
-  };
-  const midPoint2 = {
-    x: (x1 + x2) / 2,
-    y: (y1 + y2) / 2
-  };
+  // 前回の終点から今回の終点へ連続的に描画
+  // 中間点を制御点として使用
+  const controlX = x1;
+  const controlY = y1;
+  const startX = x0;
+  const startY = y0;
+  const endX = x2;
+  const endY = y2;
   
   // white-red-border特別処理
   if (color === 'white-red-border') {
@@ -1345,10 +1434,11 @@ function drawRotatedCurve(x0, y0, x1, y1, x2, y2, color, thickness) {
       drawCtx.strokeStyle = layer.color;
       drawCtx.lineWidth = layer.thickness;
       
+      // 前の点から直接描画（隙間を防ぐ）
       drawCtx.beginPath();
-      drawCtx.moveTo(midPoint1.x, midPoint1.y);
-      // 2次ベジェ曲線で滑らかに接続
-      drawCtx.quadraticCurveTo(x1, y1, midPoint2.x, midPoint2.y);
+      drawCtx.moveTo(startX, startY);
+      drawCtx.lineTo(controlX, controlY);
+      drawCtx.lineTo(endX, endY);
       drawCtx.stroke();
     });
     
@@ -1358,10 +1448,11 @@ function drawRotatedCurve(x0, y0, x1, y1, x2, y2, color, thickness) {
     drawCtx.strokeStyle = color || '#000000';
     drawCtx.lineWidth = thickness || 2;
     
+    // 前の点から直接描画（隙間を防ぐ）
     drawCtx.beginPath();
-    drawCtx.moveTo(midPoint1.x, midPoint1.y);
-    // 2次ベジェ曲線で滑らかに接続
-    drawCtx.quadraticCurveTo(x1, y1, midPoint2.x, midPoint2.y);
+    drawCtx.moveTo(startX, startY);
+    drawCtx.lineTo(controlX, controlY);
+    drawCtx.lineTo(endX, endY);
     drawCtx.stroke();
   }
   
@@ -1507,6 +1598,7 @@ function processDrawingForBack2(data, writerId) {
     item.x === data.x && item.y === data.y && item.timestamp === data.timestamp
   );
   const prevData = currentIndex > 0 ? writerDrawingData[writerId][currentIndex - 1] : null;
+  const beforePrevData = currentIndex > 1 ? writerDrawingData[writerId][currentIndex - 2] : null;
     
   // 🔍【デバッグ】前データの確認（高精度表示）
   // console.log(`🔍前データ確認: writerId=${writerId}, 配列長=${writerDrawingData[writerId]?.length || 0}, 現在インデックス=${currentIndex}, prevData=${prevData ? `存在(${prevData.x?.toFixed(3)},${prevData.y?.toFixed(3)}) ts:${prevData.timestamp}` : 'null'}, 現在=(${data.x.toFixed(3)},${data.y.toFixed(3)}) ts:${data.timestamp}`);
@@ -1554,6 +1646,7 @@ function processDrawingForBack2(data, writerId) {
       console.log(`🎯詳細: (${data.x.toFixed(1)},${data.y.toFixed(1)}) → 描画(${rotatedPrevX.toFixed(1)},${rotatedPrevY.toFixed(1)})→(${rotatedCurrX.toFixed(1)},${rotatedCurrY.toFixed(1)})`);
     }
     
+    // 🎨 シンプルな直線描画に戻す（隙間を防ぐため）
     drawRotatedStroke(
       rotatedPrevX, rotatedPrevY,
       rotatedCurrX, rotatedCurrY,
@@ -2091,7 +2184,7 @@ let backgroundOffsetY = 0; // 背景の垂直オフセット
 // 🔸 Dev Tool設定
 let devCanvasScale = 0.35; // キャンバススケール（デフォルト0.35）
 let devAnimationStartWaitTime = 3.3; // アニメーション開始待機時間（秒）
-let devRotationWaitTime = 7.5; // 回転後待機時間（秒）
+let devRotationWaitTime = 7.5 - 3.0; // 回転後待機時間（秒）- 3秒短縮
 
 // 🔸 描画エリア調整設定
 // 統一座標システム設定
@@ -5016,7 +5109,7 @@ function handleMessage(data) {
     const oldCanvasScale = devCanvasScale;
     devCanvasScale = data.canvasScale || 0.7;
     devAnimationStartWaitTime = data.animationStartWaitTime || 3.3;
-    devRotationWaitTime = data.rotationWaitTime || 8.1;
+    devRotationWaitTime = (data.rotationWaitTime || 8.1) - 3.0; // 3秒短縮
     videoPattern = data.videoPattern || 1;
     console.log(`🔧 Dev設定受信: scale=${devCanvasScale}, animationWait=${devAnimationStartWaitTime}, rotationWait=${devRotationWaitTime}, videoPattern=${videoPattern}`);
     
@@ -5662,40 +5755,31 @@ function runAnimationSequence(waitTime = null, fireworksEnabled = true, confetti
     if (waitTime !== null) {
       // 書き手側から送信された待機時間を使用
       rotationWaitTime = waitTime * 1000; // 秒をmsに変換
-      //console.log(`⏰ 書き手側設定：回転後${waitTime}秒待機してから移動開始`);
+      console.log(`⏰ 書き手側設定：フェードイン完了後${waitTime}秒待機してから移動開始`);
     } else if (currentPaperSize === "A4" || currentPaperSize === "L") {
-      rotationWaitTime = devRotationWaitTime * 1000; // Dev設定の秒数をmsに変換
-      //console.log(`⏰ ${currentPaperSize}モード：回転後${devRotationWaitTime}秒待機してから移動開始`);
+      rotationWaitTime = devRotationWaitTime * 1000; // Dev設定の秒数をmsに変換（既に-3秒済み）
+      console.log(`⏰ ${currentPaperSize}モード：フェードイン完了後${devRotationWaitTime}秒待機してから移動開始`);
     } else {
       rotationWaitTime = 1100; // ポスター：従来通り1.1秒
-      //console.log("⏰ ポスターモード：回転後1.1秒待機してから移動開始");
+      console.log("⏰ ポスターモード：フェードイン完了後1.1秒待機してから移動開始");
     }
     
-    // 🔸 回転完了後1秒で花火エフェクトを開始（チェックボックスが有効な場合のみ）
-    setTimeout(() => {
-      // 花火が有効で、既に実行中でない場合のみ実行
-      if (fireworksEnabled && !fireworksInProgress) {
-        // //console.log('🎆 回転アニメーション完了後1秒で花火を実行');
-        createReceiverFireworks();
-      } else if (!fireworksEnabled) {
-        // //console.log('🎆 花火演出は無効に設定されています');
-      } else {
-        // //console.log('🎆 花火は既に実行中のため、回転アニメーションでの花火実行をスキップ');
-      }
+    // 🔧【重要】フェードイン完了イベントをリッスンして移動アニメーション開始
+    const handleFadeInComplete = () => {
+      const fadeInCompleteTime = performance.now();
+      console.log('🎬 フェードイン完了イベント受信 - 待機時間カウント開始');
       
-      // 🔸 紙吹雪エフェクト（チェックボックスが有効な場合のみ）
-      if (confettiEnabled) {
-        // 🔸 移動アニメーション1.5秒前に紙吹雪エフェクトを追加（clack.mp3再生）
-        const confettiDelay = rotationWaitTime - 1500; // 移動開始1.5秒前
-        setTimeout(() => {
-          createConfettiEffectWithClack();
-        }, confettiDelay);
-      } else {
-        // //console.log('🎊 紙吹雪演出は無効に設定されています');
-      }
-    }, 2500); // 回転完了後1秒で実行（回転1.5秒 + 1秒 = 2.5秒後）
+      setTimeout(() => {
+        const moveAnimationStartTime = performance.now();
+        const totalWaitTime = moveAnimationStartTime - fadeInCompleteTime;
+        console.log('🎬 フェードイン完了後の待機時間経過 - 移動アニメーション開始');
+        console.log(`⏱️ フェードイン完了→移動アニメーション開始: ${totalWaitTime.toFixed(2)}ms (設定: ${rotationWaitTime}ms)`);
+        startMoveAnimation();
+      }, rotationWaitTime);
+    };
     
-    setTimeout(() => {
+    // 🔧【重要】移動アニメーション実行関数
+    const startMoveAnimation = () => {
       animationImage.style.transition = "transform 2s ease";
       
       // 🔸 用紙サイズに応じて移動距離を調整（ウィンドウ下部を完全に通過）
@@ -5746,24 +5830,45 @@ function runAnimationSequence(waitTime = null, fireworksEnabled = true, confetti
           const img = new Image();
           img.src = lastBackgroundSrc;
           img.onload = () => {
-            // 背景画像設定処理は削除済み
-            // 再描画処理は削除済み;
+            //console.log('🎨 最新の背景画像を再適用');
+            // 背景画像再適用処理は削除済み（既に適用済みのため）
           };
-        } else {
-          // 背景画像設定処理は削除済み
-          // 再描画処理は削除済み;
         }
-
-        // 🔸 アニメーション完了後にカウントダウン開始
-        // startCountdown(); // カウントダウンを無効化
         
         // 🚪 送信アニメーション完了後に扉タイマーを開始（back6.png状態の場合）
         if (isCanvasRotated && lastBackgroundSrc && lastBackgroundSrc.includes('back6.png')) {
           scheduleDoorClosing();
         }
       }, waitTime); // 🔸 用紙サイズに応じた待機時間（5秒延長済み）
-
-    }, rotationWaitTime + 1500); // 🔸 回転完了（1.5秒）+ 用紙サイズに応じた待機時間
+    };
+    
+    // 🔸 回転完了後1秒で花火エフェクトを開始（チェックボックスが有効な場合のみ）
+    setTimeout(() => {
+      // 花火が有効で、既に実行中でない場合のみ実行
+      if (fireworksEnabled && !fireworksInProgress) {
+        // //console.log('🎆 回転アニメーション完了後1秒で花火を実行');
+        createReceiverFireworks();
+      } else if (!fireworksEnabled) {
+        // //console.log('🎆 花火演出は無効に設定されています');
+      } else {
+        // //console.log('🎆 花火は既に実行中のため、回転アニメーションでの花火実行をスキップ');
+      }
+      
+      // 🔸 紙吹雪エフェクト（チェックボックスが有効な場合のみ）
+      if (confettiEnabled) {
+        // 🔸 移動アニメーション1.5秒前に紙吹雪エフェクトを追加（clack.mp3再生）
+        const confettiDelay = rotationWaitTime - 1500; // 移動開始1.5秒前
+        setTimeout(() => {
+          createConfettiEffectWithClack();
+        }, confettiDelay);
+      } else {
+        // //console.log('🎊 紙吹雪演出は無効に設定されています');
+      }
+    }, 2500); // 回転完了後1秒で実行（回転1.5秒 + 1秒 = 2.5秒後）
+    
+    // 🔧【重要】フェードイン完了イベントリスナーを追加
+    window.addEventListener('fadeInComplete', handleFadeInComplete, { once: true });
+    console.log('🎬 フェードイン完了イベントリスナー追加完了');
 
   }, animationStartDelay); // 🔸 用紙サイズに応じた遅延時間
 }
@@ -7872,6 +7977,12 @@ function startRotationAnimation(rotationWaitTime) {
   console.log(`🔍 startRotationAnimation受信: rotationWaitTime = ${rotationWaitTime}ms (${rotationWaitTime/1000}秒)`);
   isAnimationInProgress = true; // アニメーション開始フラグ
   
+  // 🎵 背景5の場合に音楽再生開始
+  if (window.isDevWhiteBackground) {
+    playBackgroundMusic();
+    console.log('🎵 背景5: アニメーション開始時に音楽再生開始');
+  }
+  
   // 実際に使用されている要素IDを使用
   const drawCanvasElement = document.getElementById('drawCanvas') || document.getElementById('drawCanvas-temp');
   const back2WrapperElement = document.getElementById('back2-wrapper'); // 正しいIDに修正
@@ -7926,16 +8037,44 @@ function startRotationAnimation(rotationWaitTime) {
       if (videoPattern === 2) {
         console.log('🎬 背景5 パターン2: 描画フェードアウト・動画フェードイン開始');
         // パターン2: 描画フェードアウト + 動画フェードイン
-        startPattern2FadeInOut().then(() => {
-          console.log('🎬 パターン2 動画再生終了: 待機時間開始');
+        // 🔧【修正】fadeInCompleteイベントを受信してから待機・スライド開始
+        const handleFadeInCompleteForPattern2 = (event) => {
+          console.log('🎬 パターン2: フェードイン完了イベント受信 - 待機時間開始');
+          if (event.detail && event.detail.remainingTime !== undefined) {
+            console.log(`⏰ フェードイン完了時の動画残り時間: ${event.detail.remainingTime.toFixed(2)}秒`);
+          }
+          if (event.detail && event.detail.fadeInDuration !== undefined) {
+            console.log(`⏱️ 受信イベント: フェードイン実行時間 ${event.detail.fadeInDuration.toFixed(2)}ms`);
+          }
           performWaitAndSlide(rotationWaitTime);
+        };
+        
+        // 🔧 フェードイン開始時間を確実にリセット
+        window.fadeInStartTimestamp = null;
+        console.log('🔄 パターン2開始前: フェードイン開始時間をリセット');
+        
+        window.addEventListener('fadeInComplete', handleFadeInCompleteForPattern2, { once: true });
+        console.log('🎬 パターン2: fadeInCompleteイベントリスナー設定完了');
+        
+        startPattern2FadeInOut().then(() => {
+          console.log('🎬 パターン2 動画再生終了: フェードインイベント待機中');
         });
       } else {
         console.log('🎬 背景5 パターン1: 回転後動画再生開始');
-        startVideoPlayback().then(() => {
-          console.log('🎬 動画再生終了: 待機時間開始');
-          // 動画終了後に待機時間を開始
+        // 🔧【修正】パターン1もfadeInCompleteイベントを受信してから待機・スライド開始
+        const handleFadeInCompleteForPattern1 = (event) => {
+          console.log('🎬 パターン1: フェードイン完了イベント受信 - 待機時間開始');
+          if (event.detail && event.detail.remainingTime !== undefined) {
+            console.log(`⏰ フェードイン完了時の動画残り時間: ${event.detail.remainingTime.toFixed(2)}秒`);
+          }
           performWaitAndSlide(rotationWaitTime);
+        };
+        
+        window.addEventListener('fadeInComplete', handleFadeInCompleteForPattern1, { once: true });
+        console.log('🎬 パターン1: fadeInCompleteイベントリスナー設定完了');
+        
+        startVideoPlayback().then(() => {
+          console.log('🎬 パターン1 動画再生終了: フェードインイベント待機中');
         });
       }
     } else {
@@ -7975,16 +8114,41 @@ function performWaitAndSlide(rotationWaitTime) {
   }
   
   setTimeout(() => {
+    const step2EndTime = performance.now();
     console.log('✅ Step 2完了: 待機時間終了');
       
     // Step 3: 下にスライドアニメーション (2秒で画面外まで)
+    const step3StartTime = performance.now();
+    const transitionTime = step3StartTime - step2EndTime;
     console.log('⬇️ Step 3: 下にスライドアニメーション開始');
+    console.log(`⏱️ Step 2完了→Step 3開始: ${transitionTime.toFixed(2)}ms`);
+    if (transitionTime > 10) {
+      console.warn(`⚠️ Step 2完了からStep 3開始まで ${transitionTime.toFixed(2)}ms の遅延が発生しています`);
+    }
+    
+    const preCssTime = performance.now();
+    console.log(`🔍 Step 3詳細: CSS適用前の時間測定開始`);
+    console.log(`🎯 アニメーション対象要素:`, {
+      id: animationTarget.id,
+      tagName: animationTarget.tagName,
+      className: animationTarget.className,
+      offsetWidth: animationTarget.offsetWidth,
+      offsetHeight: animationTarget.offsetHeight,
+      style_transform: animationTarget.style.transform,
+      style_transition: animationTarget.style.transition,
+      computedTransform: getComputedStyle(animationTarget).transform
+    });
     
     const windowHeight = window.innerHeight;
     const targetHeight = animationTarget.offsetHeight;
     const slideDistance = windowHeight + targetHeight + 100; // 完全に画面外まで
     
+    console.log(`🔍 計算完了: windowHeight=${windowHeight}, slideDistance=${slideDistance}`);
+    
+    const transitionSetTime = performance.now();
     animationTarget.style.transition = 'transform 2s ease-in-out';
+    const transitionSetComplete = performance.now();
+    console.log(`⏱️ transition設定時間: ${(transitionSetComplete - transitionSetTime).toFixed(2)}ms`);
     
     // 背景5の場合は動画も一緒に移動
     if (window.isDevWhiteBackground && currentVideoElement) {
@@ -7992,6 +8156,7 @@ function performWaitAndSlide(rotationWaitTime) {
       // 動画は既にback2Wrapper内にあるので、親要素と一緒に移動する
     }
     
+    const transformStartTime = performance.now();
     if (animationTarget.id === 'back2-wrapper') {
       // back2-wrapperの場合：回転なしでスライド
       animationTarget.style.transform = 'rotate(360deg) translateY(' + slideDistance + 'px)';
@@ -8000,6 +8165,21 @@ function performWaitAndSlide(rotationWaitTime) {
       // その他の要素の場合：回転付きでスライド
       animationTarget.style.transform = 'translateX(-50%) rotate(180deg) translateY(' + slideDistance + 'px)';
       console.log(`🔄 その他要素: ${slideDistance}px下にスライド`);
+    }
+    const transformComplete = performance.now();
+    
+    const totalCssTime = transformComplete - preCssTime;
+    const transformTime = transformComplete - transformStartTime;
+    console.log(`⏱️ transform適用時間: ${transformTime.toFixed(2)}ms`);
+    console.log(`⏱️ CSS処理総時間: ${totalCssTime.toFixed(2)}ms`);
+    console.log(`🎯 実際のアニメーション開始: ${new Date().toLocaleTimeString()}.${Date.now() % 1000}`);
+    
+    // DOM強制再描画を確保
+    animationTarget.offsetHeight; // reflow強制実行
+    console.log(`🔄 DOM reflow強制実行完了`);
+    
+    if (totalCssTime > 50) {
+      console.warn(`⚠️ CSS処理に ${totalCssTime.toFixed(2)}ms かかっています（50ms超過）`);
     }
       
       setTimeout(() => {
@@ -8066,6 +8246,11 @@ function performWaitAndSlide(rotationWaitTime) {
           
           console.log('✅ Step 5完了: リセット処理完了 - 新しい記入を受け付け可能');
           console.log('🎬 アニメーションシーケンス全体完了');
+          
+          // 🔧 フェードイン時間記録をクリア（次回のアニメーションのため）
+          window.fadeInStartTimestamp = null;
+          console.log('🔄 フェードイン開始時間をクリア - 次回アニメーション準備完了');
+          
           isAnimationInProgress = false; // アニメーション終了フラグ
           
         }, 2000); // 2秒待機
