@@ -313,11 +313,11 @@
 </head>
 <body>
 
-<button id="devButton" onclick="toggleDevPanel()">DEV</button>
-<button id="reviewButton" onclick="showPrintPreview()" style="position: fixed; top: 10px; left: 10px; z-index: 15000; background: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;">レビュー</button>
+<button id="devButton" onclick="toggleDevPanel()" style="display: none;">DEV</button>
+<button id="reviewButton" onclick="showPrintPreview()" style="position: fixed; top: 10px; left: 10px; z-index: 15000; background: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; display: none;">レビュー</button>
 
 <!-- Version情報表示 -->
-<div id="versionInfo" style="position: fixed; top: 10px; right: 120px; z-index: 15000; background: rgba(0,0,0,0.8); color: #FFD700; padding: 8px 12px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+<div id="versionInfo" style="position: fixed; top: 10px; right: 120px; z-index: 15000; background: rgba(0,0,0,0.8); color: #FFD700; padding: 8px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; display: none;">
   受信側 v3.4 (エラー修正)
 </div>
 

@@ -18,10 +18,13 @@
 </div>
 
 <!-- メインコントロール: Clear、自分だけ削除、送信 -->
-<div class="main-controls">
+<div class="main-controls" style="display: flex; align-items: center; gap: 15px;">
   <button onclick="clearCanvas()">Clear</button>
   <button onclick="clearMyDrawing()" style="background-color: #FF6B6B; color: white;">自分だけ消去</button>
   <button onclick="saveDoubleRotatedImage()" style="background-color: #4CAF50; color: white; font-size: 18px; padding: 12px 24px; font-weight: bold;">渡す</button>
+  <div id="countdownTimer" style="font-size: 16px; font-weight: bold; color: #333; display: none; background-color: #FFF3CD; border: 2px solid #FFEAA7; border-radius: 8px; padding: 8px 12px;">
+    <span id="countdownText">--秒</span>
+  </div>
 </div>
 
 <!-- 右サイドバー: ペンの色と太さを並べて配置 （Clearボタンの直下に移動） -->
@@ -33,7 +36,6 @@
     <button class="color-btn" style="background: red; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ccc;" onclick="setPenColor('red')"></button>
     <button class="color-btn" style="background: blue; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ccc;" onclick="setPenColor('blue')"></button>
     <button class="color-btn" style="background: green; width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ccc;" onclick="setPenColor('green')"></button>
-    <button class="color-btn" style="background: white; border: 4px solid red; box-sizing: border-box; width: 50px; height: 50px; border-radius: 50%;" onclick="setPenColor('white-red-border')"></button>
   </div>
   
   <!-- 右列: 太さ -->
@@ -570,6 +572,107 @@ socket.onclose = (event) => {
 let backgroundScale = 1.0; // スケール（大きさ）
 let backgroundOffsetY = 0; // 垂直オフセット
 
+// 📊 カウントダウンタイマー機能
+let countdownInterval = null;
+
+function startCountdownTimer() {
+  // 既存のタイマーをクリア
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+  
+  // カウントダウン時間を計算
+  let totalTime;
+  let calculation;
+  
+  // デバッグ: 現在の設定値を確認
+  console.log(`📊 [デバッグ] 現在の設定値:`);
+  console.log(`  - animationStartWaitTime: ${animationStartWaitTime}秒`);
+  console.log(`  - rotationWaitTime: ${rotationWaitTime}秒`);
+  console.log(`  - window.isDevWhiteBackground: ${window.isDevWhiteBackground}`);
+
+  if (window.isDevWhiteBackground) {
+    // 背景5の場合: アニメーション開始待機時間 + 動画長 + 受信側の短縮済み回転後待機時間
+    // signVideo.mp4の動画長を使用 + 受信側では rotationWaitTime - 3.0秒 が適用される
+    const videoDuration = 18.6; // signVideo.mp4の実際の長さ
+    const receiverRotationWaitTime = Math.max(0, rotationWaitTime - 3.0); // 受信側では3秒短縮される（最小0秒）
+    
+    console.log(`📊 [背景5] 詳細計算:`);
+    console.log(`  - videoDuration: ${videoDuration}秒`);
+    console.log(`  - rotationWaitTime - 3.0 = ${rotationWaitTime} - 3.0 = ${rotationWaitTime - 3.0}秒`);
+    console.log(`  - Math.max(0, ${rotationWaitTime - 3.0}) = ${receiverRotationWaitTime}秒`);
+    console.log(`  - 計算式: ${animationStartWaitTime} + ${videoDuration} + ${receiverRotationWaitTime}`);
+    
+    totalTime = animationStartWaitTime + videoDuration + receiverRotationWaitTime;
+    calculation = `開始待機:${animationStartWaitTime}s + 動画長:${videoDuration}s + 受信側回転後待機:${receiverRotationWaitTime}s`;
+  } else {
+    // 通常背景の場合: アニメーション開始待機時間 + 回転アニメーション時間(1.5s) + 受信側の短縮済み回転後待機時間
+    const receiverRotationWaitTime = Math.max(0, rotationWaitTime - 3.0); // 受信側では3秒短縮される（最小0秒）
+    
+    console.log(`📊 [通常背景] 詳細計算:`);
+    console.log(`  - rotationWaitTime - 3.0 = ${rotationWaitTime} - 3.0 = ${rotationWaitTime - 3.0}秒`);
+    console.log(`  - Math.max(0, ${rotationWaitTime - 3.0}) = ${receiverRotationWaitTime}秒`);
+    console.log(`  - 計算式: ${animationStartWaitTime} + 1.5 + ${receiverRotationWaitTime}`);
+    
+    totalTime = animationStartWaitTime + 1.5 + receiverRotationWaitTime;
+    calculation = `開始待機:${animationStartWaitTime}s + 回転:1.5s + 受信側回転後待機:${receiverRotationWaitTime}s`;
+  }
+  
+  let remainingTime = totalTime;
+  
+  console.log(`📊 [最終結果] totalTime = ${totalTime}秒`);
+  console.log(`📊 カウントダウン開始: ${totalTime}秒 (${calculation})`);
+  
+  // タイマー表示を有効化
+  const timerElement = document.getElementById('countdownTimer');
+  const textElement = document.getElementById('countdownText');
+  
+  if (timerElement && textElement) {
+    timerElement.style.display = 'block';
+    
+    // 初期値設定
+    textElement.textContent = `${Math.ceil(remainingTime)}秒`;
+    
+    // 1秒ごとにカウントダウン
+    countdownInterval = setInterval(() => {
+      remainingTime -= 1;
+      
+      if (remainingTime <= 0) {
+        // カウントダウン完了
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+        textElement.textContent = '0秒';
+        
+        // 3秒後にタイマーを非表示にする
+        setTimeout(() => {
+          timerElement.style.display = 'none';
+          console.log('📊 カウントダウンタイマー非表示');
+        }, 3000);
+        
+        console.log('📊 カウントダウン完了');
+      } else {
+        textElement.textContent = `${Math.ceil(remainingTime)}秒`;
+      }
+    }, 1000);
+  } else {
+    console.error('❌ カウントダウンタイマー要素が見つかりません');
+  }
+}
+
+function stopCountdownTimer() {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+    
+    const timerElement = document.getElementById('countdownTimer');
+    if (timerElement) {
+      timerElement.style.display = 'none';
+    }
+    
+    console.log('📊 カウントダウンタイマー停止');
+  }
+}
 
 // 🎯 イベントハンドラー・初期化処理 (キーボードイベント, DOMContentLoaded, タッチイベント) はevent-handlers.jsに移動しました
 </script>
