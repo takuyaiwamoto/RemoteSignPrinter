@@ -5305,14 +5305,14 @@ function sendCanvasToMainProcess() {
   }
   
   printCtx.restore();
-  console.log('🖨️ 送信ボタン描画完了 (180度回転)');
+  console.log('🖨️ 送信ボタン描画完了 (0度回転)');
   
-  // 印刷用データを作成（180度回転済み）
-  console.log('🖨️ 送信ボタン印刷: 180度回転で印刷データ作成');
+  // 印刷用データを作成（0度回転）
+  console.log('🖨️ 送信ボタン印刷: 0度回転で印刷データ作成');
   const imageDataUrl = printCanvas.toDataURL("image/png");
   
-  // 🔍 印刷データの180度回転確認フロー
-  console.log('🔍 === 印刷データ180度回転確認開始 ===');
+  // 🔍 印刷データ確認（0度回転）
+  console.log('🔍 === 印刷データ0度回転確認開始 ===');
   
   // 確認用キャンバスを作成して元データと比較
   const verifyCanvas = document.createElement('canvas');
@@ -5365,11 +5365,12 @@ function sendCanvasToMainProcess() {
       
       console.log('🔍 画像差異ピクセル数:', diffPixels);
       
-      if (diffPixels > 100) { // 十分な差があれば回転されていると判断
-        console.log('✅ 180度回転が正しく適用されています');
-        console.log('📤 印刷機にデータ送信を実行');
-        
-        // 🔸 印刷時に用紙サイズ情報も送信
+      // 回転確認をスキップして直接印刷実行（0度回転）
+      console.log('✅ 0度回転で印刷実行');
+      console.log('📤 印刷機にデータ送信を実行');
+      
+      // 🔸 印刷時に用紙サイズ情報も送信
+      if (typeof ipcRenderer !== 'undefined') {
         ipcRenderer.send("save-pdf", {
           imageData: imageDataUrl,
           paperSize: currentPaperSize,
@@ -5377,10 +5378,9 @@ function sendCanvasToMainProcess() {
         });
         
         console.log('✅ プリンターへの印刷命令送信完了！');
-        console.log('🖨️ === 送信ボタン印刷完了（180度回転確認済み）===');
+        console.log('🖨️ === 送信ボタン印刷完了（0度回転）===');
       } else {
-        console.error('❌ 180度回転が適用されていません！印刷を中止します');
-        console.log('🔍 デバッグ情報: 元データと同じ描画内容です');
+        console.error('❌ ipcRenderer が利用できません');
       }
     } else {
       console.error('❌ 開始座標が見つかりません');
@@ -7551,17 +7551,12 @@ async function printDrawingOnly() {
     finalCtx.fillStyle = 'white';
     finalCtx.fillRect(0, 0, L_WIDTH, L_HEIGHT);
     
-    // 180度回転して描画（現在0度の状態を180度回転させる）
-    finalCtx.save();
-    finalCtx.translate(L_WIDTH / 2, L_HEIGHT / 2);
-    finalCtx.rotate(Math.PI); // 180度回転
-    finalCtx.translate(-L_WIDTH / 2, -L_HEIGHT / 2);
+    // 0度回転（回転なし）で描画
     finalCtx.drawImage(resizeCanvas, 0, 0);
-    finalCtx.restore();
     
-    console.log('✅ 180度回転したキャンバス作成完了');
+    console.log('✅ 0度回転（回転なし）キャンバス作成完了');
     
-    // 180度回転した画像データを取得
+    // 0度回転（回転なし）画像データを取得
     const finalDataURL = finalCanvas.toDataURL('image/png');
     
     // 完全自動ダウンロード（確認なし）

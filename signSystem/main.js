@@ -215,7 +215,9 @@ ipcMain.on("save-pdf", (event, data) => {
     }
     
     // 🔸 OS別の印刷処理
-    const printerName = "Brother_MFC_J6983CDW";
+    // 用紙サイズに応じてプリンター名を変更（L版専用設定を使用）
+    const basePrinterName = "Brother_MFC_J6983CDW";
+    const printerName = paperSize === 'L' ? basePrinterName : basePrinterName;
     console.log(`🖨️ 使用予定プリンター名: "${printerName}"`);
     
     if (process.platform === 'darwin') {
@@ -254,27 +256,17 @@ ipcMain.on("save-pdf", (event, data) => {
       
       console.log(`🔍 用紙サイズ判定: paperSize="${paperSize}" (型: ${typeof paperSize})`);
       
-      if (paperSize === 'L') {
-        // L判用紙トレイを指定 (トレイ1がL版) ※renderer.jsで既に180度回転済み
-        printCommand = `lpr -P "${printerName}" -o PageSize=4x6 -o InputSlot=tray-1 "${savePath}"`;
-        console.log(`🖨️ L判印刷コマンド実行（renderer.jsで180度回転済み）: ${printCommand}`);
-        
-        // プリンタのメディアサイズ確認用コマンド実行
-        exec(`lpoptions -p "${printerName}" -l | grep -i media`, (error, stdout, stderr) => {
-          if (!error) {
-            console.log(`📋 プリンタ"${printerName}"で利用可能なメディアサイズ:`);
-            console.log(stdout);
-          }
-        });
-      } else if (paperSize === 'A4') {
-        // A4用紙トレイを指定 (トレイ2がA4)
-        printCommand = `lpr -P "${printerName}" -o PageSize=A4 -o InputSlot=tray-2 "${savePath}"`;
-        console.log(`🖨️ A4印刷コマンド実行: ${printCommand}`);
-      } else {
-        // ポストカードやその他（デフォルト）
-        printCommand = `lpr -P "${printerName}" "${savePath}"`;
-        console.log(`🖨️ デフォルト印刷コマンド実行: ${printCommand} (paperSize不明: "${paperSize}")`);
-      }
+      // シンプルにプリンターのデフォルト設定を使用（現在はL版がデフォルト）
+      printCommand = `lpr -P "${printerName}" "${savePath}"`;
+      console.log(`🖨️ 印刷コマンド実行（プリンターのデフォルト設定使用）: ${printCommand}`);
+      console.log(`📝 選択された用紙サイズ: ${paperSize} (プリンター側で自動処理)`);
+      
+      // デバッグ用：現在のプリンター設定を確認
+      exec(`lpoptions -p "${printerName}"`, (error, stdout, stderr) => {
+        if (!error) {
+          console.log(`📋 現在のプリンター設定:`, stdout);
+        }
+      });
       
       console.log('🚨🚨🚨 プリンターに印刷コマンドを実行！！！');
       console.log(`📟 実行コマンド: ${printCommand}`);
