@@ -12,6 +12,7 @@ let currentVideoElement = null; // 現在再生中の動画要素
 let videoPattern = 1;         // 動画パターン（1:回転, 2:フェード）
 let currentMusicElement = null; // 現在再生中の音楽要素
 let musicVolume = 0.5;        // 音楽のボリューム（0.0〜1.0）
+let printDelayTime = 8.5;     // 印刷遅延時間（秒）
 
 // 🎵 背景5用音楽再生
 function playBackgroundMusic() {
@@ -4404,6 +4405,12 @@ function handleMessage(data) {
       console.log(`🎵 音楽ボリューム設定: ${musicVolume}`);
     }
     
+    // 印刷遅延時間設定を受信
+    if (data.printDelayTime !== undefined) {
+      printDelayTime = data.printDelayTime;
+      console.log(`🖨️ 印刷遅延時間設定: ${printDelayTime}秒`);
+    }
+    
     // 背景5の時に音楽再生開始
     if (window.isDevWhiteBackground) {
       playBackgroundMusic();
@@ -5114,7 +5121,8 @@ function handleMessage(data) {
     devAnimationStartWaitTime = data.animationStartWaitTime || 3.3;
     devRotationWaitTime = (data.rotationWaitTime || 8.1) - 3.0; // 3秒短縮
     videoPattern = data.videoPattern || 1;
-    console.log(`🔧 Dev設定受信: scale=${devCanvasScale}, animationWait=${devAnimationStartWaitTime}, rotationWait=${devRotationWaitTime}, videoPattern=${videoPattern}`);
+    printDelayTime = data.printDelayTime || 8.5;
+    console.log(`🔧 Dev設定受信: scale=${devCanvasScale}, animationWait=${devAnimationStartWaitTime}, rotationWait=${devRotationWaitTime}, videoPattern=${videoPattern}, printDelayTime=${printDelayTime}`);
     
     // 🔸 back2.pngのサイズ更新
     if (back2Wrapper && back2Image) {
@@ -8286,12 +8294,6 @@ async function downloadAndPrintDrawing() {
       console.log('💾 画像ダウンロードを即座に実行');
       const savedPath = downloadImage(imageData.dataURL, imageData.fileName);
       
-      // デバッグ情報を出力
-      console.log('🔍 DEBUG: savedPath =', savedPath);
-      console.log('🔍 DEBUG: imageData.printPath =', imageData.printPath);
-      console.log('🔍 DEBUG: typeof savedPath =', typeof savedPath);
-      console.log('🔍 DEBUG: savedPath ? true : false =', savedPath ? true : false);
-      
       // 印刷処理を遅延実行（実際の保存パスを使用）
       const delayMs = (printDelayTime || 8.5) * 1000;
       console.log(`🖨️ ${printDelayTime || 8.5}秒後に印刷を実行`);
@@ -8301,16 +8303,11 @@ async function downloadAndPrintDrawing() {
         
         // 実際に保存されたパスを使用（Node.js環境の場合）
         const printPath = savedPath || imageData.printPath;
-        console.log('🔍 DEBUG: 最終的なprintPath =', printPath);
-        console.log('🔍 DEBUG: printPath ? true : false =', printPath ? true : false);
-        
         if (printPath) {
           console.log('✅ 印刷パスが確認できました - executePrint実行');
           executePrint(printPath);
         } else {
-          console.log('❌ 印刷パスがnull/undefined - 印刷をスキップ');
-          console.log('🔍 DEBUG: savedPath最終確認 =', savedPath);
-          console.log('🔍 DEBUG: imageData.printPath最終確認 =', imageData.printPath);
+          console.log('⚠️ 印刷パスがないため印刷をスキップ（ブラウザ環境）');
         }
       }, delayMs);
     }
@@ -8464,11 +8461,7 @@ function downloadImage(dataURL, fileName) {
   console.log('💾 downloadImage: 画像ダウンロード開始');
   
   try {
-    console.log('🔍 DEBUG: typeof require =', typeof require);
-    console.log('🔍 DEBUG: require !== undefined =', typeof require !== 'undefined');
-    
     if (typeof require !== 'undefined') {
-      console.log('🔍 DEBUG: Node.js環境として実行します');
       // Node.js環境
       try {
         const fs = require('fs');
@@ -8486,19 +8479,15 @@ function downloadImage(dataURL, fileName) {
         console.log(`📁 ファイル情報: サイズ=${fileSize}バイト, パス=${downloadsPath}`);
         
         // 保存されたパスを返す
-        console.log('🔍 DEBUG: downloadImage関数内 - return前のdownloadsPath =', downloadsPath);
-        console.log('🔍 DEBUG: downloadImage関数内 - typeof downloadsPath =', typeof downloadsPath);
         return downloadsPath;
         
       } catch (nodeError) {
         console.error('❌ Node.js保存エラー:', nodeError);
-        console.log('🔍 DEBUG: Node.js保存エラーでnullを返します');
         // ブラウザ環境のフォールバック
         downloadInBrowser(dataURL, fileName);
         return null;
       }
     } else {
-      console.log('🔍 DEBUG: ブラウザ環境として実行します - nullを返します');
       // ブラウザ環境
       downloadInBrowser(dataURL, fileName);
       return null;

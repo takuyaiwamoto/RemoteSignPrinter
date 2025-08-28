@@ -177,16 +177,8 @@ function processMessage(data) {
       // 🔸 受信側で印刷処理を実行（背景5の場合は10秒遅延）
       console.log(`🔍 背景判定デバッグ: videoPattern=${data.videoPattern}, isBackground5フラグ=${data.isBackground5}, 全データ=${JSON.stringify(data)}`);
       
-      // 全背景共通: 6秒遅延で印刷実行
-      console.log('🎬 渡すボタン押下: 6秒後に印刷実行');
-      setTimeout(() => {
-        if (typeof printDrawingOnly === 'function') {
-          printDrawingOnly();
-          console.log('✅ 受信側印刷処理実行完了（6秒遅延）');
-        } else {
-          console.error('❌ printDrawingOnly関数が見つかりません');
-        }
-      }, 6000); // 6秒遅延
+      // 印刷処理はrenderer.jsのdownloadAndPrintDrawing()で実行（重複削除）
+      console.log('🎬 渡すボタン押下: 印刷処理はrenderer.jsで実行');
       
       // 送信ボタンの無効化（他の人が送信中表示）
       const sendButton = document.querySelector('button[onclick="saveDoubleRotatedImage()"]');
