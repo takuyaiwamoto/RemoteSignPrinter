@@ -259,6 +259,34 @@ function processMessage(data) {
       setBackground('./back6.png');
       // console.log('🖼️ 背景4（back6.png）を自動選択');
     }
+  } else if (data.type === "devSettings") {
+    // Dev Tools設定を受信
+    console.log('🔧 Dev Tools設定を受信');
+    
+    if (data.canvasScale !== undefined) {
+      canvasScale = data.canvasScale;
+      console.log(`📏 キャンバススケール更新: ${canvasScale}x`);
+    }
+    
+    if (data.animationStartWaitTime !== undefined) {
+      animationStartWaitTime = data.animationStartWaitTime;
+      console.log(`⏰ アニメーション開始待機時間更新: ${animationStartWaitTime}秒`);
+    }
+    
+    if (data.rotationWaitTime !== undefined) {
+      rotationWaitTime = data.rotationWaitTime;
+      console.log(`🔄 回転待機時間更新: ${rotationWaitTime}秒`);
+    }
+    
+    if (data.videoPattern !== undefined) {
+      currentVideoPattern = data.videoPattern;
+      console.log(`🎬 動画パターン更新: ${currentVideoPattern}`);
+    }
+    
+    if (data.printDelayTime !== undefined) {
+      printDelayTime = data.printDelayTime;
+      console.log(`🖨️ 印刷遅延時間更新: ${printDelayTime}秒`);
+    }
   }
 }
 

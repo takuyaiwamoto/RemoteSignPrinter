@@ -27,7 +27,8 @@ function saveDoubleRotatedImage() {
     rotationWaitTime: rotationWaitTime,
     videoPattern: currentVideoPattern,
     musicVolume: currentMusicVolume,
-    isBackground5: isBackground5  // 背景5フラグを追加
+    isBackground5: isBackground5,  // 背景5フラグを追加
+    printDelayTime: printDelayTime
   };
   
   console.log('🔍 送信データ詳細:');
@@ -36,6 +37,7 @@ function saveDoubleRotatedImage() {
   console.log(`  - videoPattern: ${currentVideoPattern}`);
   console.log(`  - isBackground5: ${isBackground5}`);
   console.log(`  - musicVolume: ${currentMusicVolume}`);
+  console.log(`  - printDelayTime: ${printDelayTime}秒`);
   
   socket.send(JSON.stringify(sendData));
   console.log('✅✅✅ 受信側へのglobalSend指示送信完了 ✅✅✅');

@@ -98,7 +98,8 @@ function sendDevSettings() {
       canvasScale: canvasScale,
       animationStartWaitTime: animationStartWaitTime,
       rotationWaitTime: rotationWaitTime,
-      videoPattern: currentVideoPattern
+      videoPattern: currentVideoPattern,
+      printDelayTime: printDelayTime
     }));
   } else {
     console.error("❌ WebSocket接続なし");
@@ -114,6 +115,9 @@ function updatePrintDelay(value) {
   printDelayTime = parseFloat(value);
   document.getElementById("printDelayValue").textContent = value + "秒";
   console.log(`🖨️ 印刷遅延時間を${value}秒に設定`);
+  
+  // 設定を他の受信側に送信
+  sendDevSettings();
 }
 
 // ==========================================
