@@ -12,7 +12,7 @@ let currentVideoElement = null; // 現在再生中の動画要素
 let videoPattern = 1;         // 動画パターン（1:回転, 2:フェード）
 let currentMusicElement = null; // 現在再生中の音楽要素
 let musicVolume = 0.5;        // 音楽のボリューム（0.0〜1.0）
-let printDelayTime = 8.5;     // 印刷遅延時間（秒）
+let printDelayTime = 5.0;     // 印刷遅延時間（秒）
 
 // 🎵 背景5用音楽再生
 function playBackgroundMusic() {
@@ -1251,7 +1251,7 @@ let back2Wrapper = null;
 let drawCanvas = null;
 let drawCtx = null;
 let initialBack2Size = { width: 283, height: 420 }; // back2.pngの初期サイズ
-let currentScale = 1.0; // 現在のスケール
+let currentScale = 1.4; // 現在のスケール - 書き手側デフォルトと同期
 
 // 書き手側と接続時にback2.pngを180度回転で表示
 function displayBack2Image() {
@@ -2184,9 +2184,9 @@ let backgroundScale = 1.0; // 背景のスケール
 let backgroundOffsetY = 0; // 背景の垂直オフセット
 
 // 🔸 Dev Tool設定
-let devCanvasScale = 0.35; // キャンバススケール（デフォルト0.35）
-let devAnimationStartWaitTime = 3.3; // アニメーション開始待機時間（秒）
-let devRotationWaitTime = 7.5 - 3.0; // 回転後待機時間（秒）- 3秒短縮
+let devCanvasScale = 1.4; // キャンバススケール（デフォルト1.4 - 書き手側と同期）
+let devAnimationStartWaitTime = 0.1; // アニメーション開始待機時間（秒） - 書き手側と同期
+let devRotationWaitTime = 1.0 - 3.0; // 回転後待機時間（秒）- 3秒短縮、書き手側と同期
 
 // 🔸 描画エリア調整設定
 // 統一座標システム設定
@@ -5117,15 +5117,15 @@ function handleMessage(data) {
   } else if (data.type === "devSettings") {
     // 🔸 Dev Tool設定受信
     const oldCanvasScale = devCanvasScale;
-    devCanvasScale = data.canvasScale || 0.7;
-    devAnimationStartWaitTime = data.animationStartWaitTime || 3.3;
-    devRotationWaitTime = (data.rotationWaitTime || 8.1) - 3.0; // 3秒短縮
+    devCanvasScale = data.canvasScale || 1.4;
+    devAnimationStartWaitTime = data.animationStartWaitTime || 0.1;
+    devRotationWaitTime = (data.rotationWaitTime || 1.0) - 3.0; // 3秒短縮
     videoPattern = data.videoPattern || 1;
-    printDelayTime = data.printDelayTime || 8.5;
+    printDelayTime = data.printDelayTime || 5.0;
     console.log(`🔧 Dev設定受信: scale=${devCanvasScale}, animationWait=${devAnimationStartWaitTime}, rotationWait=${devRotationWaitTime}, videoPattern=${videoPattern}, printDelayTime=${printDelayTime}`);
     
-    // 🔸 back2.pngのサイズ更新
-    if (back2Wrapper && back2Image) {
+    // 🔸 back2.pngのサイズ更新（スケール変更時のみ）
+    if (back2Wrapper && back2Image && oldCanvasScale !== devCanvasScale) {
       updateBack2Size(devCanvasScale);
       console.log(`🔄 back2.png devSettings対応: スケール=${devCanvasScale}`);
     }
