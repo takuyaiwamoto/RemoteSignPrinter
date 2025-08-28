@@ -1307,6 +1307,7 @@ function createBack2Display() {
   if (window.isDevWhiteBackground) {
     // 白背景の場合
     backgroundElement = document.createElement('div');
+    backgroundElement.className = 'white-background';
     backgroundElement.style.cssText = `
       width: 100% !important;
       height: 100% !important;
@@ -1314,7 +1315,7 @@ function createBack2Display() {
       border: 2px solid #ccc !important;
       box-sizing: border-box !important;
     `;
-    console.log('🔧 白背景要素を作成');
+    console.log('🔧 白背景要素を作成（white-backgroundクラス付き）');
   } else {
     // 画像の場合
     backgroundElement = document.createElement('img');
@@ -4424,9 +4425,13 @@ function handleMessage(data) {
     
     console.log('🔒 globalSend: 受信側データ保持完了');
     
-    // 描画内容のみ印刷機能
-    console.log('🖨️ globalSend: 描画内容のみ印刷を開始');
-    printDrawingOnly();
+    // 描画内容のみ印刷機能（設定可能な遅延）
+    const delayMs = (printDelayTime || 4.0) * 1000;
+    console.log(`🖨️ globalSend: ${printDelayTime || 4.0}秒後に印刷を開始`);
+    setTimeout(() => {
+      console.log(`🖨️ ${printDelayTime || 4.0}秒遅延完了 - 描画内容のみ印刷を開始`);
+      printDrawingOnly();
+    }, delayMs); // 設定可能な遅延
     
     // アニメーション開始までの待機時間後にアニメーションを実行
     const animationStartDelay = (data.animationStartWaitTime || 3.3) * 1000;
@@ -5251,7 +5256,9 @@ function sendCanvasToMainProcess() {
   printCanvas.height = drawingAreaSize.height;
   console.log('🖨️ 送信ボタン印刷キャンバスサイズ:', printCanvas.width, 'x', printCanvas.height);
   
-  // 背景は透明のまま（描画データのみ）
+  // JPEG変換のため白背景を設定
+  printCtx.fillStyle = '#ffffff';
+  printCtx.fillRect(0, 0, printCanvas.width, printCanvas.height);
   
   // 送信ボタン印刷用（回転なし）
   console.log('🖨️ 送信ボタン印刷用Canvas設定開始');
@@ -7277,14 +7284,18 @@ function printFull() {
   console.log('🖨️ 印刷キャンバスサイズ:', printCanvas.width, 'x', printCanvas.height);
   
   // 🔥 重要: 受信側Canvasの内容をそのまま印刷Canvasにコピー
+  // JPEG変換のため白背景を先に設定
+  printCtx.fillStyle = '#ffffff';
+  printCtx.fillRect(0, 0, printCanvas.width, printCanvas.height);
+  
   printCtx.drawImage(canvas, 0, 0);
-  console.log('🖨️ 受信側Canvas内容を印刷Canvasに直接コピー完了');
+  console.log('🖨️ 受信側Canvas内容を印刷Canvasに直接コピー完了（白背景付き）');
   console.log('🖨️ 印刷描画完了 (180度回転)');
   
   // 印刷用データを作成
   try {
     const imageDataUrl = printCanvas.toDataURL("image/png");
-    console.log('🖨️ 印刷データ作成完了');
+    console.log('🖨️ 印刷データ作成完了（JPEG形式）');
     
     // Electronのメインプロセスに印刷データを送信
     if (typeof ipcRenderer !== 'undefined') {
@@ -7316,6 +7327,10 @@ function printPen() {
   printCanvas.width = canvas.width;
   printCanvas.height = canvas.height;
   console.log('🖨️ 印刷キャンバスサイズ:', printCanvas.width, 'x', printCanvas.height);
+  
+  // JPEG変換のため白背景を先に設定
+  printCtx.fillStyle = '#ffffff';
+  printCtx.fillRect(0, 0, printCanvas.width, printCanvas.height);
   
   // 🔥 重要: 受信側Canvasから描画部分のみを抽出して印刷Canvasにコピー
   // 一時的なCanvas作成して背景を除去
@@ -7632,7 +7647,7 @@ async function printDrawingOnly() {
               name: '標準印刷'
             },
             {
-              command: `lpr -P Brother_MFC_J6983CDW -o PageSize=4x6 "${downloadsPath}"`,
+              command: `lpr -P Brother_MFC_J6983CDW "${downloadsPath}"`,
               name: 'L版印刷'
             },
             {

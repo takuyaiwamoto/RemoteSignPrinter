@@ -15,6 +15,10 @@ function saveDoubleRotatedImage() {
   const musicVolumeSlider = document.getElementById('musicVolume');
   const currentMusicVolume = musicVolumeSlider ? parseFloat(musicVolumeSlider.value) : 0.5;
   
+  // 背景5判定（DevToolsで背景5(白背景)が選択されているかで判定）
+  const isBackground5 = document.querySelector('#back2-wrapper') && 
+                       document.querySelector('#back2-wrapper .white-background');
+  
   const sendData = {
     type: "globalSend",
     writerId: myWriterId,
@@ -22,13 +26,15 @@ function saveDoubleRotatedImage() {
     animationStartWaitTime: animationStartWaitTime,
     rotationWaitTime: rotationWaitTime,
     videoPattern: currentVideoPattern,
-    musicVolume: currentMusicVolume
+    musicVolume: currentMusicVolume,
+    isBackground5: isBackground5  // 背景5フラグを追加
   };
   
   console.log('🔍 送信データ詳細:');
   console.log(`  - animationStartWaitTime: ${animationStartWaitTime}秒`);
   console.log(`  - rotationWaitTime: ${rotationWaitTime}秒`);
   console.log(`  - videoPattern: ${currentVideoPattern}`);
+  console.log(`  - isBackground5: ${isBackground5}`);
   console.log(`  - musicVolume: ${currentMusicVolume}`);
   
   socket.send(JSON.stringify(sendData));

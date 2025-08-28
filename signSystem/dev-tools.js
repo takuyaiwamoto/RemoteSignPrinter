@@ -106,6 +106,17 @@ function sendDevSettings() {
 }
 
 // ==========================================
+// 印刷設定関数群
+// ==========================================
+
+// 🔧 印刷遅延時間更新関数
+function updatePrintDelay(value) {
+  printDelayTime = parseFloat(value);
+  document.getElementById("printDelayValue").textContent = value + "秒";
+  console.log(`🖨️ 印刷遅延時間を${value}秒に設定`);
+}
+
+// ==========================================
 // デバッグ用：ファイルが正しく読み込まれたことを確認
 // ==========================================
 console.log('✅ dev-tools.js loaded successfully');

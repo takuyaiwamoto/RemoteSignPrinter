@@ -172,7 +172,21 @@ function processMessage(data) {
   } else if (data.type === "globalSend") {
     // 他の書き手からの送信実行（自分が送信者でない場合のみ処理）
     if (data.writerId !== myWriterId) {
-      // console.log(`📤 他の書き手(${data.writerId})から送信実行を受信`);
+      console.log(`📤 他の書き手(${data.writerId})から送信実行を受信 - 受信側で印刷開始`);
+      
+      // 🔸 受信側で印刷処理を実行（背景5の場合は10秒遅延）
+      console.log(`🔍 背景判定デバッグ: videoPattern=${data.videoPattern}, isBackground5フラグ=${data.isBackground5}, 全データ=${JSON.stringify(data)}`);
+      
+      // 全背景共通: 6秒遅延で印刷実行
+      console.log('🎬 渡すボタン押下: 6秒後に印刷実行');
+      setTimeout(() => {
+        if (typeof printDrawingOnly === 'function') {
+          printDrawingOnly();
+          console.log('✅ 受信側印刷処理実行完了（6秒遅延）');
+        } else {
+          console.error('❌ printDrawingOnly関数が見つかりません');
+        }
+      }, 6000); // 6秒遅延
       
       // 送信ボタンの無効化（他の人が送信中表示）
       const sendButton = document.querySelector('button[onclick="saveDoubleRotatedImage()"]');
