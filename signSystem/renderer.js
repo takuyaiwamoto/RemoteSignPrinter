@@ -8286,18 +8286,31 @@ async function downloadAndPrintDrawing() {
       console.log('💾 画像ダウンロードを即座に実行');
       const savedPath = downloadImage(imageData.dataURL, imageData.fileName);
       
+      // デバッグ情報を出力
+      console.log('🔍 DEBUG: savedPath =', savedPath);
+      console.log('🔍 DEBUG: imageData.printPath =', imageData.printPath);
+      console.log('🔍 DEBUG: typeof savedPath =', typeof savedPath);
+      console.log('🔍 DEBUG: savedPath ? true : false =', savedPath ? true : false);
+      
       // 印刷処理を遅延実行（実際の保存パスを使用）
       const delayMs = (printDelayTime || 8.5) * 1000;
       console.log(`🖨️ ${printDelayTime || 8.5}秒後に印刷を実行`);
       
       setTimeout(() => {
         console.log(`🖨️ ${printDelayTime || 8.5}秒遅延完了 - 印刷処理を開始`);
+        
         // 実際に保存されたパスを使用（Node.js環境の場合）
         const printPath = savedPath || imageData.printPath;
+        console.log('🔍 DEBUG: 最終的なprintPath =', printPath);
+        console.log('🔍 DEBUG: printPath ? true : false =', printPath ? true : false);
+        
         if (printPath) {
+          console.log('✅ 印刷パスが確認できました - executePrint実行');
           executePrint(printPath);
         } else {
-          console.log('⚠️ 印刷パスがないため印刷をスキップ（ブラウザ環境）');
+          console.log('❌ 印刷パスがnull/undefined - 印刷をスキップ');
+          console.log('🔍 DEBUG: savedPath最終確認 =', savedPath);
+          console.log('🔍 DEBUG: imageData.printPath最終確認 =', imageData.printPath);
         }
       }, delayMs);
     }
@@ -8451,7 +8464,11 @@ function downloadImage(dataURL, fileName) {
   console.log('💾 downloadImage: 画像ダウンロード開始');
   
   try {
+    console.log('🔍 DEBUG: typeof require =', typeof require);
+    console.log('🔍 DEBUG: require !== undefined =', typeof require !== 'undefined');
+    
     if (typeof require !== 'undefined') {
+      console.log('🔍 DEBUG: Node.js環境として実行します');
       // Node.js環境
       try {
         const fs = require('fs');
@@ -8469,15 +8486,19 @@ function downloadImage(dataURL, fileName) {
         console.log(`📁 ファイル情報: サイズ=${fileSize}バイト, パス=${downloadsPath}`);
         
         // 保存されたパスを返す
+        console.log('🔍 DEBUG: downloadImage関数内 - return前のdownloadsPath =', downloadsPath);
+        console.log('🔍 DEBUG: downloadImage関数内 - typeof downloadsPath =', typeof downloadsPath);
         return downloadsPath;
         
       } catch (nodeError) {
         console.error('❌ Node.js保存エラー:', nodeError);
+        console.log('🔍 DEBUG: Node.js保存エラーでnullを返します');
         // ブラウザ環境のフォールバック
         downloadInBrowser(dataURL, fileName);
         return null;
       }
     } else {
+      console.log('🔍 DEBUG: ブラウザ環境として実行します - nullを返します');
       // ブラウザ環境
       downloadInBrowser(dataURL, fileName);
       return null;
