@@ -4425,17 +4425,15 @@ function handleMessage(data) {
     
     console.log('🔒 globalSend: 受信側データ保持完了');
     
-    // 描画内容のみ印刷機能（設定可能な遅延）
-    const delayMs = (printDelayTime || 4.0) * 1000;
-    console.log(`🖨️ globalSend: ${printDelayTime || 4.0}秒後に印刷を開始`);
-    setTimeout(() => {
-      console.log(`🖨️ ${printDelayTime || 4.0}秒遅延完了 - 描画内容のみ印刷を開始`);
-      printDrawingOnly();
-    }, delayMs); // 設定可能な遅延
+    // 描画内容のダウンロードと印刷（ダウンロードは即座、印刷は遅延）
+    console.log('📥 globalSend: 画像ダウンロードを即座に実行、印刷は遅延実行');
+    
+    // まず即座にダウンロード処理を実行
+    downloadAndPrintDrawing();
     
     // アニメーション開始までの待機時間後にアニメーションを実行
-    const animationStartDelay = (data.animationStartWaitTime || 3.3) * 1000;
-    const rotationWaitTime = (data.rotationWaitTime || 7.5) * 1000;
+    const animationStartDelay = (data.animationStartWaitTime || 1.0) * 1000;
+    const rotationWaitTime = (data.rotationWaitTime || 1.0) * 1000;
     
     // videoPatternを受信データから更新
     if (data.videoPattern !== undefined) {
@@ -8270,3 +8268,288 @@ function performWaitAndSlide(rotationWaitTime) {
     }, waitTime); // devtool設定の待機時間
 }
 
+// 描画内容のダウンロードと印刷を分離した新関数
+async function downloadAndPrintDrawing() {
+  console.log('📥 downloadAndPrintDrawing: ダウンロード即座実行、印刷遅延実行開始');
+  
+  if (!drawCanvas || !drawCtx) {
+    console.log('❌ downloadAndPrintDrawing: drawCanvasまたはdrawCtxが存在しません');
+    return;
+  }
+  
+  try {
+    // 画像生成とダウンロード処理（即座に実行）
+    const imageData = await generatePrintImage();
+    
+    if (imageData) {
+      // ダウンロードを即座に実行し、実際の保存パスを取得
+      console.log('💾 画像ダウンロードを即座に実行');
+      const savedPath = downloadImage(imageData.dataURL, imageData.fileName);
+      
+      // 印刷処理を遅延実行（実際の保存パスを使用）
+      const delayMs = (printDelayTime || 8.5) * 1000;
+      console.log(`🖨️ ${printDelayTime || 8.5}秒後に印刷を実行`);
+      
+      setTimeout(() => {
+        console.log(`🖨️ ${printDelayTime || 8.5}秒遅延完了 - 印刷処理を開始`);
+        // 実際に保存されたパスを使用（Node.js環境の場合）
+        const printPath = savedPath || imageData.printPath;
+        if (printPath) {
+          executePrint(printPath);
+        } else {
+          console.log('⚠️ 印刷パスがないため印刷をスキップ（ブラウザ環境）');
+        }
+      }, delayMs);
+    }
+  } catch (error) {
+    console.error('❌ downloadAndPrintDrawing: エラー:', error);
+  }
+}
+
+// 画像生成処理を分離
+async function generatePrintImage() {
+  console.log('🎨 generatePrintImage: 印刷用画像を生成');
+  
+  try {
+    // 既存のprintDrawingOnlyから画像生成部分を抽出
+    let canvasWidth, canvasHeight;
+    
+    if (back2Image && back2Image.naturalWidth && back2Image.naturalHeight) {
+      canvasWidth = back2Image.naturalWidth;
+      canvasHeight = back2Image.naturalHeight;
+      console.log(`📐 back2画像サイズを使用: ${canvasWidth} x ${canvasHeight}`);
+    } else if (initialBack2Size && initialBack2Size.width && initialBack2Size.height) {
+      canvasWidth = initialBack2Size.width;
+      canvasHeight = initialBack2Size.height;
+      console.log(`📐 初期back2サイズを使用: ${canvasWidth} x ${canvasHeight}`);
+    } else if (drawCanvas) {
+      canvasWidth = drawCanvas.width;
+      canvasHeight = drawCanvas.height;
+      console.log(`📐 drawCanvasサイズを使用: ${canvasWidth} x ${canvasHeight}`);
+    } else {
+      canvasWidth = 800;
+      canvasHeight = 600;
+      console.log('📐 デフォルトサイズを使用: 800 x 600');
+    }
+    
+    // 印刷用キャンバスを作成
+    const printCanvas = document.createElement('canvas');
+    const printCtx = printCanvas.getContext('2d');
+    
+    printCanvas.width = canvasWidth;
+    printCanvas.height = canvasHeight;
+    
+    // 背景を白に設定
+    printCtx.fillStyle = 'white';
+    printCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+    
+    console.log('🔄 描画データを0度で背景サイズキャンバスに描画');
+    
+    // 全WriterIDの描画データを0度で再描画
+    let totalStrokes = 0;
+    
+    Object.keys(writerDrawingData).forEach(writerId => {
+      const commands = writerDrawingData[writerId];
+      if (commands && commands.length > 0) {
+        commands.forEach(cmd => {
+          if (cmd.type === 'start') {
+            printCtx.beginPath();
+            printCtx.moveTo(cmd.x, cmd.y);
+          } else if (cmd.type === 'draw') {
+            printCtx.lineWidth = cmd.thickness || 8;
+            printCtx.strokeStyle = cmd.color || 'black';
+            printCtx.lineTo(cmd.x, cmd.y);
+            printCtx.stroke();
+            totalStrokes++;
+          }
+        });
+      }
+    });
+    
+    console.log(`✅ 0度描画完了: ${totalStrokes}本のストロークを描画`);
+    
+    // 描画データが無い場合はdrawCanvasから直接コピー
+    if (totalStrokes === 0 && drawCanvas) {
+      console.log('🔄 描画データが見つからないため、drawCanvasから直接コピーを試行');
+      
+      printCtx.save();
+      printCtx.translate(canvasWidth / 2, canvasHeight / 2);
+      printCtx.rotate(Math.PI);
+      printCtx.translate(-canvasWidth / 2, -canvasHeight / 2);
+      printCtx.drawImage(drawCanvas, 0, 0);
+      printCtx.restore();
+      
+      console.log('✅ drawCanvasから直接コピー完了');
+    }
+    
+    // L版サイズにリサイズ
+    const L_WIDTH = 336;
+    const L_HEIGHT = 480;
+    
+    const resizeCanvas = document.createElement('canvas');
+    const resizeCtx = resizeCanvas.getContext('2d');
+    
+    resizeCanvas.width = L_WIDTH;
+    resizeCanvas.height = L_HEIGHT;
+    
+    resizeCtx.fillStyle = 'white';
+    resizeCtx.fillRect(0, 0, L_WIDTH, L_HEIGHT);
+    
+    const scaleX = L_WIDTH / canvasWidth;
+    const scaleY = L_HEIGHT / canvasHeight;
+    const scale = Math.min(scaleX, scaleY);
+    
+    const scaledWidth = canvasWidth * scale;
+    const scaledHeight = canvasHeight * scale;
+    const offsetX = (L_WIDTH - scaledWidth) / 2;
+    const offsetY = (L_HEIGHT - scaledHeight) / 2;
+    
+    console.log(`📐 L版リサイズ: ${canvasWidth}×${canvasHeight} → ${L_WIDTH}×${L_HEIGHT} (scale: ${scale.toFixed(3)})`);
+    
+    resizeCtx.drawImage(printCanvas, 0, 0, canvasWidth, canvasHeight, offsetX, offsetY, scaledWidth, scaledHeight);
+    
+    // 最終画像を生成
+    const finalCanvas = document.createElement('canvas');
+    const finalCtx = finalCanvas.getContext('2d');
+    
+    finalCanvas.width = L_WIDTH;
+    finalCanvas.height = L_HEIGHT;
+    
+    finalCtx.fillStyle = 'white';
+    finalCtx.fillRect(0, 0, L_WIDTH, L_HEIGHT);
+    finalCtx.drawImage(resizeCanvas, 0, 0);
+    
+    const finalDataURL = finalCanvas.toDataURL('image/png');
+    const fileName = `drawing_${new Date().getFullYear()}${(new Date().getMonth()+1).toString().padStart(2,'0')}${new Date().getDate().toString().padStart(2,'0')}_${new Date().getHours().toString().padStart(2,'0')}${new Date().getMinutes().toString().padStart(2,'0')}${new Date().getSeconds().toString().padStart(2,'0')}.png`;
+    
+    // ファイルパスを生成（Node.js環境の場合）
+    let printPath = null;
+    if (typeof require !== 'undefined') {
+      try {
+        const os = require('os');
+        const path = require('path');
+        printPath = path.join(os.homedir(), 'Downloads', fileName);
+      } catch (e) {
+        console.log('⚠️ Node.js環境ではないため、ファイルパスは生成されません');
+      }
+    }
+    
+    return {
+      dataURL: finalDataURL,
+      fileName: fileName,
+      printPath: printPath
+    };
+    
+  } catch (error) {
+    console.error('❌ generatePrintImage: エラー:', error);
+    return null;
+  }
+}
+
+// ダウンロード処理を分離
+function downloadImage(dataURL, fileName) {
+  console.log('💾 downloadImage: 画像ダウンロード開始');
+  
+  try {
+    if (typeof require !== 'undefined') {
+      // Node.js環境
+      try {
+        const fs = require('fs');
+        const os = require('os');
+        const path = require('path');
+        
+        const downloadsPath = path.join(os.homedir(), 'Downloads', fileName);
+        const base64Data = dataURL.replace(/^data:image\/png;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        
+        fs.writeFileSync(downloadsPath, buffer);
+        console.log(`✅ 自動保存完了: ${downloadsPath}`);
+        
+        const fileSize = fs.statSync(downloadsPath).size;
+        console.log(`📁 ファイル情報: サイズ=${fileSize}バイト, パス=${downloadsPath}`);
+        
+        // 保存されたパスを返す
+        return downloadsPath;
+        
+      } catch (nodeError) {
+        console.error('❌ Node.js保存エラー:', nodeError);
+        // ブラウザ環境のフォールバック
+        downloadInBrowser(dataURL, fileName);
+        return null;
+      }
+    } else {
+      // ブラウザ環境
+      downloadInBrowser(dataURL, fileName);
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ downloadImage: エラー:', error);
+    return null;
+  }
+}
+
+// ブラウザでのダウンロード
+function downloadInBrowser(dataURL, fileName) {
+  const link = document.createElement('a');
+  link.href = dataURL;
+  link.download = fileName;
+  link.style.position = 'absolute';
+  link.style.left = '-9999px';
+  link.style.visibility = 'hidden';
+  
+  document.body.appendChild(link);
+  
+  setTimeout(() => {
+    link.click();
+    setTimeout(() => {
+      document.body.removeChild(link);
+      console.log('✅ ブラウザダウンロード完了');
+    }, 100);
+  }, 10);
+}
+
+// 印刷実行処理を分離
+function executePrint(filePath) {
+  console.log('🖨️ executePrint: 印刷処理開始');
+  console.log('📍 印刷ファイルパス:', filePath);
+  
+  if (!filePath) {
+    console.log('⚠️ ファイルパスが指定されていません（ブラウザ環境のため印刷スキップ）');
+    return;
+  }
+  
+  if (typeof require !== 'undefined') {
+    try {
+      const { exec } = require('child_process');
+      
+      const printCommand = `lpr -P Brother_MFC_J6983CDW "${filePath}"`;
+      console.log('📤 印刷コマンド実行:', printCommand);
+      
+      exec(printCommand, { 
+        timeout: 15000,
+        cwd: process.cwd(),
+        env: process.env
+      }, (error, stdout, stderr) => {
+        if (error) {
+          console.error('❌ 印刷エラー:', error.message);
+          if (stderr) console.error('❌ 標準エラー出力:', stderr);
+        } else {
+          console.log('✅ 印刷成功: 印刷キューに送信完了');
+          if (stdout) console.log('📋 標準出力:', stdout);
+          
+          // キュー確認
+          setTimeout(() => {
+            exec('lpq -P Brother_MFC_J6983CDW', (qError, qStdout) => {
+              console.log('📋 印刷後のキュー状態:', qStdout || 'キュー情報取得エラー');
+            });
+          }, 2000);
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ executePrint: エラー:', error);
+    }
+  } else {
+    console.log('⚠️ ブラウザ環境のため印刷処理をスキップ');
+  }
+}
