@@ -237,12 +237,12 @@ function processMessage(data) {
       }, 10000);
     }
   } else if (data.type === "heartEffect") {
-    // ハートエフェクト指示受信
-    if (heartEffectEnabled) {
-      createHeart();
-    }
+    // ハートエフェクト指示受信（受信側からのハートは常に表示）
+    console.log('💖 受信: heartEffectメッセージ受信（受信側からは常に表示）');
+    createHeart();
   } else if (data.type === "specialHeartEffect") {
     // 特別ハートエフェクト指示受信
+    console.log('🎉💖 受信: specialHeartEffectメッセージ受信');
     createSpecialHeart();
   } else if (data.type === "autoSelectBackground") {
     // console.log('🖼️ 受信側から背景自動選択指示を受信:', data.background);

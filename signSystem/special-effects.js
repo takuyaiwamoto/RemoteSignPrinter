@@ -8,7 +8,12 @@
 
 // ハート生成関数
 function createHeart() {
-  // ハート生成開始
+  // ハート生成開始（20%カット - 80%の確率で生成）
+  if (Math.random() > 0.8) {
+    console.log('💖 送信側でハート生成スキップ（20%カット）');
+    return;
+  }
+  console.log('💖 送信側で通常ハート生成')
   const heart = document.createElement('div');
   heart.className = 'heart';
   
@@ -34,35 +39,35 @@ function createHeart() {
       20% {
         opacity: 1;
         transform: rotate(45deg) translateX(${randomMoves[1]}px);
-        bottom: 80px;
+        bottom: 20vh;
       }
       40% {
         opacity: 0.9;
         transform: rotate(45deg) translateX(${randomMoves[2]}px);
-        bottom: 140px;
+        bottom: 40vh;
       }
       60% {
         opacity: 0.8;
         transform: rotate(45deg) translateX(${randomMoves[3]}px);
-        bottom: 200px;
+        bottom: 60vh;
       }
       80% {
         opacity: 0.5;
         transform: rotate(45deg) translateX(${randomMoves[4]}px);
-        bottom: 260px;
+        bottom: 80vh;
       }
       100% {
         opacity: 0;
         transform: rotate(45deg) translateX(${randomMoves[5]}px);
-        bottom: 320px;
+        bottom: 100vh;
       }
     }
   `;
   document.head.appendChild(style);
   // スタイル追加
   
-  // ランダムアニメーションを適用
-  heart.style.animation = `${randomAnimationName} 3s linear forwards`;
+  // ランダムアニメーションを適用（速度1.5倍：3s→2s）
+  heart.style.animation = `${randomAnimationName} 2s linear forwards`;
   
   // デバッグ用スタイル追加
   heart.style.border = '2px solid red';
@@ -83,15 +88,17 @@ function createHeart() {
       style.parentNode.removeChild(style);
       // スタイル削除
     }
-  }, 3000);
+  }, 2000); // 速度1.5倍に合わせて2秒に変更
 }
 
 // 特別演出用の大きなハート生成関数
 function createSpecialHeart() {
-  // 特別ハート演出開始
+  // 特別ハート演出開始（20%カット：30個→24個）
+  const heartCount = 24; // 30個の80% = 24個
+  console.log(`🎉💖 送信側で特別ハート演出開始！${heartCount}個のハートを生成します`)
   
-  // 30個のハートを30ms間隔で生成
-  for (let i = 0; i < 30; i++) {
+  // 24個のハートを30ms間隔で生成
+  for (let i = 0; i < heartCount; i++) {
     setTimeout(() => {
       const heart = document.createElement('div');
       heart.className = 'special-heart';
@@ -117,31 +124,31 @@ function createSpecialHeart() {
           25% {
             opacity: 1;
             transform: rotate(45deg) scale(0.8) translateX(${(Math.random() - 0.5) * 80}px);
-            bottom: 100px;
+            bottom: 25vh;
           }
           50% {
             opacity: 0.9;
             transform: rotate(45deg) scale(1.2) translateX(${(Math.random() - 0.5) * 120}px);
-            bottom: 200px;
+            bottom: 50vh;
           }
           75% {
             opacity: 0.6;
             transform: rotate(45deg) scale(0.9) translateX(${(Math.random() - 0.5) * 100}px);
-            bottom: 300px;
+            bottom: 75vh;
           }
           100% {
             opacity: 0;
             transform: rotate(45deg) scale(0.3) translateX(${(Math.random() - 0.5) * 150}px);
-            bottom: 400px;
+            bottom: 100vh;
           }
         }
       `;
       
       document.head.appendChild(style);
       
-      // ハートにランダム配置とアニメーションを適用
+      // ハートにランダム配置とアニメーションを適用（速度1.5倍：4s→2.67s）
       heart.style.left = randomX + 'px';
-      heart.style.animation = `${randomAnimationName} 4s ease-out forwards`;
+      heart.style.animation = `${randomAnimationName} 2.67s ease-out forwards`;
       
       // ランダムな色の特別ハート
       const heartColors = ['#ff1493', '#ff69b4', '#ff6347', '#ff1493', '#db7093', '#c71585', '#ff007f', '#ff3399'];
@@ -159,7 +166,7 @@ function createSpecialHeart() {
         if (style.parentNode) {
           style.parentNode.removeChild(style);
         }
-      }, 4000);
+      }, 2670); // 速度1.5倍に合わせて2.67秒に変更
     }, i * 30); // 30ms間隔
   }
 }

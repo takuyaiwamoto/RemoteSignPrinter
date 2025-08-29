@@ -30,11 +30,11 @@ function playBackgroundMusic() {
   
   // 音楽要素を作成
   const music = document.createElement('audio');
-  music.src = './enoguMusic.mp4';
+  music.src = './signMusic.mp3';
   music.volume = musicVolume;
   music.loop = false; // 1回のみ再生
   
-  console.log(`🎵 音楽再生開始: enoguMusic.mp4, 音量: ${musicVolume}`);
+  console.log(`🎵 音楽再生開始: signMusic.mp3, 音量: ${musicVolume}`);
   
   // 音楽再生開始
   music.play().catch(error => {
@@ -2177,7 +2177,7 @@ let currentPrintMode = "drawOnly"; // 🔸 現在の印刷モード（デフォ�
 let currentVideoSize = 100; // 🔸 現在のビデオサイズ（デフォルト100%）
 let starEffectEnabled = true; // 星エフェクトの状態（標準でON）
 let fairyDustEffectEnabled = true; // 妖精の粉エフェクトの状態（標準でON）
-let heartEffectEnabled = false; // ハートエフェクトの状態（標準でOFF）
+let heartEffectEnabled = true; // ハートエフェクトの状態（標準でON）
 
 // 🔸 背景変形パラメータ
 let backgroundScale = 1.0; // 背景のスケール
@@ -7294,8 +7294,14 @@ function printFull() {
   printCtx.fillStyle = '#ffffff';
   printCtx.fillRect(0, 0, printCanvas.width, printCanvas.height);
   
+  // 180度回転して描画
+  printCtx.save();
+  printCtx.translate(printCanvas.width / 2, printCanvas.height / 2);
+  printCtx.rotate(Math.PI); // 180度回転
+  printCtx.translate(-printCanvas.width / 2, -printCanvas.height / 2);
   printCtx.drawImage(canvas, 0, 0);
-  console.log('🖨️ 受信側Canvas内容を印刷Canvasに直接コピー完了（白背景付き）');
+  printCtx.restore();
+  console.log('🖨️ 受信側Canvas内容を180度回転して印刷Canvasにコピー完了（白背景付き）');
   console.log('🖨️ 印刷描画完了 (180度回転)');
   
   // 印刷用データを作成
@@ -7376,13 +7382,19 @@ function printPen() {
     }
   }
   
-  // 処理済みデータを印刷Canvasに適用
-  printCtx.putImageData(imageData, 0, 0);
-  console.log('🖨️ 受信側Canvas描画部分のみを印刷Canvasにコピー完了（背景除去済み）');
+  // 一時的にImageDataを別のCanvasに適用して180度回転処理
+  tempCtx.putImageData(imageData, 0, 0);
+  
+  // 印刷Canvasに180度回転して描画
+  printCtx.save();
+  printCtx.translate(printCanvas.width / 2, printCanvas.height / 2);
+  printCtx.rotate(Math.PI); // 180度回転
+  printCtx.translate(-printCanvas.width / 2, -printCanvas.height / 2);
+  printCtx.drawImage(tempCanvas, 0, 0);
+  printCtx.restore();
+  console.log('🖨️ 受信側Canvas描画部分を180度回転して印刷Canvasにコピー完了（背景除去済み）');
   
   console.log('🖨️ ペン印刷完了：受信側Canvas内容を直接コピー');
-  
-  printCtx.restore();
   console.log('🖨️ ペン印刷描画完了 (180度回転)');
   
   // 印刷用データを作成
@@ -7572,12 +7584,17 @@ async function printDrawingOnly() {
     finalCtx.fillStyle = 'white';
     finalCtx.fillRect(0, 0, L_WIDTH, L_HEIGHT);
     
-    // 0度回転（回転なし）で描画
+    // 180度回転で描画
+    finalCtx.save();
+    finalCtx.translate(L_WIDTH / 2, L_HEIGHT / 2);
+    finalCtx.rotate(Math.PI); // 180度回転
+    finalCtx.translate(-L_WIDTH / 2, -L_HEIGHT / 2);
     finalCtx.drawImage(resizeCanvas, 0, 0);
+    finalCtx.restore();
     
-    console.log('✅ 0度回転（回転なし）キャンバス作成完了');
+    console.log('✅ 180度回転キャンバス作成完了');
     
-    // 0度回転（回転なし）画像データを取得
+    // 180度回転画像データを取得
     const finalDataURL = finalCanvas.toDataURL('image/png');
     
     // 完全自動ダウンロード（確認なし）
@@ -8427,7 +8444,14 @@ async function generatePrintImage() {
     
     finalCtx.fillStyle = 'white';
     finalCtx.fillRect(0, 0, L_WIDTH, L_HEIGHT);
+    
+    // 180度回転して描画
+    finalCtx.save();
+    finalCtx.translate(L_WIDTH / 2, L_HEIGHT / 2);
+    finalCtx.rotate(Math.PI); // 180度回転
+    finalCtx.translate(-L_WIDTH / 2, -L_HEIGHT / 2);
     finalCtx.drawImage(resizeCanvas, 0, 0);
+    finalCtx.restore();
     
     const finalDataURL = finalCanvas.toDataURL('image/png');
     const fileName = `drawing_${new Date().getFullYear()}${(new Date().getMonth()+1).toString().padStart(2,'0')}${new Date().getDate().toString().padStart(2,'0')}_${new Date().getHours().toString().padStart(2,'0')}${new Date().getMinutes().toString().padStart(2,'0')}${new Date().getSeconds().toString().padStart(2,'0')}.png`;
