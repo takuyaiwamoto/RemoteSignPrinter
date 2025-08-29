@@ -123,6 +123,22 @@ function togglePenSound() {
   // 音声は受信側のみで再生
 }
 
+// 🎬 映像再生機能の切り替え
+let videoPlaybackEnabled = true; // デフォルトでON
+function toggleVideoPlayback() {
+  const checkbox = document.getElementById('videoPlayback');
+  videoPlaybackEnabled = checkbox.checked;
+  console.log(`🎬 映像再生: ${videoPlaybackEnabled ? 'ON' : 'OFF'}`);
+  
+  // WebSocketで受信側に通知
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: 'videoPlaybackToggle',
+      enabled: videoPlaybackEnabled
+    }));
+  }
+}
+
 // 🔍 背景デバッグ表示制御関数
 function toggleBackgroundDebug() {
   backgroundDebugEnabled = !backgroundDebugEnabled;

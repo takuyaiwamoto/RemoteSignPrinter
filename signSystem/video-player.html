@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Video Player</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    #videoContainer {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+    
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    
+    #controls {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px 20px;
+      border-radius: 5px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    button {
+      padding: 8px 16px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    button:hover {
+      background: #45a049;
+    }
+    
+    button:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
+    
+    #status {
+      color: white;
+      margin-left: 20px;
+      font-family: sans-serif;
+    }
+    
+    #timeDisplay {
+      color: white;
+      margin-left: 10px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div id="videoContainer">
+    <video id="signVideo" src="./signVideoG.mp4"></video>
+    <div id="controls">
+      <button id="playBtn" onclick="playVideo()">再生</button>
+      <button id="pauseBtn" onclick="pauseVideo()" style="display:none;">一時停止</button>
+      <button id="resetBtn" onclick="resetVideo()">リセット</button>
+      <span id="timeDisplay">0:00 / 0:00</span>
+      <span id="status">準備完了</span>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    const video = document.getElementById('signVideo');
+    const playBtn = document.getElementById('playBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const status = document.getElementById('status');
+    const timeDisplay = document.getElementById('timeDisplay');
+    
+    let isWaitingForDraw = false;
+    let isWaitingForSend = false;
+    let isWaitingForAnimation = false;
+    let hasPassedDrawPoint = false;  // 10秒地点を通過済みかどうか
+    let hasPassedSendPoint = false;  // 22秒地点を通過済みかどうか
+    let hasPassedAnimationPoint = false;  // 24秒地点を通過済みかどうか
+    
+    // 時間表示の更新
+    function updateTimeDisplay() {
+      const current = Math.floor(video.currentTime);
+      const duration = Math.floor(video.duration) || 0;
+      const currentMin = Math.floor(current / 60);
+      const currentSec = current % 60;
+      const durationMin = Math.floor(duration / 60);
+      const durationSec = duration % 60;
+      
+      timeDisplay.textContent = `${currentMin}:${currentSec.toString().padStart(2, '0')} / ${durationMin}:${durationSec.toString().padStart(2, '0')}`;
+    }
+    
+    // ビデオの時間更新イベント
+    video.addEventListener('timeupdate', () => {
+      updateTimeDisplay();
+      const currentTime = video.currentTime;
+      
+      // 10.5秒で自動一時停止（書き手の描画待ち）- 一度だけ実行
+      if (currentTime >= 10.5 && currentTime < 11 && !isWaitingForDraw && !hasPassedDrawPoint && video.playing) {
+        pauseVideo();
+        isWaitingForDraw = true;
+        status.textContent = '書き手の描画を待機中...';
+        console.log('🎬 10.5秒: 書き手の描画待機開始');
+      }
+      
+      // 21秒で自動一時停止（渡すボタン待ち）- 一度だけ実行
+      if (currentTime >= 21 && currentTime < 21.5 && !isWaitingForSend && !hasPassedSendPoint && video.playing) {
+        pauseVideo();
+        isWaitingForSend = true;
+        status.textContent = '渡すボタンを待機中...';
+        console.log('🎬 21秒: 渡すボタン待機開始');
+      }
+      
+      // 24秒での一時停止は削除（コメントアウト）
+      // if (currentTime >= 24 && currentTime < 24.5 && !isWaitingForAnimation && !hasPassedAnimationPoint && video.playing) {
+      //   pauseVideo();
+      //   isWaitingForAnimation = true;
+      //   status.textContent = 'アニメーションを待機中...';
+      //   console.log('🎬 24秒: アニメーション待機開始');
+      // }
+    });
+    
+    // ビデオメタデータ読み込み完了
+    video.addEventListener('loadedmetadata', () => {
+      updateTimeDisplay();
+    });
+    
+    // 再生状態の管理
+    Object.defineProperty(video, 'playing', {
+      get: function() {
+        return !!(this.currentTime > 0 && !this.paused && !this.ended && this.readyState > 2);
+      }
+    });
+    
+    // 再生関数
+    function playVideo() {
+      video.play();
+      playBtn.style.display = 'none';
+      pauseBtn.style.display = 'inline-block';
+      status.textContent = '再生中';
+    }
+    
+    // 一時停止関数
+    function pauseVideo() {
+      video.pause();
+      playBtn.style.display = 'inline-block';
+      pauseBtn.style.display = 'none';
+      if (!isWaitingForDraw && !isWaitingForSend && !isWaitingForAnimation) {
+        status.textContent = '一時停止';
+      }
+    }
+    
+    // リセット関数
+    function resetVideo() {
+      video.currentTime = 0;
+      pauseVideo();
+      isWaitingForDraw = false;
+      isWaitingForSend = false;
+      isWaitingForAnimation = false;
+      hasPassedDrawPoint = false;
+      hasPassedSendPoint = false;
+      hasPassedAnimationPoint = false;
+      status.textContent = '準備完了';
+      console.log('🎬 動画をリセットしました');
+    }
+    
+    // IPCからのコマンド受信
+    ipcRenderer.on('video-command', (event, data) => {
+      console.log('🎬 コマンド受信:', data);
+      
+      switch(data.command) {
+        case 'play':
+          playVideo();
+          break;
+          
+        case 'pause':
+          pauseVideo();
+          break;
+          
+        case 'reset':
+          resetVideo();
+          break;
+          
+        case 'drawingStarted':
+          if (isWaitingForDraw) {
+            isWaitingForDraw = false;
+            hasPassedDrawPoint = true;  // 10秒地点を通過済みとマーク
+            status.textContent = '描画検出 - 再生再開';
+            playVideo();
+            console.log('🎬 描画開始を検出、再生再開');
+          }
+          break;
+          
+        case 'sendButtonPressed':
+          if (isWaitingForSend) {
+            isWaitingForSend = false;
+            hasPassedSendPoint = true;  // 22秒地点を通過済みとマーク
+            status.textContent = '渡すボタン検出 - 最後まで再生';
+            playVideo();
+            console.log('🎬 渡すボタン押下を検出、最後まで再生');
+            
+            // 動画終了まで再生を続ける
+            video.addEventListener('ended', () => {
+              status.textContent = '再生完了';
+              playBtn.style.display = 'inline-block';
+              pauseBtn.style.display = 'none';
+            }, { once: true });
+          }
+          break;
+          
+        case 'animationStarted':
+          // 24秒での一時停止は無効化したため、このイベントは無視
+          console.log('🎬 アニメーション開始イベント受信（無視）');
+          break;
+      }
+    });
+    
+    console.log('🎬 Sign Video Player 初期化完了');
+  </script>
+</body>
+</html>

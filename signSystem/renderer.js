@@ -1060,6 +1060,40 @@ async function createTransparentWindow() {
   }
 }
 
+// 動画ウィンドウ作成関数
+let videoWindowCreated = false;
+async function createVideoWindow() {
+  if (videoWindowCreated) {
+    console.log('🎬 動画ウィンドウは既に作成済みです');
+    return;
+  }
+  
+  if (typeof ipcRenderer === 'undefined') {
+    console.error('❌ 動画ウィンドウ作成失敗: ipcRendererが利用できません');
+    return;
+  }
+  
+  try {
+    const result = await ipcRenderer.invoke('create-video-window');
+    if (result.success) {
+      videoWindowCreated = !result.exists;
+      console.log('🎬 動画ウィンドウ作成成功');
+    }
+  } catch (error) {
+    console.error('❌ 動画ウィンドウ作成エラー:', error);
+  }
+}
+
+// 動画制御コマンド送信関数
+function sendVideoCommand(command, data = {}) {
+  if (typeof ipcRenderer !== 'undefined') {
+    ipcRenderer.send('video-control', { command, ...data });
+    console.log(`🎬 動画コマンド送信: ${command}`);
+  } else {
+    console.error(`🎬 動画コマンド送信失敗: ipcRendererが利用できません (${command})`);
+  }
+}
+
 // Electron透明ウィンドウにハートを追加する関数
 function createSpecialHeartInOverlay(x) {
   const heartData = { x, timestamp: Date.now() };
@@ -2442,6 +2476,15 @@ document.addEventListener('DOMContentLoaded', () => {
   setReceiverCanvasSize();
   //console.log('🔧 初期化: 横長キャンバスサイズを適用');
   //console.log(`🔧 初期化後の描画エリアサイズ: ${drawingAreaSize.width} x ${drawingAreaSize.height}`);
+  
+  // 🎬 映像再生機能がデフォルトで有効な場合、動画ウィンドウを作成
+  setTimeout(() => {
+    // WebSocketで書き手から設定を受信するまで少し待つ
+    if (!window.videoPlaybackDisabled) {
+      createVideoWindow();
+      console.log('🎬 初期化: 動画ウィンドウを作成');
+    }
+  }, 2000);
   
   // ウィンドウリサイズ時にback2.pngを中央に再配置
   window.addEventListener('resize', () => {
@@ -4226,6 +4269,10 @@ function handleMessage(data) {
       return;
     }
     
+    // 🎬 描画検出フラグをリセット
+    window.firstDrawingDetected = false;
+    console.log('🎬 描画検出フラグをリセット');
+    
     // 送信ボタン後のクリア前に描画データを0度回転で保存（印刷機能は削除）
     if ([].length > 0) {
       console.log("🔴 送信ボタン → 描画データを0度回転で保存のみ");
@@ -4398,6 +4445,10 @@ function handleMessage(data) {
     console.log(`🎬🎬🎬 GLOBAL SEND メッセージ受信！ 書き手(${data.writerId})から送信指示受信 🎬🎬🎬`);
     console.log(`⏱️ アニメーション待機時間: ${data.animationStartWaitTime}秒`);
     console.log(`⏱️ 回転後待機時間: ${data.rotationWaitTime}秒`);
+    
+    // 🎬 渡すボタン押下を動画に通知
+    sendVideoCommand('sendButtonPressed');
+    console.log('🎬 渡すボタン押下を動画に通知');
     
     // 音楽ボリューム設定を受信
     if (data.musicVolume !== undefined) {
@@ -4668,6 +4719,13 @@ function handleMessage(data) {
     // writer ID を取得（デフォルトは writer1 で後方互換性を保つ）
     const writerId = data.writerId || 'writer1';
     console.log("🎯 DRAW処理開始: writerId =", writerId);
+    
+    // 🎬 最初の描画を検出して動画再生
+    if (!window.firstDrawingDetected) {
+      window.firstDrawingDetected = true;
+      sendVideoCommand('drawingStarted');
+      console.log('🎬 最初の描画を検出、動画に通知');
+    }
     
     // 最終接触時刻を更新
     if (writerLastSeen.has(writerId)) {
@@ -5223,6 +5281,18 @@ function handleMessage(data) {
     // 🔸 SwitchBotテスト指示を受信
     //console.log("🤖 送信側からSwitchBotテスト指示を受信");
     executeSwitchBotSequence();
+  } else if (data.type === "videoPlaybackToggle") {
+    // 🎬 映像再生機能の切り替え
+    console.log(`🎬 映像再生設定を受信: ${data.enabled ? 'ON' : 'OFF'}`);
+    if (data.enabled) {
+      window.videoPlaybackDisabled = false;
+      // 動画ウィンドウを作成
+      createVideoWindow();
+    } else {
+      window.videoPlaybackDisabled = true;
+      // 動画ウィンドウにリセット指示を送信
+      sendVideoCommand('reset');
+    }
   } else if (data.type === "printMode") {
     // 🔸 印刷モード変更通知を受信
     currentPrintMode = data.mode;
@@ -5777,22 +5847,12 @@ function runAnimationSequence(waitTime = null, fireworksEnabled = true, confetti
       console.log("⏰ ポスターモード：フェードイン完了後1.1秒待機してから移動開始");
     }
     
-    // 🔧【重要】フェードイン完了イベントをリッスンして移動アニメーション開始
-    const handleFadeInComplete = () => {
-      const fadeInCompleteTime = performance.now();
-      console.log('🎬 フェードイン完了イベント受信 - 待機時間カウント開始');
-      
-      setTimeout(() => {
-        const moveAnimationStartTime = performance.now();
-        const totalWaitTime = moveAnimationStartTime - fadeInCompleteTime;
-        console.log('🎬 フェードイン完了後の待機時間経過 - 移動アニメーション開始');
-        console.log(`⏱️ フェードイン完了→移動アニメーション開始: ${totalWaitTime.toFixed(2)}ms (設定: ${rotationWaitTime}ms)`);
-        startMoveAnimation();
-      }, rotationWaitTime);
-    };
-    
-    // 🔧【重要】移動アニメーション実行関数
+    // 🔧【重要】移動アニメーション実行関数（先に定義）
     const startMoveAnimation = () => {
+      // 🎬 移動アニメーション開始を動画に通知
+      sendVideoCommand('animationStarted');
+      console.log('🎬 移動アニメーション開始を動画に通知');
+      
       animationImage.style.transition = "transform 2s ease";
       
       // 🔸 用紙サイズに応じて移動距離を調整（ウィンドウ下部を完全に通過）
@@ -5854,6 +5914,37 @@ function runAnimationSequence(waitTime = null, fireworksEnabled = true, confetti
         }
       }, waitTime); // 🔸 用紙サイズに応じた待機時間（5秒延長済み）
     };
+    
+    // 🔧【重要】フェードイン完了イベントをリッスンして移動アニメーション開始
+    const handleFadeInComplete = () => {
+      const fadeInCompleteTime = performance.now();
+      console.log('🎬 フェードイン完了イベント受信 - 待機時間カウント開始');
+      
+      setTimeout(() => {
+        const moveAnimationStartTime = performance.now();
+        const totalWaitTime = moveAnimationStartTime - fadeInCompleteTime;
+        console.log('🎬 フェードイン完了後の待機時間経過 - 移動アニメーション開始');
+        console.log(`⏱️ フェードイン完了→移動アニメーション開始: ${totalWaitTime.toFixed(2)}ms (設定: ${rotationWaitTime}ms)`);
+        startMoveAnimation();
+      }, rotationWaitTime);
+    };
+    
+    // 背景5以外の通常のアニメーションでは、回転完了後に直接移動アニメーションを開始
+    if (!window.isDevWhiteBackground) {
+      const delayTime = 1500 + rotationWaitTime;
+      console.log(`🎬 通常アニメーション: ${delayTime}ms後に移動開始予約 (回転1.5秒 + 待機${rotationWaitTime}ms)`);
+      // 回転アニメーション（1.5秒）+ 待機時間後に移動開始
+      setTimeout(() => {
+        console.log('🎬 通常アニメーション: タイマー発火 - 移動アニメーション関数を呼び出し');
+        try {
+          startMoveAnimation();
+        } catch (error) {
+          console.error('🎬 移動アニメーション実行エラー:', error);
+        }
+      }, delayTime); // 回転1.5秒 + 待機時間
+    } else {
+      console.log('🎬 背景5モード: fadeInCompleteイベント待機');
+    }
     
     // 🔸 回転完了後1秒で花火エフェクトを開始（チェックボックスが有効な場合のみ）
     setTimeout(() => {

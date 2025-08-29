@@ -634,6 +634,56 @@ ipcMain.handle('create-transparent-window', async () => {
   return await createTransparentOverlayWindow();
 });
 
+// 動画ウィンドウ管理
+let videoWindow = null;
+
+// 動画ウィンドウ作成のIPCハンドラー
+ipcMain.handle('create-video-window', async () => {
+  if (videoWindow && !videoWindow.isDestroyed()) {
+    console.log('🎬 動画ウィンドウは既に存在します');
+    videoWindow.focus();
+    return { success: true, exists: true };
+  }
+  
+  videoWindow = new BrowserWindow({
+    width: 1280,
+    height: 720,
+    resizable: true,
+    maximizable: true,
+    show: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      webSecurity: false
+    },
+    title: 'Sign Video Player'
+  });
+  
+  // HTMLファイルをロード
+  const videoHtmlPath = path.join(__dirname, 'video-player.html');
+  videoWindow.loadFile(videoHtmlPath);
+  
+  videoWindow.once('ready-to-show', () => {
+    videoWindow.show();
+    console.log('🎬 動画ウィンドウを表示しました');
+  });
+  
+  videoWindow.on('closed', () => {
+    videoWindow = null;
+    console.log('🎬 動画ウィンドウが閉じられました');
+  });
+  
+  return { success: true, exists: false };
+});
+
+// 動画制御のIPCハンドラー
+ipcMain.on('video-control', (event, data) => {
+  if (videoWindow && !videoWindow.isDestroyed()) {
+    videoWindow.webContents.send('video-command', data);
+    console.log(`🎬 動画制御コマンド送信: ${data.command}`);
+  }
+});
+
 // 透明ウィンドウにハート追加のIPCハンドラー
 ipcMain.on('add-heart-to-transparent-window', (event, data) => {
   console.log('📨 ハート追加要求を受信:', data);
