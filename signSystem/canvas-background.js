@@ -777,6 +777,11 @@ function startWaitingAnimation() {
       sendWebSocketMessage(slideMessage);
       console.log('📡 WebSocket: 受信側経由で透明ウィンドウにスライド指示を送信');
       ipcSent = true;
+      
+      // 書き手側でも2秒後にカウントダウン開始
+      setTimeout(() => {
+        startSyncCountdown();
+      }, 2000);
     } catch (error) {
       console.log('⚠️ WebSocket経由でのスライド指示送信失敗:', error.message);
     }
@@ -793,6 +798,11 @@ function startWaitingAnimation() {
       socket.send(JSON.stringify(slideMessage));
       console.log('📡 WebSocket (直接): 受信側経由で透明ウィンドウにスライド指示を送信');
       ipcSent = true;
+      
+      // 書き手側でも2秒後にカウントダウン開始
+      setTimeout(() => {
+        startSyncCountdown();
+      }, 2000);
     } catch (error) {
       console.log('⚠️ WebSocket直接送信失敗:', error.message);
     }
@@ -801,6 +811,37 @@ function startWaitingAnimation() {
   if (!ipcSent) {
     console.log('⚠️ すべての送信方法が失敗しました - 書き手がブラウザ環境の可能性');
   }
+}
+
+// ==========================================
+// 書き手側カウントダウン機能（透明ウィンドウと同期）
+// ==========================================
+
+// 書き手側のカウントダウン機能
+function startSyncCountdown() {
+  const countdownElement = document.getElementById('syncCountdown');
+  if (!countdownElement) {
+    console.log('❌ syncCountdown要素が見つかりません');
+    return;
+  }
+  
+  let count = 5;
+  
+  countdownElement.style.display = 'block';
+  countdownElement.textContent = count;
+  console.log('⏱️ 書き手側カウントダウン開始: 5秒');
+  
+  const countdownInterval = setInterval(() => {
+    count--;
+    if (count > 0) {
+      countdownElement.textContent = count;
+      console.log(`⏱️ 書き手側カウントダウン: ${count}`);
+    } else {
+      countdownElement.style.display = 'none';
+      console.log('⏱️ 書き手側カウントダウン終了');
+      clearInterval(countdownInterval);
+    }
+  }, 1000);
 }
 
 // ==========================================
