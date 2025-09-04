@@ -705,6 +705,9 @@ function setBackgroundDev() {
 function startWaitingAnimation() {
   console.log('🚀 スタートボタンが押されました - 待機画像スライド開始');
   
+  // 「幕が上るまで」カウントダウンを開始
+  showCurtainCountdown();
+  
   // 環境の詳細調査（安全にチェック）
   const envInfo = {
     'typeof require': typeof require,
@@ -778,10 +781,10 @@ function startWaitingAnimation() {
       console.log('📡 WebSocket: 受信側経由で透明ウィンドウにスライド指示を送信');
       ipcSent = true;
       
-      // 書き手側でも2秒後にカウントダウン開始
+      // 書き手側では6秒後にカウントダウン開始（3秒待機 + 3秒アニメーション）
       setTimeout(() => {
         startSyncCountdown();
-      }, 2000);
+      }, 6000);
     } catch (error) {
       console.log('⚠️ WebSocket経由でのスライド指示送信失敗:', error.message);
     }
@@ -799,10 +802,10 @@ function startWaitingAnimation() {
       console.log('📡 WebSocket (直接): 受信側経由で透明ウィンドウにスライド指示を送信');
       ipcSent = true;
       
-      // 書き手側でも2秒後にカウントダウン開始
+      // 書き手側では6秒後にカウントダウン開始（3秒待機 + 3秒アニメーション）
       setTimeout(() => {
         startSyncCountdown();
-      }, 2000);
+      }, 6000);
     } catch (error) {
       console.log('⚠️ WebSocket直接送信失敗:', error.message);
     }
@@ -811,6 +814,47 @@ function startWaitingAnimation() {
   if (!ipcSent) {
     console.log('⚠️ すべての送信方法が失敗しました - 書き手がブラウザ環境の可能性');
   }
+}
+
+// ==========================================
+// 「幕が上るまで」カウントダウン機能
+// ==========================================
+
+// スタートボタン上にカウントダウン表示
+function showCurtainCountdown() {
+  const curtainCountdown = document.getElementById('curtainCountdown');
+  const curtainTimer = document.getElementById('curtainTimer');
+  
+  if (!curtainCountdown || !curtainTimer) {
+    console.log('❌ curtainCountdown要素が見つかりません');
+    return;
+  }
+  
+  // スタートボタンの位置を取得
+  const startButton = document.querySelector('button[onclick="startWaitingAnimation()"]');
+  if (startButton) {
+    const rect = startButton.getBoundingClientRect();
+    curtainCountdown.style.left = rect.left + 'px';
+    curtainCountdown.style.top = (rect.top - 80) + 'px'; // ボタンの上に配置
+  }
+  
+  // カウントダウン開始
+  let count = 3;
+  curtainCountdown.style.display = 'block';
+  curtainTimer.textContent = count;
+  console.log('🎭 幕が上るまで: 3秒');
+  
+  const countdownInterval = setInterval(() => {
+    count--;
+    if (count > 0) {
+      curtainTimer.textContent = count;
+      console.log(`🎭 幕が上るまで: ${count}秒`);
+    } else {
+      curtainCountdown.style.display = 'none';
+      console.log('🎭 幕が上りました！');
+      clearInterval(countdownInterval);
+    }
+  }, 1000);
 }
 
 // ==========================================

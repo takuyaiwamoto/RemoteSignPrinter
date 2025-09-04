@@ -43,6 +43,25 @@
   display: none;
 ">5</div>
 
+<!-- スタートボタン上の「幕が上るまで」カウントダウン -->
+<div id="curtainCountdown" style="
+  position: absolute;
+  background: rgba(255, 255, 255, 0.95);
+  color: #333;
+  padding: 10px 15px;
+  border-radius: 8px;
+  border: 2px solid #FF9800;
+  font-size: 16px;
+  font-weight: bold;
+  z-index: 10000;
+  display: none;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+">
+  <div style="font-size: 14px; color: #666;">幕が上るまで</div>
+  <div id="curtainTimer" style="font-size: 28px; color: #FF9800; margin-top: 5px;">3</div>
+</div>
+
 <!-- 右サイドバー: ペンの色と太さを並べて配置 （Clearボタンの直下に移動） -->
 <div class="right-sidebar" style="display: flex; gap: 15px; margin-top: 5px;">
   <!-- 左列: 色 -->

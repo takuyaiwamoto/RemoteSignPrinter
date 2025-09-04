@@ -552,7 +552,7 @@ async function createTransparentOverlayWindow() {
           object-fit: cover;
           z-index: 1000;
           opacity: 1;
-          transition: transform 2s ease-in-out;
+          transition: transform 3s ease-in-out;
           pointer-events: none;
         }
         #waitingImage.slide-up {
@@ -561,18 +561,56 @@ async function createTransparentOverlayWindow() {
         #waitingImage.slide-down {
           transform: translateY(0);
         }
+        /* ネオン・サイバー タイマー（採用デザイン） */
         #countdown {
           position: fixed;
           top: 20px;
           right: 20px;
-          background: rgba(0, 0, 0, 0.8);
-          color: white;
-          padding: 15px 20px;
-          border-radius: 10px;
-          font-size: 24px;
+          background: rgba(0, 0, 0, 0.9);
+          color: #00ffff;
+          padding: 20px 30px;
+          border-radius: 8px;
+          font-size: 32px;
           font-weight: bold;
+          font-family: 'Courier New', monospace;
           z-index: 2000;
           display: none;
+          border: 2px solid #00ffff;
+          box-shadow: 0 0 20px #00ffff, inset 0 0 20px rgba(0, 255, 255, 0.1);
+          text-shadow: 0 0 10px #00ffff;
+          animation: neonPulse 1.5s infinite alternate;
+          transition: all 0.3s ease;
+        }
+        
+        /* ラスト3秒の穏やかな注意モード */
+        #countdown.danger {
+          color: #ff6b6b;
+          border-color: #ff6b6b;
+          box-shadow: 0 0 20px #ff6b6b, inset 0 0 15px rgba(255, 107, 107, 0.2);
+          text-shadow: 0 0 10px #ff6b6b;
+          animation: gentleShake 0.5s infinite, gentlePulse 1s infinite alternate;
+        }
+        
+        @keyframes neonPulse {
+          from { box-shadow: 0 0 20px #00ffff, inset 0 0 20px rgba(0, 255, 255, 0.1); }
+          to { box-shadow: 0 0 30px #00ffff, 0 0 40px #00ffff, inset 0 0 20px rgba(0, 255, 255, 0.2); }
+        }
+        
+        @keyframes gentlePulse {
+          from { 
+            box-shadow: 0 0 20px #ff6b6b, inset 0 0 15px rgba(255, 107, 107, 0.2);
+            transform: scale(1);
+          }
+          to { 
+            box-shadow: 0 0 25px #ff6b6b, 0 0 35px #ff6b6b, inset 0 0 20px rgba(255, 107, 107, 0.3);
+            transform: scale(1.02);
+          }
+        }
+        
+        @keyframes gentleShake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-1px); }
+          75% { transform: translateX(1px); }
         }
       </style>
     </head>
@@ -581,6 +619,8 @@ async function createTransparentOverlayWindow() {
         <button id="transparentBtn">透明化</button>
         <button id="fullscreenBtn">最大化</button>
       </div>
+      
+      <!-- ネオンサイバータイマー -->
       <div id="countdown">5</div>
       ${waitingImageBase64 ? `<img id="waitingImage" src="${waitingImageBase64}" alt="待機中" />` : '<div id="waitingImage" style="color: #333;">Loading...</div>'}
       <script>
@@ -655,31 +695,46 @@ async function createTransparentOverlayWindow() {
             // 既存のクラスをクリアしてスライドアップ
             waitingImage.className = '';
             waitingImage.classList.add('slide-up');
-            console.log('📤 待機画像を上部にスライド開始（2秒）');
+            console.log('📤 待機画像を上部にスライド開始（3秒）');
             
-            // 2秒後にカウントダウン開始
+            // 3秒後にカウントダウン開始
             setTimeout(() => {
               startCountdown();
-            }, 2000);
+            }, 3000);
           }
         });
         
-        // カウントダウン機能
+        // ネオンサイバー カウントダウン機能（ラスト3秒で赤色振動）
         function startCountdown() {
           const countdownElement = document.getElementById('countdown');
           let count = 5;
           
+          if (!countdownElement) {
+            console.error('❌ カウントダウン要素が見つかりません');
+            return;
+          }
+          
+          // タイマーを表示
           countdownElement.style.display = 'block';
           countdownElement.textContent = count;
-          console.log('⏱️ カウントダウン開始: 5秒');
+          countdownElement.className = ''; // クラスをリセット
+          console.log('⏱️ ネオンサイバー カウントダウン開始: 5秒');
           
           const countdownInterval = setInterval(() => {
             count--;
             if (count > 0) {
               countdownElement.textContent = count;
-              console.log(\`⏱️ カウントダウン: \${count}\`);
+              
+              // ラスト3秒になったら穏やかな注意モード
+              if (count <= 3) {
+                countdownElement.classList.add('danger');
+                console.log(\`⚠️ 注意モード カウントダウン: \${count}\`);
+              } else {
+                console.log(\`⏱️ カウントダウン: \${count}\`);
+              }
             } else {
               countdownElement.style.display = 'none';
+              countdownElement.className = ''; // クラスをリセット
               console.log('⏱️ カウントダウン終了');
               
               // 待機画像を下に移動

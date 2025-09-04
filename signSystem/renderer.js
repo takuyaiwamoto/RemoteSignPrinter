@@ -4429,14 +4429,29 @@ function handleMessage(data) {
     // 書き手からのスライドアニメーション指示
     console.log(`📤 書き手(${data.writerId || 'unknown'})からスライドアニメーション指示受信:`, data);
     
-    // 受信側（Electron環境）から透明ウィンドウにIPC送信
+    // open.wav音声を再生（受信側で）
     try {
-      const slideData = { action: 'slide', timestamp: data.timestamp || Date.now() };
-      ipcRenderer.send('add-slide-to-transparent-window', slideData);
-      console.log('📡 受信側: 透明ウィンドウにスライドアニメーション指示を中継送信');
+      const openAudio = new Audio('./open.wav');
+      openAudio.volume = 0.7; // 音量設定（70%）
+      openAudio.play().then(() => {
+        console.log('🔊 受信側: open.wav再生開始');
+      }).catch(error => {
+        console.error('❌ 受信側: open.wav再生エラー:', error);
+      });
     } catch (error) {
-      console.error('❌ 受信側からのIPC送信失敗:', error);
+      console.error('❌ 受信側: open.wav読み込みエラー:', error);
     }
+    
+    // 3秒後に透明ウィンドウにスライドアニメーション指示を送信
+    setTimeout(() => {
+      try {
+        const slideData = { action: 'slide', timestamp: data.timestamp || Date.now() };
+        ipcRenderer.send('add-slide-to-transparent-window', slideData);
+        console.log('📡 受信側: 透明ウィンドウにスライドアニメーション指示を中継送信');
+      } catch (error) {
+        console.error('❌ 受信側からのIPC送信失敗:', error);
+      }
+    }, 3000); // 3秒遅延後にアニメーション開始
     
   } else if (data.type === "globalClear") {
     // 書き手からの全体クリア指示
