@@ -40,6 +40,9 @@
       display: flex;
       gap: 10px;
       align-items: center;
+      transition: opacity 0.5s ease;
+      opacity: 1;
+      pointer-events: auto;
     }
     
     button {
@@ -93,6 +96,7 @@
     const pauseBtn = document.getElementById('pauseBtn');
     const status = document.getElementById('status');
     const timeDisplay = document.getElementById('timeDisplay');
+    const controls = document.getElementById('controls');
     
     let isWaitingForDraw = false;
     let isWaitingForSend = false;
@@ -100,6 +104,39 @@
     let hasPassedDrawPoint = false;  // 10秒地点を通過済みかどうか
     let hasPassedSendPoint = false;  // 22秒地点を通過済みかどうか
     let hasPassedAnimationPoint = false;  // 24秒地点を通過済みかどうか
+    let endedTimeout = null;  // 終了後の表示制御用タイマー
+    
+    // コントロール表示制御関数
+    function hideControls() {
+      controls.style.opacity = '0';
+      controls.style.pointerEvents = 'none';
+      console.log('🎬 コントロールを非表示');
+    }
+    
+    function showControls() {
+      controls.style.opacity = '1';
+      controls.style.pointerEvents = 'auto';
+      console.log('🎬 コントロールを表示');
+    }
+    
+    // 動画終了時の処理
+    function handleVideoEnded() {
+      status.textContent = '再生完了';
+      playBtn.style.display = 'inline-block';
+      pauseBtn.style.display = 'none';
+      console.log('🎬 動画再生終了');
+      
+      // 既存のタイマーがあればクリア
+      if (endedTimeout) {
+        clearTimeout(endedTimeout);
+      }
+      
+      // 5秒後にコントロールを表示
+      endedTimeout = setTimeout(() => {
+        showControls();
+        console.log('🎬 動画終了から5秒経過、コントロールを表示');
+      }, 5000);
+    }
     
     // 時間表示の更新
     function updateTimeDisplay() {
@@ -161,6 +198,9 @@
       playBtn.style.display = 'none';
       pauseBtn.style.display = 'inline-block';
       status.textContent = '再生中';
+      
+      // 再生開始時にコントロールを非表示
+      hideControls();
     }
     
     // 一時停止関数
@@ -184,6 +224,15 @@
       hasPassedSendPoint = false;
       hasPassedAnimationPoint = false;
       status.textContent = '準備完了';
+      
+      // タイマーをクリア
+      if (endedTimeout) {
+        clearTimeout(endedTimeout);
+        endedTimeout = null;
+      }
+      
+      // コントロールを表示
+      showControls();
       console.log('🎬 動画をリセットしました');
     }
     
@@ -209,7 +258,10 @@
             isWaitingForDraw = false;
             hasPassedDrawPoint = true;  // 10秒地点を通過済みとマーク
             status.textContent = '描画検出 - 再生再開';
-            playVideo();
+            video.play();
+            playBtn.style.display = 'none';
+            pauseBtn.style.display = 'inline-block';
+            hideControls(); // コントロールを非表示
             console.log('🎬 描画開始を検出、再生再開');
           }
           break;
@@ -224,9 +276,7 @@
             
             // 動画終了まで再生を続ける
             video.addEventListener('ended', () => {
-              status.textContent = '再生完了';
-              playBtn.style.display = 'inline-block';
-              pauseBtn.style.display = 'none';
+              handleVideoEnded();
             }, { once: true });
           }
           break;

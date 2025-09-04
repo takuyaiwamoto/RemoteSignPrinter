@@ -95,8 +95,8 @@ window.addEventListener('DOMContentLoaded', () => {
     
     // さらに少し待ってから背景設定（WebSocket安定化後）
     setTimeout(() => {
-      // 背景画像を設定（デフォルト：背景2）
-      setBackground('./back2.png');
+      // 背景画像を設定（デフォルト：背景5）
+      setBackgroundDev();
     }, 2000);
     
   }, 500); // WebSocket接続を待つため少し遅延

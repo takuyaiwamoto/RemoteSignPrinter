@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevTool リモートコントローラー</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      color: #333;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    
+    h1 {
+      text-align: center;
+      color: #764ba2;
+      margin-bottom: 10px;
+      font-size: 2.5em;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .status-bar {
+      background: #f0f0f0;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ff4444;
+      animation: pulse 2s infinite;
+    }
+    
+    .status-dot.connected {
+      background: #44ff44;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+    
+    .control-section {
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    
+    .control-section h2 {
+      color: #667eea;
+      margin-bottom: 15px;
+      font-size: 1.5em;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 10px;
+    }
+    
+    .control-group {
+      display: grid;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+    
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+    
+    label {
+      font-weight: 600;
+      min-width: 200px;
+      color: #555;
+    }
+    
+    input[type="range"] {
+      flex: 1;
+      min-width: 200px;
+    }
+    
+    .range-value {
+      background: #667eea;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      min-width: 80px;
+      text-align: center;
+      font-weight: bold;
+    }
+    
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    button.selected {
+      background: #44ff44;
+      color: #333;
+    }
+    
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    
+    input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+    
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .emergency-stop {
+      background: #ff4444;
+      font-size: 20px;
+      padding: 15px 30px;
+    }
+    
+    .emergency-stop:hover {
+      background: #ff6666;
+    }
+    
+    .info-box {
+      background: #e3f2fd;
+      border-left: 4px solid #2196F3;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 5px;
+    }
+    
+    .info-box h3 {
+      color: #1976D2;
+      margin-bottom: 10px;
+    }
+    
+    .connection-status {
+      font-weight: bold;
+      color: #ff4444;
+    }
+    
+    .connection-status.connected {
+      color: #44ff44;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎮 DevTool リモートコントローラー</h1>
+    
+    <div class="status-bar">
+      <div class="status-indicator">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="connectionStatus" class="connection-status">未接続</span>
+      </div>
+      <div>
+        <span id="connectedClients">接続中のクライアント: 0</span>
+      </div>
+    </div>
+    
+    <div class="info-box">
+      <h3>ℹ️ 管理者コントロールパネル</h3>
+      <p>このページから、すべての書き手側のDevTool設定をリモート制御できます。</p>
+      <p>設定変更は即座にすべての接続中のクライアントに反映されます。</p>
+    </div>
+    
+    <!-- キャンバス設定 -->
+    <div class="control-section">
+      <h2>📐 キャンバス設定</h2>
+      <div class="control-group">
+        <div class="control-row">
+          <label>キャンバスサイズ調整:</label>
+          <input type="range" id="canvasScale" min="0.1" max="3.0" step="0.05" value="1.4">
+          <span class="range-value" id="canvasScaleValue">1.4x</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- タイミング設定 -->
+    <div class="control-section">
+      <h2>⏱️ タイミング設定</h2>
+      <div class="control-group">
+        <div class="control-row">
+          <label>アニメーション開始待機時間:</label>
+          <input type="range" id="animationStartWait" min="0.1" max="10" step="0.1" value="0.1">
+          <span class="range-value" id="animationStartWaitValue">0.1秒</span>
+        </div>
+        <div class="control-row">
+          <label>回転後待機時間:</label>
+          <input type="range" id="rotationWait" min="1" max="10" step="0.5" value="1.0">
+          <span class="range-value" id="rotationWaitValue">1.0秒</span>
+        </div>
+        <div class="control-row">
+          <label>印刷遅延時間:</label>
+          <input type="range" id="printDelay" min="0" max="10" step="0.5" value="5.0">
+          <span class="range-value" id="printDelayValue">5.0秒</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 背景設定 -->
+    <div class="control-section">
+      <h2>🎨 背景設定</h2>
+      <div class="control-group">
+        <div class="button-group">
+          <button onclick="setBackground('./back3.png')">背景1</button>
+          <button onclick="setBackground('./back2.png')">背景2</button>
+          <button onclick="setBackground('./back4.png')">背景3</button>
+          <button onclick="setBackground('./back6.png')">背景4</button>
+          <button onclick="setBackgroundDev()" style="background: #ffc0cb; color: #333;">背景5(dev)</button>
+          <button onclick="setBackground(null)">白</button>
+          <button onclick="setSpecialBackgroundToggle()" style="background: linear-gradient(45deg, #ff1493, #00ffff);">🎬 動画背景</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 動画・音楽設定 -->
+    <div class="control-section">
+      <h2>🎵 動画・音楽設定</h2>
+      <div class="control-group">
+        <div class="control-row">
+          <label>音楽ボリューム（背景5）:</label>
+          <input type="range" id="musicVolume" min="0" max="1" step="0.05" value="0.5">
+          <span class="range-value" id="musicVolumeValue">50%</span>
+        </div>
+        <div class="control-row">
+          <label>背景5動画パターン:</label>
+          <div class="button-group">
+            <button id="pattern1Btn" onclick="setVideoPattern(1)">パターン1(回転)</button>
+            <button id="pattern2Btn" class="selected" onclick="setVideoPattern(2)">パターン2(フェード)</button>
+          </div>
+        </div>
+        <div class="control-row">
+          <label>ビデオサイズ:</label>
+          <div class="button-group">
+            <button id="size100Btn" class="selected" onclick="setVideoSize(100)">100%</button>
+            <button id="size90Btn" onclick="setVideoSize(90)">90%</button>
+            <button id="size80Btn" onclick="setVideoSize(80)">80%</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- エフェクト設定 -->
+    <div class="control-section">
+      <h2>✨ エフェクト設定</h2>
+      <div class="control-group">
+        <div class="checkbox-group">
+          <input type="checkbox" id="starEffect">
+          <label for="starEffect">星エフェクト</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="fairyDustEffect">
+          <label for="fairyDustEffect">妖精の粉エフェクト</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="heartEffect">
+          <label for="heartEffect">💖 ハートエフェクト</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="penSoundEffect">
+          <label for="penSoundEffect">🎵 ペン音</label>
+        </div>
+      </div>
+      <hr style="margin: 20px 0;">
+      <div class="control-group">
+        <h3>送信後演出</h3>
+        <div class="checkbox-group">
+          <input type="checkbox" id="fireworksEffect" checked>
+          <label for="fireworksEffect">🎆 花火</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="confettiEffect" checked>
+          <label for="confettiEffect">🎊 紙吹雪</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="videoPlayback" checked>
+          <label for="videoPlayback">🎬 映像再生</label>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 印刷設定 -->
+    <div class="control-section">
+      <h2>🖨️ 印刷設定</h2>
+      <div class="control-group">
+        <div class="control-row">
+          <label>用紙サイズ:</label>
+          <div class="button-group">
+            <button id="a4Btn" class="selected" onclick="setPaperSize('A4')">A4</button>
+            <button id="lBtn" onclick="setPaperSize('L')">L判</button>
+            <button id="posterBtn" onclick="setPaperSize('poster')">ポストカード</button>
+          </div>
+        </div>
+        <div class="control-row">
+          <label>印刷モード:</label>
+          <div class="button-group">
+            <button id="drawOnlyBtn" class="selected" onclick="setPrintMode('drawOnly')">描画モード</button>
+            <button id="fullModeBtn" onclick="setPrintMode('fullMode')">フルモード</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- テスト・特殊機能 -->
+    <div class="control-section">
+      <h2>🧪 テスト・特殊機能</h2>
+      <div class="control-group">
+        <div class="button-group">
+          <button onclick="testFireworks()">🎆 花火テスト</button>
+          <button onclick="testConfetti()">🎊 紙吹雪テスト</button>
+          <button onclick="playVideo()">📹 ビデオ再生</button>
+          <button onclick="testSwitchBot()">🤖 SwitchBotテスト</button>
+          <button onclick="testDrawRightBottom()">座標テスト（右下）</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <div class="checkbox-group">
+          <input type="checkbox" id="switchBotEffect">
+          <label for="switchBotEffect">🤖 SwitchBotバブル</label>
+        </div>
+        <div class="checkbox-group">
+          <input type="checkbox" id="backgroundDebug">
+          <label for="backgroundDebug">🔍 背景デバッグ</label>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 制御ボタン -->
+    <div class="control-section">
+      <h2>🎮 制御コマンド</h2>
+      <div class="button-group">
+        <button onclick="sendAllSettings()" style="background: #4CAF50;">
+          📤 すべての設定を送信
+        </button>
+        <button onclick="refreshClients()">
+          🔄 クライアント情報を更新
+        </button>
+        <button onclick="clearAllCanvas()" class="emergency-stop">
+          🚨 全キャンバスクリア
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // WebSocket接続
+    let socket = null;
+    let adminId = 'admin_' + Math.random().toString(36).substr(2, 9);
+    let isConnected = false;
+    
+    // WebSocket接続を初期化
+    function initWebSocket() {
+      socket = new WebSocket("wss://realtime-sign-server-1.onrender.com");
+      
+      socket.onopen = () => {
+        console.log("✅ WebSocket接続完了（管理者）");
+        isConnected = true;
+        updateConnectionStatus(true);
+        
+        // 管理者として登録
+        socket.send(JSON.stringify({
+          type: 'admin_register',
+          adminId: adminId,
+          role: 'admin'
+        }));
+      };
+      
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleMessage(data);
+        } catch (error) {
+          console.error('❌ メッセージ処理エラー:', error);
+        }
+      };
+      
+      socket.onerror = (error) => {
+        console.error("❌ WebSocketエラー:", error);
+      };
+      
+      socket.onclose = () => {
+        console.log("⚠️ WebSocket切断");
+        isConnected = false;
+        updateConnectionStatus(false);
+        
+        // 5秒後に再接続を試みる
+        setTimeout(() => {
+          console.log("🔄 再接続を試みています...");
+          initWebSocket();
+        }, 5000);
+      };
+    }
+    
+    // メッセージハンドラー
+    function handleMessage(data) {
+      switch(data.type) {
+        case 'client_count':
+          updateClientCount(data.count);
+          break;
+        case 'admin_registered':
+          console.log('✅ 管理者として登録完了');
+          break;
+        case 'setting_applied':
+          console.log('✅ 設定が適用されました:', data.setting);
+          break;
+      }
+    }
+    
+    // 接続状態を更新
+    function updateConnectionStatus(connected) {
+      const statusDot = document.getElementById('statusDot');
+      const connectionStatus = document.getElementById('connectionStatus');
+      
+      if (connected) {
+        statusDot.classList.add('connected');
+        connectionStatus.classList.add('connected');
+        connectionStatus.textContent = '接続中';
+      } else {
+        statusDot.classList.remove('connected');
+        connectionStatus.classList.remove('connected');
+        connectionStatus.textContent = '未接続';
+      }
+    }
+    
+    // クライアント数を更新
+    function updateClientCount(count) {
+      document.getElementById('connectedClients').textContent = `接続中のクライアント: ${count}`;
+    }
+    
+    // 設定送信関数
+    function sendSetting(settingType, value) {
+      if (!isConnected || !socket) {
+        alert('WebSocket未接続です。接続を確認してください。');
+        return;
+      }
+      
+      const message = {
+        type: 'devtool_control',
+        role: 'admin',
+        adminId: adminId,
+        setting: settingType,
+        value: value,
+        fromAdmin: true, // 管理者からの設定であることを明示
+        priority: 'high', // 高優先度設定
+        timestamp: Date.now()
+      };
+      
+      socket.send(JSON.stringify(message));
+      console.log('📤 設定送信:', settingType, value);
+    }
+    
+    // スライダー値の更新と送信
+    function setupSlider(sliderId, valueId, settingType, formatter) {
+      const slider = document.getElementById(sliderId);
+      const valueDisplay = document.getElementById(valueId);
+      
+      slider.addEventListener('input', (e) => {
+        const value = parseFloat(e.target.value);
+        valueDisplay.textContent = formatter(value);
+        sendSetting(settingType, value);
+      });
+    }
+    
+    // チェックボックスの設定
+    function setupCheckbox(checkboxId, settingType) {
+      const checkbox = document.getElementById(checkboxId);
+      checkbox.addEventListener('change', (e) => {
+        sendSetting(settingType, e.target.checked);
+      });
+    }
+    
+    // 背景設定
+    function setBackground(backgroundPath) {
+      sendSetting('background', backgroundPath);
+    }
+    
+    function setBackgroundDev() {
+      sendSetting('backgroundDev', true);
+    }
+    
+    function setSpecialBackgroundToggle() {
+      sendSetting('specialBackgroundToggle', true);
+    }
+    
+    // ビデオパターン設定
+    function setVideoPattern(pattern) {
+      document.querySelectorAll('#pattern1Btn, #pattern2Btn').forEach(btn => {
+        btn.classList.remove('selected');
+      });
+      document.getElementById(`pattern${pattern}Btn`).classList.add('selected');
+      sendSetting('videoPattern', pattern);
+    }
+    
+    // ビデオサイズ設定
+    function setVideoSize(size) {
+      document.querySelectorAll('#size100Btn, #size90Btn, #size80Btn').forEach(btn => {
+        btn.classList.remove('selected');
+      });
+      document.getElementById(`size${size}Btn`).classList.add('selected');
+      sendSetting('videoSize', size);
+    }
+    
+    // 用紙サイズ設定
+    function setPaperSize(size) {
+      document.querySelectorAll('#a4Btn, #lBtn, #posterBtn').forEach(btn => {
+        btn.classList.remove('selected');
+      });
+      const btnMap = { 'A4': 'a4Btn', 'L': 'lBtn', 'poster': 'posterBtn' };
+      document.getElementById(btnMap[size]).classList.add('selected');
+      sendSetting('paperSize', size);
+    }
+    
+    // 印刷モード設定
+    function setPrintMode(mode) {
+      document.querySelectorAll('#drawOnlyBtn, #fullModeBtn').forEach(btn => {
+        btn.classList.remove('selected');
+      });
+      const btnMap = { 'drawOnly': 'drawOnlyBtn', 'fullMode': 'fullModeBtn' };
+      document.getElementById(btnMap[mode]).classList.add('selected');
+      sendSetting('printMode', mode);
+    }
+    
+    // テスト機能
+    function testFireworks() {
+      sendSetting('testFireworks', true);
+    }
+    
+    function testConfetti() {
+      sendSetting('testConfetti', true);
+    }
+    
+    function playVideo() {
+      sendSetting('playVideo', true);
+    }
+    
+    function testSwitchBot() {
+      sendSetting('testSwitchBot', true);
+    }
+    
+    function testDrawRightBottom() {
+      sendSetting('testDrawRightBottom', true);
+    }
+    
+    // すべての設定を送信
+    function sendAllSettings() {
+      // スライダーの値を送信
+      const sliders = [
+        { id: 'canvasScale', type: 'canvasScale' },
+        { id: 'animationStartWait', type: 'animationStartWait' },
+        { id: 'rotationWait', type: 'rotationWait' },
+        { id: 'musicVolume', type: 'musicVolume' },
+        { id: 'printDelay', type: 'printDelay' }
+      ];
+      
+      sliders.forEach(slider => {
+        const value = parseFloat(document.getElementById(slider.id).value);
+        sendSetting(slider.type, value);
+      });
+      
+      // チェックボックスの値を送信
+      const checkboxes = [
+        'starEffect', 'fairyDustEffect', 'heartEffect', 'penSoundEffect',
+        'fireworksEffect', 'confettiEffect', 'videoPlayback',
+        'switchBotEffect', 'backgroundDebug'
+      ];
+      
+      checkboxes.forEach(id => {
+        const checked = document.getElementById(id).checked;
+        sendSetting(id, checked);
+      });
+      
+      alert('すべての設定を送信しました');
+    }
+    
+    // クライアント情報を更新
+    function refreshClients() {
+      sendSetting('refreshClients', true);
+    }
+    
+    // 全キャンバスクリア
+    function clearAllCanvas() {
+      if (confirm('本当にすべてのキャンバスをクリアしますか？')) {
+        sendSetting('clearAllCanvas', true);
+      }
+    }
+    
+    // 初期化
+    document.addEventListener('DOMContentLoaded', () => {
+      // WebSocket接続
+      initWebSocket();
+      
+      // スライダーの設定
+      setupSlider('canvasScale', 'canvasScaleValue', 'canvasScale', v => `${v}x`);
+      setupSlider('animationStartWait', 'animationStartWaitValue', 'animationStartWait', v => `${v}秒`);
+      setupSlider('rotationWait', 'rotationWaitValue', 'rotationWait', v => `${v}秒`);
+      setupSlider('musicVolume', 'musicVolumeValue', 'musicVolume', v => `${Math.round(v * 100)}%`);
+      setupSlider('printDelay', 'printDelayValue', 'printDelay', v => `${v}秒`);
+      
+      // チェックボックスの設定
+      const checkboxSettings = [
+        'starEffect', 'fairyDustEffect', 'heartEffect', 'penSoundEffect',
+        'fireworksEffect', 'confettiEffect', 'videoPlayback',
+        'switchBotEffect', 'backgroundDebug'
+      ];
+      
+      checkboxSettings.forEach(id => {
+        setupCheckbox(id, id);
+      });
+      
+      console.log('🎮 DevTool リモートコントローラー初期化完了');
+    });
+  </script>
+</body>
+</html>

@@ -60,8 +60,8 @@ function processMessage(data) {
       }));
       
       // WriterID割り当て完了後に背景画像を受信側に送信
-      console.log("🖼️ WriterID割り当て完了 - 背景画像を受信側に送信");
-      setBackground('./back2.png');
+      console.log("🖼️ WriterID割り当て完了 - 背景5を受信側に送信");
+      setBackgroundDev();
     } else {
       // 他のクライアント向けのメッセージなので静かに無視（エラーではない）
       console.log("🔇 セッションID不一致のWriterID割り当てメッセージ（他クライアント向け）");

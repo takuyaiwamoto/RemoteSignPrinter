@@ -97,8 +97,8 @@
   
   <div class="button-group">
     <label>背景5動画パターン:</label>
-    <button id="pattern1Btn" class="selected" onclick="setVideoPattern(1)" style="background: #4CAF50; color: white;">パターン1(回転)</button>
-    <button id="pattern2Btn" onclick="setVideoPattern(2)" style="background: #2196F3; color: white;">パターン2(フェード)</button>
+    <button id="pattern1Btn" onclick="setVideoPattern(1)" style="background: #4CAF50; color: white;">パターン1(回転)</button>
+    <button id="pattern2Btn" class="selected" onclick="setVideoPattern(2)" style="background: #2196F3; color: white;">パターン2(フェード)</button>
   </div>
   
   <div class="button-group">
@@ -214,7 +214,7 @@ let currentVideoSize = 100; // 現在のビデオサイズ（デフォルト100%
 let canvasScale = 1.4; // キャンバススケール
 let animationStartWaitTime = 0.1; // アニメーション開始待機時間
 let rotationWaitTime = 1.0; // 回転後待機時間
-let currentVideoPattern = 1; // 背景5動画パターン（1:回転, 2:フェード）
+let currentVideoPattern = 2; // 背景5動画パターン（1:回転, 2:フェード） - 初期値をパターン2に設定
 let printDelayTime = 5.0; // 印刷遅延時間（秒）
 let currentPenThickness = 6; // 現在のペンの太さ（細い）
 let currentPenColor = 'black'; // 現在のペンの色

@@ -13,6 +13,7 @@ let videoPattern = 1;         // 動画パターン（1:回転, 2:フェード�
 let currentMusicElement = null; // 現在再生中の音楽要素
 let musicVolume = 0.5;        // 音楽のボリューム（0.0〜1.0）
 let printDelayTime = 5.0;     // 印刷遅延時間（秒）
+let currentVideoIndex = 1;    // 現在の動画番号（1〜4を順番に使用）
 
 // 🎵 背景5用音楽再生
 function playBackgroundMusic() {
@@ -67,7 +68,14 @@ function createVideoElement() {
   
   // 動画要素を作成
   const video = document.createElement('video');
-  video.src = './backVideo.mp4';
+  
+  // 1〜4の動画を順番に選択
+  video.src = `./backVideo${currentVideoIndex}.mp4`;
+  console.log(`🎬 動画選択: backVideo${currentVideoIndex}.mp4 (${currentVideoIndex}/4)`);
+  
+  // 次回のために番号を進める（1→2→3→4→1...）
+  currentVideoIndex = (currentVideoIndex % 4) + 1;
+  
   video.muted = true; // 音声なしで自動再生を許可
   video.loop = false; // 1回のみ再生
   video.preload = 'auto';
@@ -1431,6 +1439,9 @@ let writerDrawingData = {};
 // WriterID別キャンバスサイズ管理
 let writerCanvasSizes = {};
 
+// 受信側Writer別曲線描画状態管理
+let receiverWriterStates = {};
+
 // 180度回転した描画を実行
 // ベジェ曲線で滑らかに描画する関数（連続版）
 function drawRotatedCurve(x0, y0, x1, y1, x2, y2, color, thickness) {
@@ -1495,17 +1506,43 @@ function drawRotatedCurve(x0, y0, x1, y1, x2, y2, color, thickness) {
   drawCtx.restore();
 }
 
-function drawRotatedStroke(x1, y1, x2, y2, color, thickness) {
+// 受信側Writer別曲線描画状態管理ヘルパー関数
+function getReceiverWriterState(writerId) {
+  if (!writerId) writerId = 'unknown';
+  
+  if (!receiverWriterStates[writerId]) {
+    receiverWriterStates[writerId] = {
+      lastPosition: null,
+      currentPath: [],
+      isDrawing: false
+    };
+  }
+  return receiverWriterStates[writerId];
+}
+
+function resetReceiverWriterState(writerId) {
+  if (!writerId) writerId = 'unknown';
+  receiverWriterStates[writerId] = {
+    lastPosition: null,
+    currentPath: [],
+    isDrawing: false
+  };
+  console.log(`🔄 受信側Writer状態リセット完了: ${writerId}`);
+}
+
+function drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, writerId) {
   if (!drawCtx) {
     return;
   }
   
+  const writerState = getReceiverWriterState(writerId);
+  
   // 🔍【調査用】座標間距離の計算
   const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-  const isLongDistance = distance > 10; // 10px以上の距離を長距離と判定
+  const isLongDistance = distance > 10;
   
   if (isLongDistance) {
-    console.log(`📏距離調査: ${distance.toFixed(1)}px | (${x1.toFixed(1)},${y1.toFixed(1)}) → (${x2.toFixed(1)},${y2.toFixed(1)}) | 長距離:${isLongDistance ? '⚠️大きな間隔' : '✅正常'}`);
+    console.log(`📏距離調査: ${distance.toFixed(1)}px | (${x1.toFixed(1)},${y1.toFixed(1)}) → (${x2.toFixed(1)},${y2.toFixed(1)}) | Writer:${writerId}`);
   }
   
   drawCtx.save();
@@ -1519,44 +1556,114 @@ function drawRotatedStroke(x1, y1, x2, y2, color, thickness) {
   drawCtx.lineCap = 'round';
   drawCtx.lineJoin = 'round';
   
-  // 🔴 white-red-border特別処理
-  if (color === 'white-red-border') {
-    console.log('🔴 drawRotatedStroke: white-red-border特別処理実行中');
+  // 描画開始時のみbeginPathを実行（送信側と同じロジック）
+  if (!writerState.isDrawing) {
+    // 新しい描画開始
+    writerState.isDrawing = true;
+    writerState.currentPath = [{ x: x1, y: y1 }];
     
-    // ピンク色のグラデーション効果（送信側と同じ）
-    const layers = [
-      { thickness: (thickness || 8) + 13, alpha: 0.2, color: '#ffccdd' },
-      { thickness: (thickness || 8) + 10, alpha: 0.5, color: '#ffaacc' },
-      { thickness: (thickness || 8) + 8, alpha: 0.8, color: '#ff88bb' },
-      { thickness: Math.max(1, (thickness || 8) - 4), alpha: 0.9, color: '#ffffff' }
-    ];
-    
-    // 各レイヤーを描画（外側から内側へ）
-    layers.forEach(layer => {
-      drawCtx.globalAlpha = layer.alpha;
-      drawCtx.strokeStyle = layer.color;
-      drawCtx.lineWidth = layer.thickness;
+    // 🔴 white-red-border特別処理
+    if (color === 'white-red-border') {
+      const layers = [
+        { thickness: (thickness || 8) + 13, alpha: 0.2, color: '#ffccdd' },
+        { thickness: (thickness || 8) + 10, alpha: 0.5, color: '#ffaacc' },
+        { thickness: (thickness || 8) + 8, alpha: 0.8, color: '#ff88bb' },
+        { thickness: Math.max(1, (thickness || 8) - 4), alpha: 0.9, color: '#ffffff' }
+      ];
       
+      layers.forEach(layer => {
+        drawCtx.globalAlpha = layer.alpha;
+        drawCtx.strokeStyle = layer.color;
+        drawCtx.lineWidth = layer.thickness;
+        drawCtx.beginPath();
+        drawCtx.moveTo(x1, y1);
+      });
+      drawCtx.globalAlpha = 1.0;
+      
+    } else {
+      drawCtx.strokeStyle = color || '#000000';
+      drawCtx.lineWidth = thickness || 2;
       drawCtx.beginPath();
       drawCtx.moveTo(x1, y1);
+    }
+  }
+  
+  // 現在の点をパスに追加
+  writerState.currentPath.push({ x: x2, y: y2 });
+  
+  // 🎨 滑らかな曲線描画（送信側と同じアルゴリズム）
+  if (writerState.currentPath.length >= 3) {
+    const pathLen = writerState.currentPath.length;
+    const prev1 = writerState.currentPath[pathLen - 2];
+    const current = writerState.currentPath[pathLen - 1];
+    
+    // 中点を制御点として使用
+    const midX = (prev1.x + current.x) / 2;
+    const midY = (prev1.y + current.y) / 2;
+    
+    // 🔴 white-red-border特別処理
+    if (color === 'white-red-border') {
+      const layers = [
+        { thickness: (thickness || 8) + 13, alpha: 0.2, color: '#ffccdd' },
+        { thickness: (thickness || 8) + 10, alpha: 0.5, color: '#ffaacc' },
+        { thickness: (thickness || 8) + 8, alpha: 0.8, color: '#ff88bb' },
+        { thickness: Math.max(1, (thickness || 8) - 4), alpha: 0.9, color: '#ffffff' }
+      ];
+      
+      layers.forEach(layer => {
+        drawCtx.globalAlpha = layer.alpha;
+        drawCtx.strokeStyle = layer.color;
+        drawCtx.lineWidth = layer.thickness;
+        drawCtx.quadraticCurveTo(prev1.x, prev1.y, midX, midY);
+        drawCtx.stroke();
+      });
+      drawCtx.globalAlpha = 1.0;
+      
+    } else {
+      // 通常色の曲線描画（連続描画）
+      drawCtx.strokeStyle = color || '#000000';
+      drawCtx.lineWidth = thickness || 2;
+      drawCtx.quadraticCurveTo(prev1.x, prev1.y, midX, midY);
+      drawCtx.stroke();
+    }
+  } else {
+    // 最初の数点は直線描画（連続描画）
+    if (color === 'white-red-border') {
+      const layers = [
+        { thickness: (thickness || 8) + 13, alpha: 0.2, color: '#ffccdd' },
+        { thickness: (thickness || 8) + 10, alpha: 0.5, color: '#ffaacc' },
+        { thickness: (thickness || 8) + 8, alpha: 0.8, color: '#ff88bb' },
+        { thickness: Math.max(1, (thickness || 8) - 4), alpha: 0.9, color: '#ffffff' }
+      ];
+      
+      layers.forEach(layer => {
+        drawCtx.globalAlpha = layer.alpha;
+        drawCtx.strokeStyle = layer.color;
+        drawCtx.lineWidth = layer.thickness;
+        drawCtx.lineTo(x2, y2);
+        drawCtx.stroke();
+      });
+      drawCtx.globalAlpha = 1.0;
+      
+    } else {
+      drawCtx.strokeStyle = color || '#000000';
+      drawCtx.lineWidth = thickness || 2;
       drawCtx.lineTo(x2, y2);
       drawCtx.stroke();
-    });
-    
-    // アルファ値を元に戻す
-    drawCtx.globalAlpha = 1.0;
-    
-  } else {
-    // 通常色の描画
-    drawCtx.strokeStyle = color || '#000000';
-    drawCtx.lineWidth = thickness || 2;
-    drawCtx.beginPath();
-    drawCtx.moveTo(x1, y1);
-    drawCtx.lineTo(x2, y2);
-    drawCtx.stroke();
+    }
+  }
+  
+  // パスの長さを制限（メモリ効率化）
+  if (writerState.currentPath.length > 3) {
+    writerState.currentPath.shift();
   }
   
   drawCtx.restore();
+}
+
+// レガシー互換用の関数
+function drawRotatedStroke(x1, y1, x2, y2, color, thickness) {
+  drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, 'legacy');
 }
 
 // キャンバスをクリア
@@ -1623,6 +1730,12 @@ function processDrawingForBack2(data, writerId) {
     writerDrawingData[writerId] = [];
   }
   
+  // startイベント時は受信側Writer状態をリセット
+  if (data.type === 'start') {
+    resetReceiverWriterState(writerId);
+    console.log(`🎨 受信側Writer状態リセット: ${writerId}`);
+  }
+  
   // Writer別配列に追加
   writerDrawingData[writerId].push(data);
   
@@ -1682,12 +1795,13 @@ function processDrawingForBack2(data, writerId) {
       console.log(`🎯詳細: (${data.x.toFixed(1)},${data.y.toFixed(1)}) → 描画(${rotatedPrevX.toFixed(1)},${rotatedPrevY.toFixed(1)})→(${rotatedCurrX.toFixed(1)},${rotatedCurrY.toFixed(1)})`);
     }
     
-    // 🎨 シンプルな直線描画に戻す（隙間を防ぐため）
-    drawRotatedStroke(
+    // 🎨 滑らかな曲線描画に変更（Writer別状態管理対応）
+    drawRotatedSmoothStroke(
       rotatedPrevX, rotatedPrevY,
       rotatedCurrX, rotatedCurrY,
       data.color || '#000000',
-      data.thickness || 2
+      data.thickness || 2,
+      writerId
     );
   }
 }
