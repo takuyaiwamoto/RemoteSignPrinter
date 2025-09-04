@@ -552,11 +552,27 @@ async function createTransparentOverlayWindow() {
           object-fit: cover;
           z-index: 1000;
           opacity: 1;
-          transition: transform 1s ease-in-out;
+          transition: transform 2s ease-in-out;
           pointer-events: none;
         }
         #waitingImage.slide-up {
           transform: translateY(-100vh);
+        }
+        #waitingImage.slide-down {
+          transform: translateY(0);
+        }
+        #countdown {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: rgba(0, 0, 0, 0.8);
+          color: white;
+          padding: 15px 20px;
+          border-radius: 10px;
+          font-size: 24px;
+          font-weight: bold;
+          z-index: 2000;
+          display: none;
         }
       </style>
     </head>
@@ -565,6 +581,7 @@ async function createTransparentOverlayWindow() {
         <button id="transparentBtn">透明化</button>
         <button id="fullscreenBtn">最大化</button>
       </div>
+      <div id="countdown">5</div>
       ${waitingImageBase64 ? `<img id="waitingImage" src="${waitingImageBase64}" alt="待機中" />` : '<div id="waitingImage" style="color: #333;">Loading...</div>'}
       <script>
         const { ipcRenderer } = require('electron');
@@ -635,10 +652,48 @@ async function createTransparentOverlayWindow() {
           console.log('📤 透明ウィンドウでスライドアニメーション要求を受信:', data);
           const waitingImage = document.getElementById('waitingImage');
           if (waitingImage) {
+            // 既存のクラスをクリアしてスライドアップ
+            waitingImage.className = '';
             waitingImage.classList.add('slide-up');
-            console.log('📤 待機画像を上部にスライド開始');
+            console.log('📤 待機画像を上部にスライド開始（2秒）');
+            
+            // 2秒後にカウントダウン開始
+            setTimeout(() => {
+              startCountdown();
+            }, 2000);
           }
         });
+        
+        // カウントダウン機能
+        function startCountdown() {
+          const countdownElement = document.getElementById('countdown');
+          let count = 5;
+          
+          countdownElement.style.display = 'block';
+          countdownElement.textContent = count;
+          console.log('⏱️ カウントダウン開始: 5秒');
+          
+          const countdownInterval = setInterval(() => {
+            count--;
+            if (count > 0) {
+              countdownElement.textContent = count;
+              console.log(\`⏱️ カウントダウン: \${count}\`);
+            } else {
+              countdownElement.style.display = 'none';
+              console.log('⏱️ カウントダウン終了');
+              
+              // 待機画像を下に移動
+              const waitingImage = document.getElementById('waitingImage');
+              if (waitingImage) {
+                waitingImage.className = '';
+                waitingImage.classList.add('slide-down');
+                console.log('📤 待機画像を下部（元の位置）にスライド開始');
+              }
+              
+              clearInterval(countdownInterval);
+            }
+          }, 1000);
+        }
         
         // 画像スライドアニメーション要求を受信（旧式・互換性のため残存）
         ipcRenderer.on('slide-waiting-image', (event) => {
