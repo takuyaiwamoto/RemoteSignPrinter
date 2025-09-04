@@ -4425,6 +4425,19 @@ function handleMessage(data) {
     
     console.log('🧹 受信側：全執筆者データを完全クリア');
     // 再描画処理は削除済み;
+  } else if (data.type === "slide-animation") {
+    // 書き手からのスライドアニメーション指示
+    console.log(`📤 書き手(${data.writerId || 'unknown'})からスライドアニメーション指示受信:`, data);
+    
+    // 受信側（Electron環境）から透明ウィンドウにIPC送信
+    try {
+      const slideData = { action: 'slide', timestamp: data.timestamp || Date.now() };
+      ipcRenderer.send('add-slide-to-transparent-window', slideData);
+      console.log('📡 受信側: 透明ウィンドウにスライドアニメーション指示を中継送信');
+    } catch (error) {
+      console.error('❌ 受信側からのIPC送信失敗:', error);
+    }
+    
   } else if (data.type === "globalClear") {
     // 書き手からの全体クリア指示
     console.log(`🧹 書き手(${data.writerId})から全体クリア指示受信`);

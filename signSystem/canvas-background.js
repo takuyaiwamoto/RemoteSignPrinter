@@ -698,4 +698,110 @@ function setBackgroundDev() {
 // ==========================================
 // デバッグ用：ファイルが正しく読み込まれたことを確認
 // ==========================================
+// スタートボタン関数
+// ==========================================
+
+// スタートボタン押下時の処理
+function startWaitingAnimation() {
+  console.log('🚀 スタートボタンが押されました - 待機画像スライド開始');
+  
+  // 環境の詳細調査（安全にチェック）
+  const envInfo = {
+    'typeof require': typeof require,
+    'typeof ipcRenderer': typeof ipcRenderer,
+    'typeof window': typeof window,
+    'typeof process': typeof process
+  };
+  
+  // processが定義されている場合のみelectronバージョンをチェック
+  if (typeof process !== 'undefined') {
+    envInfo['process.versions.electron'] = process.versions?.electron;
+  }
+  
+  // windowが定義されている場合のみプロトコルをチェック
+  if (typeof window !== 'undefined') {
+    envInfo['window.location.protocol'] = window.location?.protocol;
+  }
+  
+  console.log('🔍 環境調査:', envInfo);
+  
+  // ハート機能がどのように動作しているかを確認するため、既存のcreateSpecialHeartInOverlay関数を呼び出してみる
+  if (typeof createSpecialHeartInOverlay === 'function') {
+    console.log('🧪 テスト: ハート機能でIPC送信テスト');
+    try {
+      createSpecialHeartInOverlay(100); // テスト用の座標
+      console.log('✅ ハート機能のIPC送信は成功');
+    } catch (error) {
+      console.log('❌ ハート機能のIPC送信も失敗:', error.message);
+    }
+  } else {
+    console.log('❌ createSpecialHeartInOverlay関数が見つかりません');
+  }
+  
+  // ハート機能と同じ仕組みでIPC送信（複数の方法でipcRendererにアクセス）
+  let ipcSent = false;
+  
+  // 方法1: グローバルのipcRendererを直接使用（renderer.jsで定義済み）
+  if (typeof ipcRenderer !== 'undefined') {
+    try {
+      const slideData = { action: 'slide', timestamp: Date.now() };
+      ipcRenderer.send('add-slide-to-transparent-window', slideData);
+      console.log('📡 Electron (global): ハート機能と同じルートで透明ウィンドウにスライド指示を送信');
+      ipcSent = true;
+    } catch (error) {
+      console.log('⚠️ グローバルipcRenderer送信失敗:', error.message);
+    }
+  }
+  
+  // 方法2: require経由でのipcRenderer取得
+  if (!ipcSent && typeof require !== 'undefined') {
+    try {
+      const { ipcRenderer: localIpcRenderer } = require('electron');
+      const slideData = { action: 'slide', timestamp: Date.now() };
+      localIpcRenderer.send('add-slide-to-transparent-window', slideData);
+      console.log('📡 Electron (require): ハート機能と同じルートで透明ウィンドウにスライド指示を送信');
+      ipcSent = true;
+    } catch (error) {
+      console.log('⚠️ require経由でのIPC送信失敗:', error.message);
+    }
+  }
+  
+  // 方法3: WebSocket経由で受信側に指示を送信（書き手=ブラウザ、受信側=Electron構成）
+  if (!ipcSent && typeof sendWebSocketMessage === 'function') {
+    try {
+      const slideMessage = {
+        type: 'slide-animation',
+        action: 'slide',
+        timestamp: Date.now()
+      };
+      sendWebSocketMessage(slideMessage);
+      console.log('📡 WebSocket: 受信側経由で透明ウィンドウにスライド指示を送信');
+      ipcSent = true;
+    } catch (error) {
+      console.log('⚠️ WebSocket経由でのスライド指示送信失敗:', error.message);
+    }
+  }
+  
+  // 方法4: 直接socket.sendを使用（フォールバック）
+  if (!ipcSent && typeof socket !== 'undefined' && socket.readyState === WebSocket.OPEN) {
+    try {
+      const slideMessage = {
+        type: 'slide-animation',
+        action: 'slide',
+        timestamp: Date.now()
+      };
+      socket.send(JSON.stringify(slideMessage));
+      console.log('📡 WebSocket (直接): 受信側経由で透明ウィンドウにスライド指示を送信');
+      ipcSent = true;
+    } catch (error) {
+      console.log('⚠️ WebSocket直接送信失敗:', error.message);
+    }
+  }
+  
+  if (!ipcSent) {
+    console.log('⚠️ すべての送信方法が失敗しました - 書き手がブラウザ環境の可能性');
+  }
+}
+
+// ==========================================
 console.log('✅ canvas-background.js loaded successfully');

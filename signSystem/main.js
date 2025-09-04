@@ -433,12 +433,27 @@ async function createTransparentOverlayWindow() {
     }
   });
   
+  // waiting.pngを読み込んでbase64に変換
+  const fs = require('fs');
+  const path = require('path');
+  const waitingImagePath = path.join(__dirname, 'waiting.png');
+  let waitingImageBase64 = '';
+  
+  try {
+    const imageBuffer = fs.readFileSync(waitingImagePath);
+    waitingImageBase64 = `data:image/png;base64,${imageBuffer.toString('base64')}`;
+    console.log('✅ waiting.png読み込み成功');
+  } catch (error) {
+    console.error('❌ waiting.png読み込み失敗:', error);
+    waitingImageBase64 = ''; // 空の場合は画像なしで表示
+  }
+  
   // 透明ウィンドウのHTML内容
   const transparentHTML = `
     <!DOCTYPE html>
     <html>
     <head>
-      <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
       <style>
         body {
           margin: 0;
@@ -528,6 +543,21 @@ async function createTransparentOverlayWindow() {
           opacity: 1 !important;
           visibility: visible !important;
         }
+        #waitingImage {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          object-fit: cover;
+          z-index: 1000;
+          opacity: 1;
+          transition: transform 1s ease-in-out;
+          pointer-events: none;
+        }
+        #waitingImage.slide-up {
+          transform: translateY(-100vh);
+        }
       </style>
     </head>
     <body>
@@ -535,18 +565,19 @@ async function createTransparentOverlayWindow() {
         <button id="transparentBtn">透明化</button>
         <button id="fullscreenBtn">最大化</button>
       </div>
+      ${waitingImageBase64 ? `<img id="waitingImage" src="${waitingImageBase64}" alt="待機中" />` : '<div id="waitingImage" style="color: #333;">Loading...</div>'}
       <script>
         const { ipcRenderer } = require('electron');
         
         // 透明状態監視用の変数
         let isCurrentlyTransparent = false;
         
-        // 透明化ボタンイベント
+        // 透明化ボタンイベント（ウィンドウのみ透明化、画像はそのまま）
         document.getElementById('transparentBtn').addEventListener('click', () => {
           document.body.classList.add('transparent');
           ipcRenderer.send('set-overlay-transparent', true);
           isCurrentlyTransparent = true;
-          console.log('🔍 オーバーレイウィンドウを透明化');
+          console.log('🔍 オーバーレイウィンドウを透明化（画像はそのまま表示）');
         });
         
         // 最大化ボタンイベント
@@ -599,11 +630,93 @@ async function createTransparentOverlayWindow() {
           }, 1000);
         });
         
+        // スライドアニメーション要求を受信（ハート機能と同じ仕組み）
+        ipcRenderer.on('add-slide-to-transparent', (event, data) => {
+          console.log('📤 透明ウィンドウでスライドアニメーション要求を受信:', data);
+          const waitingImage = document.getElementById('waitingImage');
+          if (waitingImage) {
+            waitingImage.classList.add('slide-up');
+            console.log('📤 待機画像を上部にスライド開始');
+          }
+        });
+        
+        // 画像スライドアニメーション要求を受信（旧式・互換性のため残存）
+        ipcRenderer.on('slide-waiting-image', (event) => {
+          const waitingImage = document.getElementById('waitingImage');
+          if (waitingImage) {
+            waitingImage.classList.add('slide-up');
+            console.log('📤 待機画像を上部にスライド開始（旧式）');
+          }
+        });
+        
+        // ブラウザ環境対応 + Electron環境でのLocalStorage併用
+        if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+          // LocalStorageの変更を監視
+          window.addEventListener('storage', (event) => {
+            if (event.key === 'slideWaitingImage' && event.newValue) {
+              try {
+                const data = JSON.parse(event.newValue);
+                if (data.action === 'slide') {
+                  const waitingImage = document.getElementById('waitingImage');
+                  if (waitingImage) {
+                    waitingImage.classList.add('slide-up');
+                    console.log('📤 LocalStorage経由で待機画像を上部にスライド開始');
+                  }
+                }
+              } catch (error) {
+                console.error('❌ LocalStorageイベント処理エラー:', error);
+              }
+            }
+          });
+          
+          // 定期的にLocalStorageをポーリング（storageイベントが発火しない場合の対策）
+          setInterval(() => {
+            const slideCommand = localStorage.getItem('slideWaitingImage');
+            if (slideCommand) {
+              try {
+                const data = JSON.parse(slideCommand);
+                if (data.action === 'slide' && Date.now() - data.timestamp < 2000) { // 2秒以内の指示のみ有効
+                  const waitingImage = document.getElementById('waitingImage');
+                  if (waitingImage && !waitingImage.classList.contains('slide-up')) {
+                    waitingImage.classList.add('slide-up');
+                    console.log('📤 ポーリングでLocalStorageから待機画像スライド実行');
+                    // 使用済みコマンドを削除
+                    localStorage.removeItem('slideWaitingImage');
+                  }
+                }
+              } catch (error) {
+                console.error('❌ LocalStorageポーリングエラー:', error);
+              }
+            }
+          }, 500);
+          
+          // 初期化時にLocalStorageをチェック（既存の指示があるかもしれない）
+          setTimeout(() => {
+            const slideCommand = localStorage.getItem('slideWaitingImage');
+            if (slideCommand) {
+              try {
+                const data = JSON.parse(slideCommand);
+                if (data.action === 'slide' && Date.now() - data.timestamp < 5000) { // 5秒以内の指示のみ有効
+                  const waitingImage = document.getElementById('waitingImage');
+                  if (waitingImage) {
+                    waitingImage.classList.add('slide-up');
+                    console.log('📤 初期化時LocalStorageから待機画像スライド実行');
+                  }
+                }
+              } catch (error) {
+                console.error('❌ 初期化時LocalStorageチェックエラー:', error);
+              }
+            }
+          }, 100);
+        }
+        
         // 透明状態を維持する監視機能
         setInterval(() => {
           if (isCurrentlyTransparent && !document.body.classList.contains('transparent')) {
             document.body.classList.add('transparent');
-            ipcRenderer.send('ensure-overlay-transparency');
+            if (typeof ipcRenderer !== 'undefined') {
+              ipcRenderer.send('ensure-overlay-transparency');
+            }
             console.log('👻 透明状態を復元');
           }
         }, 500);
@@ -702,6 +815,39 @@ ipcMain.on('add-heart-to-transparent-window', (event, data) => {
     }
   } else {
     console.log('❌ 透明ウィンドウが存在しないかデストロイされています');
+  }
+});
+
+// スライドアニメーション要求のIPCハンドラー（ハート機能と同じ仕組み）
+ipcMain.on('add-slide-to-transparent-window', (event, data) => {
+  console.log('📨 スライドアニメーション要求を受信:', data);
+  
+  if (globalTransparentWindow && !globalTransparentWindow.isDestroyed()) {
+    // WebContentsが準備できているか確認
+    if (globalTransparentWindow.webContents.isLoading()) {
+      console.log('⏳ 透明ウィンドウの読み込み中、少し待機...');
+      globalTransparentWindow.webContents.once('did-finish-load', () => {
+        globalTransparentWindow.webContents.send('add-slide-to-transparent', data);
+        console.log('👻 透明ウィンドウ読み込み完了後にスライド送信');
+      });
+    } else {
+      globalTransparentWindow.webContents.send('add-slide-to-transparent', data);
+      console.log('👻 透明ウィンドウにスライド送信指示完了');
+    }
+  } else {
+    console.log('❌ 透明ウィンドウが存在しないかデストロイされています');
+  }
+});
+
+// 画像スライドアニメーション要求のIPCハンドラー（旧式・互換性のため残存）
+ipcMain.on('slide-waiting-image', () => {
+  console.log('📨 画像スライド要求を受信（旧式）');
+  
+  if (globalTransparentWindow && !globalTransparentWindow.isDestroyed()) {
+    globalTransparentWindow.webContents.send('slide-waiting-image');
+    console.log('👻 透明ウィンドウに画像スライド指示送信');
+  } else {
+    console.log('❌ 透明ウィンドウが存在しません');
   }
 });
 
