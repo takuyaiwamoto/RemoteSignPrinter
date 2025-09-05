@@ -1706,36 +1706,38 @@ function drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, writerId) {
   drawCtx.lineCap = 'round';
   drawCtx.lineJoin = 'round';
   
+  // 🔧【バグ修正】Writer別Path状態完全分離のため毎回beginPathを実行
   // 描画開始時のみbeginPathを実行（送信側と同じロジック）
   if (!writerState.isDrawing) {
     // 新しい描画開始
     writerState.isDrawing = true;
     writerState.currentPath = [{ x: x1, y: y1 }];
+  }
+  
+  // 🔧【重要】Writer別Canvas Path完全分離のため毎回パスをリセット
+  drawCtx.beginPath();
+  
+  // 🔴 white-red-border特別処理
+  if (color === 'white-red-border') {
+    const layers = [
+      { thickness: (thickness || 8) + 13, alpha: 0.2, color: '#ffccdd' },
+      { thickness: (thickness || 8) + 10, alpha: 0.5, color: '#ffaacc' },
+      { thickness: (thickness || 8) + 8, alpha: 0.8, color: '#ff88bb' },
+      { thickness: Math.max(1, (thickness || 8) - 4), alpha: 0.9, color: '#ffffff' }
+    ];
     
-    // 🔴 white-red-border特別処理
-    if (color === 'white-red-border') {
-      const layers = [
-        { thickness: (thickness || 8) + 13, alpha: 0.2, color: '#ffccdd' },
-        { thickness: (thickness || 8) + 10, alpha: 0.5, color: '#ffaacc' },
-        { thickness: (thickness || 8) + 8, alpha: 0.8, color: '#ff88bb' },
-        { thickness: Math.max(1, (thickness || 8) - 4), alpha: 0.9, color: '#ffffff' }
-      ];
-      
-      layers.forEach(layer => {
-        drawCtx.globalAlpha = layer.alpha;
-        drawCtx.strokeStyle = layer.color;
-        drawCtx.lineWidth = layer.thickness;
-        drawCtx.beginPath();
-        drawCtx.moveTo(x1, y1);
-      });
-      drawCtx.globalAlpha = 1.0;
-      
-    } else {
-      drawCtx.strokeStyle = color || '#000000';
-      drawCtx.lineWidth = thickness || 2;
-      drawCtx.beginPath();
+    layers.forEach(layer => {
+      drawCtx.globalAlpha = layer.alpha;
+      drawCtx.strokeStyle = layer.color;
+      drawCtx.lineWidth = layer.thickness;
       drawCtx.moveTo(x1, y1);
-    }
+    });
+    drawCtx.globalAlpha = 1.0;
+    
+  } else {
+    drawCtx.strokeStyle = color || '#000000';
+    drawCtx.lineWidth = thickness || 2;
+    drawCtx.moveTo(x1, y1);
   }
   
   // 現在の点をパスに追加
@@ -1764,6 +1766,9 @@ function drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, writerId) {
         drawCtx.globalAlpha = layer.alpha;
         drawCtx.strokeStyle = layer.color;
         drawCtx.lineWidth = layer.thickness;
+        // 🔧【バグ修正】各レイヤーでもPath分離
+        drawCtx.beginPath();
+        drawCtx.moveTo(x1, y1);
         drawCtx.quadraticCurveTo(prev1.x, prev1.y, midX, midY);
         drawCtx.stroke();
       });
@@ -1790,6 +1795,9 @@ function drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, writerId) {
         drawCtx.globalAlpha = layer.alpha;
         drawCtx.strokeStyle = layer.color;
         drawCtx.lineWidth = layer.thickness;
+        // 🔧【バグ修正】各レイヤーでもPath分離
+        drawCtx.beginPath();
+        drawCtx.moveTo(x1, y1);
         drawCtx.lineTo(x2, y2);
         drawCtx.stroke();
       });
