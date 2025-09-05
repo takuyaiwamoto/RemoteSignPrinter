@@ -1706,16 +1706,14 @@ function drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, writerId) {
   drawCtx.lineCap = 'round';
   drawCtx.lineJoin = 'round';
   
-  // 🔧【バグ修正】Writer別Path状態完全分離のため毎回beginPathを実行
-  // 描画開始時のみbeginPathを実行（送信側と同じロジック）
+  // 🔧【バグ修正】Writer別Path状態分離 + 同一Writer内連続線維持
   if (!writerState.isDrawing) {
-    // 新しい描画開始
+    // 新しい描画開始時のみbeginPath
     writerState.isDrawing = true;
     writerState.currentPath = [{ x: x1, y: y1 }];
+    drawCtx.beginPath();
+    console.log(`🎨 Writer ${writerId}: 新しい描画開始`);
   }
-  
-  // 🔧【重要】Writer別Canvas Path完全分離のため毎回パスをリセット
-  drawCtx.beginPath();
   
   // 🔴 white-red-border特別処理
   if (color === 'white-red-border') {
@@ -1775,12 +1773,9 @@ function drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, writerId) {
       drawCtx.globalAlpha = 1.0;
       
     } else {
-      // 通常色の曲線描画（連続描画）
+      // 通常色の曲線描画（同一Writer内連続線）
       drawCtx.strokeStyle = color || '#000000';
       drawCtx.lineWidth = thickness || 2;
-      // 🔧【バグ修正】通常色でもPath分離必要
-      drawCtx.beginPath();
-      drawCtx.moveTo(x1, y1);
       drawCtx.quadraticCurveTo(prev1.x, prev1.y, midX, midY);
       drawCtx.stroke();
     }
@@ -1809,9 +1804,6 @@ function drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, writerId) {
     } else {
       drawCtx.strokeStyle = color || '#000000';
       drawCtx.lineWidth = thickness || 2;
-      // 🔧【バグ修正】通常色でもPath分離必要
-      drawCtx.beginPath();
-      drawCtx.moveTo(x1, y1);
       drawCtx.lineTo(x2, y2);
       drawCtx.stroke();
     }
@@ -1898,6 +1890,13 @@ function processDrawingForBack2(data, writerId) {
   if (data.type === 'start') {
     resetReceiverWriterState(writerId);
     console.log(`🎨 受信側Writer状態リセット: ${writerId}`);
+  }
+  
+  // endイベント時もWriter状態をリセット
+  if (data.type === 'end') {
+    const writerState = getReceiverWriterState(writerId);
+    writerState.isDrawing = false;
+    console.log(`🎨 受信側Writer描画終了: ${writerId}`);
   }
   
   // Writer別配列に追加
