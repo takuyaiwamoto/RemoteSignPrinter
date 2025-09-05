@@ -3,6 +3,88 @@
 // 分離日: 2025-08-20
 
 // ==========================================
+// カウントダウン共通システム（canvas-background.js用）
+// ==========================================
+
+// DOM要素取得の共通関数群
+function getCountdownElements() {
+  return {
+    // 「幕が上るまで」カウントダウン関連
+    curtainCountdown: document.getElementById('curtainCountdown'),
+    curtainTimer: document.getElementById('curtainTimer'),
+    
+    // 同期カウントダウン関連
+    syncCountdown: document.getElementById('syncCountdown'),
+    
+    // タイマー関連
+    countdownTimer: document.getElementById('countdownTimer'),
+    countdownText: document.getElementById('countdownText'),
+    
+    // 表示制御関連
+    curtainClosedDisplay: document.getElementById('curtainClosedDisplay')
+  };
+}
+
+// 汎用カウントダウン関数（canvas-background.js用）
+function createCountdownNew(options) {
+  const {
+    element,           // 表示要素
+    seconds,          // カウントダウン秒数
+    onTick,          // 毎秒コールバック (count) => {}
+    onComplete,      // 完了時コールバック () => {}
+    logPrefix = '⏱️', // ログプレフィックス
+    showElement = true, // 要素を表示するか
+    hideOnComplete = true // 完了時に要素を非表示にするか
+  } = options;
+
+  if (!element) {
+    console.log(`❌ [新canvas] カウントダウン要素が見つかりません`);
+    return null;
+  }
+
+  let count = Math.round(seconds);
+  console.log(`${logPrefix} [新canvas] カウントダウン開始: ${count}秒`);
+
+  // 要素を表示
+  if (showElement) {
+    element.style.display = 'block';
+  }
+  
+  // 初期表示
+  element.textContent = count;
+  
+  // カウントダウン実行
+  const interval = setInterval(() => {
+    count--;
+    if (count > 0) {
+      element.textContent = count;
+      console.log(`${logPrefix} [新canvas] カウントダウン: ${count}`);
+      
+      // 毎秒コールバック実行
+      if (onTick) {
+        onTick(count);
+      }
+    } else {
+      // カウントダウン終了
+      clearInterval(interval);
+      console.log(`${logPrefix} [新canvas] カウントダウン終了`);
+      
+      // 要素を非表示
+      if (hideOnComplete) {
+        element.style.display = 'none';
+      }
+      
+      // 完了コールバック実行
+      if (onComplete) {
+        onComplete();
+      }
+    }
+  }, 1000);
+
+  return interval; // タイマーIDを返す
+}
+
+// ==========================================
 // 背景範囲計算関数群
 // ==========================================
 
@@ -705,7 +787,13 @@ function setBackgroundDev() {
 function startWaitingAnimation() {
   console.log('🚀 スタートボタンが押されました - 待機画像スライド開始');
   
-  // 「幕が上るまで」カウントダウンを開始
+  // スタートボタンが押されたことをフラグで記録
+  window.hasStartedAnimation = true;
+  
+  // 1. まず全ての書き手に「幕が上るまで」カウントダウンを送信
+  sendCurtainCountdownToAll();
+  
+  // 2. 送信側（自分）も「幕が上るまで」カウントダウンを開始
   showCurtainCountdown();
   
   // 環境の詳細調査（安全にチェック）
@@ -780,12 +868,26 @@ function startWaitingAnimation() {
       sendWebSocketMessage(slideMessage);
       console.log('📡 WebSocket: 受信側経由で透明ウィンドウにスライド指示を送信');
       
+      // カウントダウン時間を計算・設定（送信側と同じ時間を共有）
+      let countdownTime = 0;
+      if (typeof calculateCountdownTime === 'function') {
+        countdownTime = calculateCountdownTime();
+        if (typeof currentCountdownTime !== 'undefined') {
+          window.currentCountdownTime = countdownTime; // グローバル変数にも保存
+        }
+        console.log(`📡 [計算] calculateCountdownTime() = ${countdownTime}秒`);
+      } else {
+        countdownTime = (typeof currentCountdownTime !== 'undefined') ? currentCountdownTime : 0;
+        console.log(`📡 [フォールバック] currentCountdownTime: ${currentCountdownTime}, countdownTime: ${countdownTime}`);
+      }
+      
       // 全書き手にカウントダウン開始を通知（drawing形式で送信してサーバーにブロードキャストさせる）
       const globalCountdownMessage = {
         type: 'draw', // サーバーがブロードキャストするメッセージタイプを使用
         action: 'global-countdown-start', // 実際のアクションをactionフィールドに
         timestamp: Date.now(),
-        delay: 6000, // 6秒後にカウントダウン開始
+        delay: 0, // 即座にカウントダウン開始（同じタイミング）
+        totalTime: countdownTime, // 送信側と同じカウントダウン時間
         writerId: myWriterId, // 送信者のWriter ID
         x: 0, y: 0, // drawタイプに必要なダミー座標
         color: 'transparent' // ダミーカラー
@@ -795,10 +897,7 @@ function startWaitingAnimation() {
       
       ipcSent = true;
       
-      // 書き手側では6秒後にカウントダウン開始（3秒待機 + 3秒アニメーション）
-      setTimeout(() => {
-        startSyncCountdown();
-      }, 6000);
+      // 古い処理を削除（新しい仕組みに置き換え）
     } catch (error) {
       console.log('⚠️ WebSocket経由でのスライド指示送信失敗:', error.message);
     }
@@ -815,12 +914,26 @@ function startWaitingAnimation() {
       socket.send(JSON.stringify(slideMessage));
       console.log('📡 WebSocket (直接): 受信側経由で透明ウィンドウにスライド指示を送信');
       
+      // カウントダウン時間を計算・設定（送信側と同じ時間を共有）
+      let countdownTime = 0;
+      if (typeof calculateCountdownTime === 'function') {
+        countdownTime = calculateCountdownTime();
+        if (typeof currentCountdownTime !== 'undefined') {
+          window.currentCountdownTime = countdownTime; // グローバル変数にも保存
+        }
+        console.log(`📡 [計算直接] calculateCountdownTime() = ${countdownTime}秒`);
+      } else {
+        countdownTime = (typeof currentCountdownTime !== 'undefined') ? currentCountdownTime : 0;
+        console.log(`📡 [フォールバック直接] currentCountdownTime: ${currentCountdownTime}, countdownTime: ${countdownTime}`);
+      }
+      
       // 全書き手にカウントダウン開始を通知（drawing形式で送信してサーバーにブロードキャストさせる）
       const globalCountdownMessage = {
         type: 'draw', // サーバーがブロードキャストするメッセージタイプを使用
         action: 'global-countdown-start', // 実際のアクションをactionフィールドに
         timestamp: Date.now(),
-        delay: 6000, // 6秒後にカウントダウン開始
+        delay: 0, // 即座にカウントダウン開始（同じタイミング）
+        totalTime: countdownTime, // 送信側と同じカウントダウン時間
         writerId: myWriterId, // 送信者のWriter ID
         x: 0, y: 0, // drawタイプに必要なダミー座標
         color: 'transparent' // ダミーカラー
@@ -830,10 +943,7 @@ function startWaitingAnimation() {
       
       ipcSent = true;
       
-      // 書き手側では6秒後にカウントダウン開始（3秒待機 + 3秒アニメーション）
-      setTimeout(() => {
-        startSyncCountdown();
-      }, 6000);
+      // 古い処理を削除（新しい仕組みに置き換え）
     } catch (error) {
       console.log('⚠️ WebSocket直接送信失敗:', error.message);
     }
@@ -847,6 +957,27 @@ function startWaitingAnimation() {
 // ==========================================
 // 「幕が上るまで」カウントダウン機能
 // ==========================================
+
+// 全書き手に「幕が上るまで」カウントダウンを送信
+function sendCurtainCountdownToAll() {
+  console.log('📡 全書き手に「幕が上るまで」カウントダウンを送信');
+  
+  // WebSocket経由で全書き手にカウントダウン指示を送信
+  if (typeof socket !== 'undefined' && socket.readyState === WebSocket.OPEN) {
+    const curtainMessage = {
+      type: 'draw', // サーバーがブロードキャストするため
+      action: 'curtain-countdown', // 「幕が上るまで」カウントダウン
+      countdown: 3, // 3秒固定
+      writerId: myWriterId,
+      x: 0, y: 0, // drawタイプに必要なダミー座標
+      color: 'transparent' // ダミーカラー
+    };
+    socket.send(JSON.stringify(curtainMessage));
+    console.log('📡 「幕が上るまで」メッセージ送信完了');
+  } else {
+    console.log('⚠️ WebSocket未接続のため「幕が上るまで」送信をスキップ');
+  }
+}
 
 // スタートボタン上にカウントダウン表示
 function showCurtainCountdown() {
@@ -881,8 +1012,65 @@ function showCurtainCountdown() {
       curtainCountdown.style.display = 'none';
       console.log('🎭 幕が上りました！');
       clearInterval(countdownInterval);
+      
+      // 幕が上がったら全員に5秒カウントダウンを送信
+      sendFiveSecondCountdownToAll();
+      
+      // 送信側（自分）も統一された3秒待機を使用
+      const unifiedWaitTime = 3000; // 固定3秒（他の全員と統一）
+      console.log(`📡 送信側: 統一待機時間${unifiedWaitTime}ms後に5秒カウントダウン開始`);
+      
+      setTimeout(() => {
+        startSyncCountdown();
+      }, unifiedWaitTime);
     }
   }, 1000);
+}
+
+// 受信側の「幕が上るまで」カウントダウン終了までの遅延を計算
+function calculateReceiverCurtainDelay() {
+  // 受信側は以下のケースが考えられる：
+  // 1. 「幕が上るまで」カウントダウンがまだ進行中 → 残り時間分だけ遅延
+  // 2. 「幕が上るまで」カウントダウンが既に終了 → 即座開始
+  
+  // WebSocket通信遅延: 約100ms
+  const networkDelay = 100;
+  
+  // 受信側の「幕が上るまで」は最大3秒残っている可能性
+  // 最悪ケース（受信側がまだ3秒残っている）を想定
+  const maxReceiverCurtainRemaining = 3000; // 3秒
+  
+  // 安全マージン
+  const safetyMargin = 200; // 0.2秒
+  
+  const totalDelay = networkDelay + maxReceiverCurtainRemaining + safetyMargin;
+  
+  console.log(`📊 受信側遅延計算: 通信${networkDelay}ms + 最大幕残り${maxReceiverCurtainRemaining}ms + マージン${safetyMargin}ms = ${totalDelay}ms`);
+  
+  return totalDelay;
+}
+
+// 全書き手に5秒カウントダウンを送信
+function sendFiveSecondCountdownToAll() {
+  console.log('📡 全書き手に5秒カウントダウンを送信');
+  
+  // WebSocket経由で全書き手にカウントダウン指示を送信
+  if (typeof socket !== 'undefined' && socket.readyState === WebSocket.OPEN) {
+    const fiveSecondMessage = {
+      type: 'draw', // サーバーがブロードキャストするため
+      action: 'five-second-countdown', // 5秒カウントダウン
+      countdown: 5, // 固定5秒
+      writerId: myWriterId,
+      x: 0, y: 0, // drawタイプに必要なダミー座標
+      color: 'transparent' // ダミーカラー
+    };
+    socket.send(JSON.stringify(fiveSecondMessage));
+    console.log('📡 5秒カウントダウンメッセージ送信完了');
+  } else {
+    console.log('⚠️ WebSocket未接続のため5秒カウントダウン送信をスキップ');
+  }
+  
+  // 送信側（自分）は自分のメッセージを受信したときに開始する（受信側と同期）
 }
 
 // ==========================================
@@ -899,7 +1087,9 @@ function startSyncCountdown() {
     return;
   }
   
+  // 固定5秒カウントダウン
   let count = 5;
+  console.log(`⏱️ 書き手側カウントダウン開始: 固定${count}秒`);
   
   // 幕が閉じています表示を非表示にしてカウントダウンを表示
   if (curtainClosedElement) {
@@ -907,7 +1097,7 @@ function startSyncCountdown() {
   }
   countdownElement.style.display = 'block';
   countdownElement.textContent = count;
-  console.log('⏱️ 書き手側カウントダウン開始: 5秒');
+  console.log(`⏱️ 書き手側カウントダウン開始: ${count}秒`);
   
   const countdownInterval = setInterval(() => {
     count--;

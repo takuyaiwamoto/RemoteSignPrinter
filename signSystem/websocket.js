@@ -7,7 +7,7 @@
 // ==========================================
 
 // 🔸 メッセージ処理メイン関数
-function processMessage(data) {
+function handleWebSocketMessage(data) {
   // console.log(`📨 メッセージ受信: type=${data.type}, writerId=${data.writerId || 'なし'}`);
   // console.log(`📨 受信時の状態: hasSentData=${hasSentData}, drawingCommands数=${drawingCommands.length}, otherWritersDataキー数=${Object.keys(otherWritersData).length}`);
   if (Object.keys(otherWritersData).length > 0) {

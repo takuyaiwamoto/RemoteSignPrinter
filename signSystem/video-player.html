@@ -80,6 +80,22 @@
 <body>
   <div id="videoContainer">
     <video id="signVideo" src="./signVideoG.mp4"></video>
+    
+    <!-- 送信側用5秒カウントダウン表示 -->
+    <div id="syncCountdown" style="
+      position: fixed;
+      top: 20px;
+      right: 50px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 15px 20px;
+      border-radius: 10px;
+      font-size: 24px;
+      font-weight: bold;
+      z-index: 1000;
+      display: none;
+    ">5</div>
+    
     <div id="controls">
       <button id="playBtn" onclick="playVideo()">再生</button>
       <button id="pauseBtn" onclick="pauseVideo()" style="display:none;">一時停止</button>
@@ -285,10 +301,47 @@
           // 24秒での一時停止は無効化したため、このイベントは無視
           console.log('🎬 アニメーション開始イベント受信（無視）');
           break;
+          
+        case 'start-countdown':
+          console.log('📡 IPC: カウントダウン指示を受信:', data);
+          const seconds = data.seconds || 5;
+          startReceiverSyncCountdown(seconds);
+          break;
       }
     });
     
+    // カウントダウン処理は上記のvideo-commandで処理
+    
     console.log('🎬 Sign Video Player 初期化完了');
+    
+    // 送信側用5秒カウントダウン関数
+    function startReceiverSyncCountdown(totalTime) {
+      const countdownElement = document.getElementById('syncCountdown');
+      
+      if (!countdownElement) {
+        console.log('❌ 送信側: syncCountdown要素が見つかりません');
+        return;
+      }
+      
+      let count = Math.round(totalTime);
+      console.log(`⏱️ 送信側5秒カウントダウン開始: ${count}秒 (受信側と同期)`);
+      
+      // カウントダウンを表示
+      countdownElement.style.display = 'block';
+      countdownElement.textContent = count;
+      
+      const countdownInterval = setInterval(() => {
+        count--;
+        if (count > 0) {
+          countdownElement.textContent = count;
+          console.log(`⏱️ 送信側カウントダウン: ${count}`);
+        } else {
+          countdownElement.style.display = 'none';
+          console.log('⏱️ 送信側カウントダウン終了');
+          clearInterval(countdownInterval);
+        }
+      }, 1000);
+    }
   </script>
 </body>
 </html>

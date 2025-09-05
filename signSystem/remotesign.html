@@ -243,12 +243,77 @@
 <div id="countdown"></div>
 
 <script>
-const canvas = document.getElementById("drawCanvas");
+// ===========================
+// 🏗️ DOM CACHE SYSTEM - DOM要素キャッシュシステム
+// ===========================
 
-const ctx = canvas.getContext("2d");
+class DOMCache {
+  constructor() {
+    this.cache = new Map();
+    this.contextCache = new Map();
+  }
+  
+  // 要素を取得（キャッシュ利用）
+  getElementById(id) {
+    if (!this.cache.has(id)) {
+      const element = document.getElementById(id);
+      if (element) {
+        this.cache.set(id, element);
+      }
+    }
+    return this.cache.get(id);
+  }
+  
+  // Canvas contextを取得（キャッシュ利用）
+  getContext(canvasId, contextType = '2d') {
+    const key = `${canvasId}_${contextType}`;
+    if (!this.contextCache.has(key)) {
+      const canvas = this.getElementById(canvasId);
+      if (canvas && canvas.getContext) {
+        const context = canvas.getContext(contextType);
+        this.contextCache.set(key, context);
+      }
+    }
+    return this.contextCache.get(key);
+  }
+  
+  // 要素のキャッシュをクリア
+  clearCache(id) {
+    this.cache.delete(id);
+    // Context関連もクリア
+    for (const key of this.contextCache.keys()) {
+      if (key.startsWith(id + '_')) {
+        this.contextCache.delete(key);
+      }
+    }
+  }
+  
+  // 全キャッシュをクリア
+  clearAll() {
+    this.cache.clear();
+    this.contextCache.clear();
+    console.log('🏗️ DOMキャッシュをクリア');
+  }
+  
+  // バッチ取得（複数要素を一度に取得）
+  getElements(ids) {
+    const result = {};
+    for (const id of ids) {
+      result[id] = this.getElementById(id);
+    }
+    return result;
+  }
+}
+
+// DOMCacheインスタンス作成
+const domCache = new DOMCache();
+
+// よく使う要素を事前キャッシュ
+const canvas = domCache.getElementById("drawCanvas");
+const ctx = domCache.getContext("drawCanvas", "2d");
 let drawing = false;
 let socket = new WebSocket("wss://realtime-sign-server-1.onrender.com");
-let myWriterId = null; // 自分のwriter ID
+// [WriterManagerに移行済み] myWriterId
 let otherWritersData = {}; // 他の執筆者のデータ
 
 // 描画状態管理用グローバル変数
@@ -262,15 +327,225 @@ let currentPaperSize = "A4"; // 現在の用紙サイズ
 let currentPrintMode = "drawOnly"; // 現在の印刷モード（デフォルト：描画モード）
 let currentVideoSize = 100; // 現在のビデオサイズ（デフォルト100%）
 let canvasScale = 1.4; // キャンバススケール
-let animationStartWaitTime = 0.1; // アニメーション開始待機時間
-let rotationWaitTime = 1.0; // 回転後待機時間
-let currentVideoPattern = 2; // 背景5動画パターン（1:回転, 2:フェード） - 初期値をパターン2に設定
-let printDelayTime = 5.0; // 印刷遅延時間（秒）
-let currentPenThickness = 6; // 現在のペンの太さ（細い）
-let currentPenColor = 'black'; // 現在のペンの色
-let hasSentData = false; // 送信済みフラグ
-// WriterID別の描画状態管理（書き手側用）
-const writerDrawingStates = {};
+// ===========================
+// 📋 UNIFIED SETTINGS OBJECT - 設定値統一管理
+// ===========================
+const APP_SETTINGS = {
+  // アニメーション設定
+  animationStartWaitTime: 0.1,  // アニメーション開始待機時間（秒）
+  rotationWaitTime: 1.0,         // 回転後待機時間（秒）
+  currentVideoPattern: 2,        // 背景5動画パターン（1:回転, 2:フェード）
+  
+  // 印刷設定
+  printDelayTime: 5.0,          // 印刷遅延時間（秒）
+  
+  // 描画設定
+  currentPenThickness: 6,       // 現在のペンの太さ（細い）
+  currentPenColor: 'black',     // 現在のペンの色
+  
+  // 状態管理
+  hasSentData: false            // 送信済みフラグ
+};
+
+// 後方互換性のための参照（段階的に削除予定）
+let animationStartWaitTime = APP_SETTINGS.animationStartWaitTime;
+let rotationWaitTime = APP_SETTINGS.rotationWaitTime;
+let currentVideoPattern = APP_SETTINGS.currentVideoPattern;
+let printDelayTime = APP_SETTINGS.printDelayTime;
+let currentPenThickness = APP_SETTINGS.currentPenThickness;
+let currentPenColor = APP_SETTINGS.currentPenColor;
+let hasSentData = APP_SETTINGS.hasSentData;
+
+// ==========================================
+// カウントダウン共通システム（新機能 - 既存機能には影響なし）
+// ==========================================
+
+// カウントダウン関連定数
+const COUNTDOWN_CONSTANTS = {
+  CURTAIN_SECONDS: 3, // 「幕が上るまで」カウントダウン秒数
+  SYNC_SECONDS: 5, // 同期カウントダウン秒数  
+  UNIFIED_WAIT_TIME: 3000, // 統一待機時間（ミリ秒）
+  NETWORK_DELAY: 100, // ネットワーク遅延（ミリ秒）
+  SAFETY_MARGIN: 200, // 安全マージン（ミリ秒）
+  MAX_RECEIVER_CURTAIN_REMAINING: 3000, // 受信側「幕が上るまで」最大残り時間（ミリ秒）
+  TIMEOUT_DURATION: 5000 // タイムアウト時間（ミリ秒）
+};
+
+// ===========================
+// 📊 COUNTDOWN SYSTEM - 統一化実装
+// ===========================
+// 
+// システム構成:
+// 1. COUNTDOWN_CONSTANTS: 統一された設定値
+// 2. getCountdownElements(): DOM要素アクセス統一化
+// 3. createCountdownNew(): 汎用カウントダウン実装
+// 4. calculateCountdownTime(): 時間計算ロジック
+// 5. 各種状態管理関数: hasStartedCurtainCountdown等
+// 6. 実装関数群: startReceiverCurtainCountdown, startReceiverSyncCountdown等
+// 
+// リファクタリング完了項目:
+// ✅ 定数統一化 (COUNTDOWN_CONSTANTS)
+// ✅ DOM要素取得統一化 (getCountdownElements) 
+// ✅ 汎用カウントダウン関数統一化 (createCountdownNew)
+// ✅ 古い実装の削除とクリーンアップ
+// ===========================
+
+// DOM要素取得の共通関数群（DOMCache利用）
+function getCountdownElements() {
+  return {
+    // 「幕が上るまで」カウントダウン関連
+    curtainCountdown: domCache.getElementById('curtainCountdown'),
+    curtainTimer: domCache.getElementById('curtainTimer'),
+    
+    // 同期カウントダウン関連
+    syncCountdown: domCache.getElementById('syncCountdown'),
+    
+    // タイマー関連
+    countdownTimer: domCache.getElementById('countdownTimer'),
+    countdownText: domCache.getElementById('countdownText'),
+    
+    // 表示制御関連
+    curtainClosedDisplay: domCache.getElementById('curtainClosedDisplay')
+  };
+}
+
+// 汎用カウントダウン関数（新機能 - テスト用）
+function createCountdownNew(options) {
+  const {
+    element,           // 表示要素
+    seconds,          // カウントダウン秒数
+    onTick,          // 毎秒コールバック (count) => {}
+    onComplete,      // 完了時コールバック () => {}
+    logPrefix = '⏱️', // ログプレフィックス
+    showElement = true, // 要素を表示するか
+    hideOnComplete = true // 完了時に要素を非表示にするか
+  } = options;
+
+  if (!element) {
+    console.log(`❌ [新] カウントダウン要素が見つかりません`);
+    return null;
+  }
+
+  let count = Math.round(seconds);
+  console.log(`${logPrefix} [新] カウントダウン開始: ${count}秒`);
+
+  // 要素を表示
+  if (showElement) {
+    element.style.display = 'block';
+  }
+  
+  // 初期表示
+  element.textContent = count;
+  
+  // カウントダウン実行
+  const interval = setInterval(() => {
+    count--;
+    if (count > 0) {
+      element.textContent = count;
+      console.log(`${logPrefix} [新] カウントダウン: ${count}`);
+      
+      // 毎秒コールバック実行
+      if (onTick) {
+        onTick(count);
+      }
+    } else {
+      // カウントダウン終了
+      clearInterval(interval);
+      console.log(`${logPrefix} [新] カウントダウン終了`);
+      
+      // 要素を非表示
+      if (hideOnComplete) {
+        element.style.display = 'none';
+      }
+      
+      // 完了コールバック実行
+      if (onComplete) {
+        onComplete();
+      }
+    }
+  }, 1000);
+
+  return interval; // タイマーIDを返す
+}
+// ===========================
+// 👤 WRITER MANAGER - WriterID管理システム
+// ===========================
+
+class WriterManager {
+  constructor() {
+    this.myWriterId = null;                    // 自分のWriterID
+    this.drawingStates = {};                   // WriterID別の描画状態
+    this.activeWriters = new Set();            // アクティブなWriter一覧
+  }
+  
+  // 自分のWriterIDを設定
+  setMyWriterId(id) {
+    this.myWriterId = id;
+    console.log(`👤 WriterID設定: ${id}`);
+  }
+  
+  // 自分のWriterIDを取得
+  getMyWriterId() {
+    return this.myWriterId;
+  }
+  
+  // 自分のメッセージかどうか判定
+  isMyMessage(writerId) {
+    return writerId === this.myWriterId;
+  }
+  
+  // 描画状態を取得
+  getDrawingState(writerId) {
+    if (!this.drawingStates[writerId]) {
+      this.drawingStates[writerId] = {
+        isDrawing: false,
+        lastX: null,
+        lastY: null,
+        lastTimestamp: null
+      };
+    }
+    return this.drawingStates[writerId];
+  }
+  
+  // 描画状態を更新
+  updateDrawingState(writerId, state) {
+    this.drawingStates[writerId] = {
+      ...this.getDrawingState(writerId),
+      ...state
+    };
+  }
+  
+  // 描画状態をリセット
+  resetDrawingState(writerId) {
+    delete this.drawingStates[writerId];
+  }
+  
+  // アクティブなWriterを追加
+  addActiveWriter(writerId) {
+    this.activeWriters.add(writerId);
+  }
+  
+  // アクティブなWriterを削除
+  removeActiveWriter(writerId) {
+    this.activeWriters.delete(writerId);
+    this.resetDrawingState(writerId);
+  }
+  
+  // すべてのWriterをクリア
+  clearAll() {
+    this.myWriterId = null;
+    this.drawingStates = {};
+    this.activeWriters.clear();
+    console.log('👤 WriterManager: すべてクリア');
+  }
+}
+
+// WriterManagerインスタンス作成
+const writerManager = new WriterManager();
+
+// 後方互換性のための参照（段階的に削除予定）
+let myWriterId = null;
+const writerDrawingStates = writerManager.drawingStates;
 
 // 描画データを保存する配列
 let drawingCommands = [];
@@ -408,49 +683,107 @@ socket.onmessage = (event) => {
   }
 };
 
-// WebSocketメッセージ処理関数
-function processMessage(data) {
-  // draw形式で送信された全体カウントダウン指示を処理
-  if (data.type === 'draw' && data.action === 'global-countdown-start') {
+// ===========================
+// 📡 WEBSOCKET MESSAGE HANDLERS - メッセージハンドラーマップ
+// ===========================
+
+const MESSAGE_HANDLERS = {
+  // 「幕が上るまで」カウントダウンハンドラー
+  'curtain-countdown': function(data) {
+    console.log('📡 「幕が上るまで」カウントダウン指示を受信:', data);
+    
+    const curtainSeconds = data.countdown || 3;
+    const isMyMessage = writerManager.isMyMessage(data.writerId);
+    const hasStarted = hasStartedCurtainCountdown();
+    
+    console.log(`🔍 詳細判定: writerId=${data.writerId}, myWriterId=${writerManager.getMyWriterId()}, isMyMessage=${isMyMessage}, hasStarted=${hasStarted}`);
+    
+    if (isMyMessage && hasStarted) {
+      console.log('📡 スタートを押した送信側: 既にcanvas-background.jsで「幕が上るまで」表示済み');
+    } else if (isMyMessage && !hasStarted) {
+      console.log('📡 スタートを押していない送信側: canvas-background.jsでのみ表示（重複回避）');
+    } else {
+      console.log('📡 受信側: 「幕が上るまで」カウントダウン開始');
+      startReceiverCurtainCountdown(curtainSeconds);
+    }
+  },
+  
+  // 5秒カウントダウンハンドラー
+  'five-second-countdown': function(data) {
+    console.log('📡 5秒カウントダウン指示を受信:', data);
+    
+    const fiveSeconds = data.countdown || 5;
+    const isStartButtonPresser = writerManager.isMyMessage(data.writerId) && hasStartedCurtainCountdown();
+    
+    if (isStartButtonPresser) {
+      console.log('📡 スタートを押した送信側: 自分のメッセージは無視（計算ベースで既に開始済み）');
+    } else {
+      console.log('📡 受信側・スタートを押していない送信側: 統一された3秒待機後に5秒カウントダウン開始');
+      const unifiedWaitTime = 3000;
+      
+      setTimeout(() => {
+        console.log('📡 統一待機終了: 5秒カウントダウン開始');
+        startReceiverSyncCountdown(fiveSeconds);
+      }, unifiedWaitTime);
+    }
+  },
+  
+  // グローバルカウントダウンハンドラー
+  'global-countdown-start': function(data) {
     console.log('📡 全体カウントダウン開始指示を受信:', data);
     
-    // 自分が送信したメッセージは無視（自分は既にカウントダウン開始済み）
-    if (data.writerId === myWriterId) {
+    if (writerManager.isMyMessage(data.writerId)) {
       console.log('📡 自分が送信したメッセージのため無視');
       return;
     }
     
-    // 「幕が閉じています」を非表示にしてカウントダウンを開始
-    const curtainClosedElement = document.getElementById('curtainClosedDisplay');
+    console.log('📡 「幕が上るまで」カウントダウンを優先するため、global-countdown-startを無視');
+    
+    const curtainClosedElement = domCache.getElementById('curtainClosedDisplay');
     if (curtainClosedElement) {
       curtainClosedElement.style.display = 'none';
+      console.log('📡 「幕が閉じています」を非表示にしました');
     }
-    
-    // 指定された遅延後にカウントダウン開始
-    setTimeout(() => {
-      startSyncCountdown();
-    }, data.delay || 6000);
-    
-    console.log(`📡 ${data.delay || 6000}ms後にカウントダウン開始予定`);
+  }
+};
+
+// WebSocketメッセージ処理関数（リファクタ済み）
+function processMessage(data) {
+  console.log('🔍 processMessage呼び出し:', data.type, data);
+  
+  // drawタイプのメッセージをハンドラーマップで処理
+  if (data.type === 'draw' && data.action) {
+    const handler = MESSAGE_HANDLERS[data.action];
+    if (handler) {
+      handler(data);
+      return;
+    }
   }
   
-  // 従来の形式も念のため残しておく
+  // 通常のdrawメッセージやその他のメッセージはwebsocket.jsに転送
+  if (typeof handleWebSocketMessage === 'function') {
+    handleWebSocketMessage(data);
+  } else {
+    console.log('🔍 handleWebSocketMessage関数が見つかりません');
+  }
+  
+  // 従来の形式も処理（後方互換性）
   if (data.type === 'global-countdown-start') {
-    console.log('📡 全体カウントダウン開始指示を受信（従来形式）:', data);
+    // ハンドラーマップを使用
+    MESSAGE_HANDLERS['global-countdown-start'](data);
     
-    const curtainClosedElement = document.getElementById('curtainClosedDisplay');
-    if (curtainClosedElement) {
-      curtainClosedElement.style.display = 'none';
+    // 追加処理: タイミング付きカウントダウン
+    const countdownTime = data.totalTime;
+    const delay = data.delay || 0;
+    
+    if (countdownTime) {
+      setTimeout(() => {
+        console.log(`📡 従来形式で同期カウントダウン開始（${countdownTime}秒）`);
+        startReceiverSyncCountdown(countdownTime);
+      }, delay);
+      console.log(`📡 ${delay}ms後にカウントダウン開始予定`);
     }
-    
-    setTimeout(() => {
-      startSyncCountdown();
-    }, data.delay || 6000);
-    
-    console.log(`📡 ${data.delay || 6000}ms後にカウントダウン開始予定`);
   }
-  
-  // 他のメッセージタイプの処理もここに追加可能
 }
 
 // 不要なコントロール表示機能を削除 - シンプルなUIに統一
@@ -518,7 +851,7 @@ const DeviceManager = {
     console.log('💻 PC設定を適用');
     
     // PC用の特別な設定
-    const canvas = document.getElementById('drawCanvas');
+    const canvas = domCache.getElementById('drawCanvas');
     if (canvas) {
       // PCではマウス操作を最適化
       canvas.style.cursor = 'crosshair';
@@ -537,7 +870,7 @@ const DeviceManager = {
     console.log('📱 タブレット設定を適用');
     
     // タブレット用の特別な設定
-    const canvas = document.getElementById('drawCanvas');
+    const canvas = domCache.getElementById('drawCanvas');
     if (canvas) {
       // タブレットではタッチ操作を最適化
       canvas.style.cursor = 'none'; // カーソル非表示
@@ -556,7 +889,7 @@ const DeviceManager = {
     console.log('📱 モバイル設定を適用');
     
     // モバイル用の特別な設定
-    const canvas = document.getElementById('drawCanvas');
+    const canvas = domCache.getElementById('drawCanvas');
     if (canvas) {
       canvas.style.cursor = 'none';
     }
@@ -656,11 +989,12 @@ const DeviceManager = {
 socket.onerror = (error) => console.error("❌ WebSocketエラー（送信側）:", error);
 socket.onclose = (event) => {
   console.log("⚠️ WebSocket切断（送信側）:", event.code, event.reason);
-  console.log("🧹 切断前の状態:", { myWriterId, mySessionId });
+  console.log("🧹 切断前の状態:", { myWriterId: writerManager.getMyWriterId(), mySessionId });
   
   // 接続切断時にセッション情報をリセット
   mySessionId = null;
-  myWriterId = null;
+  writerManager.setMyWriterId(null);  // WriterIDをクリア
+  myWriterId = null;  // 後方互換性
   console.log("🧹 WebSocket切断に伴いセッション情報をリセット");
   
   // Writer ID表示をクリア
@@ -682,106 +1016,185 @@ socket.onclose = (event) => {
 let backgroundScale = 1.0; // スケール（大きさ）
 let backgroundOffsetY = 0; // 垂直オフセット
 
+// ===========================
+// 📊 COUNTDOWN CALCULATION & UTILITIES
+// ===========================
+
 // 📊 カウントダウンタイマー機能
 let countdownInterval = null;
 
-function startCountdownTimer() {
-  // 既存のタイマーをクリア
-  if (countdownInterval) {
-    clearInterval(countdownInterval);
-    countdownInterval = null;
-  }
-  
-  // カウントダウン時間を計算
+// グローバル変数：現在のカウントダウン時間（他の関数からアクセス可能）
+let currentCountdownTime = 0;
+
+// カウントダウン時間を計算する共通関数
+function calculateCountdownTime() {
   let totalTime;
   let calculation;
   
-  // デバッグ: 現在の設定値を確認
-  console.log(`📊 [デバッグ] 現在の設定値:`);
-  console.log(`  - animationStartWaitTime: ${animationStartWaitTime}秒`);
-  console.log(`  - rotationWaitTime: ${rotationWaitTime}秒`);
+  console.log(`📊 [時間計算] 現在の設定値:`);
+  console.log(`  - animationStartWaitTime: ${APP_SETTINGS.animationStartWaitTime}秒`);
+  console.log(`  - rotationWaitTime: ${APP_SETTINGS.rotationWaitTime}秒`);
   console.log(`  - window.isDevWhiteBackground: ${window.isDevWhiteBackground}`);
 
   if (window.isDevWhiteBackground) {
     // 背景5の場合: アニメーション開始待機時間 + 動画長 + 受信側の短縮済み回転後待機時間
     // signVideo.mp4の動画長を使用 + 受信側では rotationWaitTime - 3.0秒 が適用される
     const videoDuration = 18.6; // signVideo.mp4の実際の長さ
-    const receiverRotationWaitTime = Math.max(0, rotationWaitTime - 3.0); // 受信側では3秒短縮される（最小0秒）
+    const receiverRotationWaitTime = Math.max(0, APP_SETTINGS.rotationWaitTime - 3.0); // 受信側では3秒短縮される（最小0秒）
     
     console.log(`📊 [背景5] 詳細計算:`);
     console.log(`  - videoDuration: ${videoDuration}秒`);
-    console.log(`  - rotationWaitTime - 3.0 = ${rotationWaitTime} - 3.0 = ${rotationWaitTime - 3.0}秒`);
-    console.log(`  - Math.max(0, ${rotationWaitTime - 3.0}) = ${receiverRotationWaitTime}秒`);
-    console.log(`  - 計算式: ${animationStartWaitTime} + ${videoDuration} + ${receiverRotationWaitTime}`);
+    console.log(`  - rotationWaitTime - 3.0 = ${APP_SETTINGS.rotationWaitTime} - 3.0 = ${APP_SETTINGS.rotationWaitTime - 3.0}秒`);
+    console.log(`  - Math.max(0, ${APP_SETTINGS.rotationWaitTime - 3.0}) = ${receiverRotationWaitTime}秒`);
+    console.log(`  - 計算式: ${APP_SETTINGS.animationStartWaitTime} + ${videoDuration} + ${receiverRotationWaitTime}`);
     
-    totalTime = animationStartWaitTime + videoDuration + receiverRotationWaitTime;
-    calculation = `開始待機:${animationStartWaitTime}s + 動画長:${videoDuration}s + 受信側回転後待機:${receiverRotationWaitTime}s`;
+    totalTime = APP_SETTINGS.animationStartWaitTime + videoDuration + receiverRotationWaitTime;
+    calculation = `開始待機:${APP_SETTINGS.animationStartWaitTime}s + 動画長:${videoDuration}s + 受信側回転後待機:${receiverRotationWaitTime}s`;
   } else {
     // 通常背景の場合: アニメーション開始待機時間 + 回転アニメーション時間(1.5s) + 受信側の短縮済み回転後待機時間
-    const receiverRotationWaitTime = Math.max(0, rotationWaitTime - 3.0); // 受信側では3秒短縮される（最小0秒）
+    const receiverRotationWaitTime = Math.max(0, APP_SETTINGS.rotationWaitTime - 3.0); // 受信側では3秒短縮される（最小0秒）
     
     console.log(`📊 [通常背景] 詳細計算:`);
-    console.log(`  - rotationWaitTime - 3.0 = ${rotationWaitTime} - 3.0 = ${rotationWaitTime - 3.0}秒`);
-    console.log(`  - Math.max(0, ${rotationWaitTime - 3.0}) = ${receiverRotationWaitTime}秒`);
-    console.log(`  - 計算式: ${animationStartWaitTime} + 1.5 + ${receiverRotationWaitTime}`);
+    console.log(`  - rotationWaitTime - 3.0 = ${APP_SETTINGS.rotationWaitTime} - 3.0 = ${APP_SETTINGS.rotationWaitTime - 3.0}秒`);
+    console.log(`  - Math.max(0, ${APP_SETTINGS.rotationWaitTime - 3.0}) = ${receiverRotationWaitTime}秒`);
+    console.log(`  - 計算式: ${APP_SETTINGS.animationStartWaitTime} + 1.5 + ${receiverRotationWaitTime}`);
     
-    totalTime = animationStartWaitTime + 1.5 + receiverRotationWaitTime;
-    calculation = `開始待機:${animationStartWaitTime}s + 回転:1.5s + 受信側回転後待機:${receiverRotationWaitTime}s`;
+    totalTime = APP_SETTINGS.animationStartWaitTime + 1.5 + receiverRotationWaitTime;
+    calculation = `開始待機:${APP_SETTINGS.animationStartWaitTime}s + 回転:1.5s + 受信側回転後待機:${receiverRotationWaitTime}s`;
   }
   
-  let remainingTime = totalTime;
-  
-  console.log(`📊 [最終結果] totalTime = ${totalTime}秒`);
-  console.log(`📊 カウントダウン開始: ${totalTime}秒 (${calculation})`);
-  
-  // タイマー表示を有効化
-  const timerElement = document.getElementById('countdownTimer');
-  const textElement = document.getElementById('countdownText');
-  
-  if (timerElement && textElement) {
-    timerElement.style.display = 'block';
-    
-    // 初期値設定
-    textElement.textContent = `${Math.ceil(remainingTime)}秒`;
-    
-    // 1秒ごとにカウントダウン
-    countdownInterval = setInterval(() => {
-      remainingTime -= 1;
-      
-      if (remainingTime <= 0) {
-        // カウントダウン完了
-        clearInterval(countdownInterval);
-        countdownInterval = null;
-        textElement.textContent = '0秒';
-        
-        // 3秒後にタイマーを非表示にする
-        setTimeout(() => {
-          timerElement.style.display = 'none';
-          console.log('📊 カウントダウンタイマー非表示');
-        }, 3000);
-        
-        console.log('📊 カウントダウン完了');
-      } else {
-        textElement.textContent = `${Math.ceil(remainingTime)}秒`;
-      }
-    }, 1000);
-  } else {
-    console.error('❌ カウントダウンタイマー要素が見つかりません');
-  }
+  console.log(`📊 [計算結果] totalTime = ${totalTime}秒 (${calculation})`);
+  return totalTime;
 }
 
-function stopCountdownTimer() {
-  if (countdownInterval) {
-    clearInterval(countdownInterval);
-    countdownInterval = null;
-    
-    const timerElement = document.getElementById('countdownTimer');
-    if (timerElement) {
-      timerElement.style.display = 'none';
+// [削除済み] startCountdownTimer - 使用されていない古い実装
+
+// [削除済み] startReceiverCountdownTimer と startSyncedCountdownTimer - 使用されていない古い実装
+
+// [削除済み] stopCountdownTimer - 使用されていない古い実装
+
+// ===========================
+// 📊 COUNTDOWN STATE MANAGEMENT
+// ===========================
+
+// スタートボタンを押したかどうかを判定
+function hasStartedCurtainCountdown() {
+  // canvas-background.jsの関数が存在し、実際にスタートボタンが押されているかチェック
+  // startWaitingAnimation関数が呼ばれたかどうかで判定
+  const result = typeof startWaitingAnimation !== 'undefined' && window.hasStartedAnimation === true;
+  console.log(`🔍 hasStartedCurtainCountdown: startWaitingAnimation=${typeof startWaitingAnimation}, hasStartedAnimation=${window.hasStartedAnimation}, result=${result}`);
+  return result;
+}
+
+// 受信側の「幕が上るまで」カウントダウン終了までの遅延を計算（canvas-background.jsと同じロジック）
+function calculateReceiverCurtainDelay() {
+  // WebSocket通信遅延: 約100ms
+  const networkDelay = 100;
+  
+  // 受信側の「幕が上るまで」は最大3秒残っている可能性
+  const maxReceiverCurtainRemaining = 3000; // 3秒
+  
+  // 安全マージン
+  const safetyMargin = 200; // 0.2秒
+  
+  const totalDelay = networkDelay + maxReceiverCurtainRemaining + safetyMargin;
+  
+  console.log(`📊 remotesign.html遅延計算: 通信${networkDelay}ms + 最大幕残り${maxReceiverCurtainRemaining}ms + マージン${safetyMargin}ms = ${totalDelay}ms`);
+  
+  return totalDelay;
+}
+
+// 「幕が上るまで」カウントダウン終了を待ってから5秒カウントダウンを開始
+function waitForCurtainEndThenStartCountdown(fiveSeconds) {
+  const curtainCountdown = document.getElementById('curtainCountdown');
+  
+  // 「幕が上るまで」カウントダウンの終了を監視
+  const checkInterval = setInterval(() => {
+    if (!curtainCountdown || curtainCountdown.style.display === 'none') {
+      // 「幕が上るまで」カウントダウンが終了した
+      clearInterval(checkInterval);
+      console.log('📡 受信側: 「幕が上るまで」終了を検知、5秒カウントダウン開始');
+      startReceiverSyncCountdown(fiveSeconds);
     }
-    
-    console.log('📊 カウントダウンタイマー停止');
+  }, 100); // 100ms間隔でチェック
+  
+  // 安全のため、最大5秒でタイムアウト
+  setTimeout(() => {
+    clearInterval(checkInterval);
+    console.log('📡 受信側: タイムアウトで5秒カウントダウンを強制開始');
+    startReceiverSyncCountdown(fiveSeconds);
+  }, 5000);
+}
+
+// ===========================
+// 📊 COUNTDOWN IMPLEMENTATIONS
+// ===========================
+
+// [削除済み] startReceiverCurtainCountdown_OLD - 古いバックアップ実装（新実装で置換済み）
+
+// 受信側用の「幕が上るまで」カウントダウン関数（統一実装使用）
+function startReceiverCurtainCountdown(seconds) {
+  console.log(`🎭 受信側「幕が上るまで」カウントダウン開始: ${seconds}秒`);
+  
+  const elements = getCountdownElements();
+  
+  if (!elements.curtainCountdown || !elements.curtainTimer) {
+    console.log('❌ 受信側: curtainCountdown要素が見つかりません');
+    return;
   }
+  
+  // curtainCountdown全体を表示
+  elements.curtainCountdown.style.display = 'block';
+  
+  // 新しいカウントダウンシステムを使用
+  return createCountdownNew({
+    element: elements.curtainTimer,
+    seconds: seconds,
+    logPrefix: '🎭 受信側',
+    showElement: false, // curtainCountdownを手動で表示制御
+    hideOnComplete: false, // 手動で非表示制御
+    onComplete: () => {
+      elements.curtainCountdown.style.display = 'none';
+      console.log('🎭 受信側: 幕が上りました！');
+    }
+  });
+}
+
+// 受信側用の同期カウントダウン関数（新実装使用）
+function startReceiverSyncCountdown(totalTime) {
+  console.log(`⏱️ [新実装] 受信側同期カウントダウン開始: ${totalTime}秒`);
+  
+  const elements = getCountdownElements();
+  const curtainClosedElement = domCache.getElementById('curtainClosedDisplay');
+  
+  if (!elements.syncCountdown) {
+    console.log('❌ 受信側: syncCountdown要素が見つかりません');
+    return;
+  }
+  
+  // 幕が閉じています表示を非表示
+  if (curtainClosedElement) {
+    curtainClosedElement.style.display = 'none';
+  }
+  
+  // 新しい統一カウントダウンを使用
+  createCountdownNew({
+    element: elements.syncCountdown,
+    seconds: totalTime,
+    onTick: (remaining) => {
+      console.log(`⏱️ 受信側カウントダウン: ${remaining}`);
+    },
+    onComplete: () => {
+      console.log('⏱️ 受信側カウントダウン終了');
+      // カウントダウン終了後に幕が閉じています表示を再表示
+      if (curtainClosedElement) {
+        curtainClosedElement.style.display = 'block';
+      }
+    },
+    logPrefix: '⏱️ [受信側同期]',
+    showElement: true,
+    hideOnComplete: true
+  });
 }
 
 // 🎯 イベントハンドラー・初期化処理 (キーボードイベント, DOMContentLoaded, タッチイベント) はevent-handlers.jsに移動しました

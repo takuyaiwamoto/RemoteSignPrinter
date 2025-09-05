@@ -1181,3 +1181,19 @@ ipcMain.on("print-transparent-image", (event, data) => {
     }
   });
 });
+
+// カウントダウン開始指示をvideo-playerに転送
+ipcMain.on('start-countdown', (event, data) => {
+  console.log('📡 IPC: カウントダウン開始指示を受信:', data);
+  
+  // video-playerウィンドウにカウントダウン指示を転送
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('video-command', { 
+      command: 'start-countdown', 
+      seconds: data.seconds || 5 
+    });
+    console.log('📡 IPC: video-playerにカウントダウン指示を転送');
+  } else {
+    console.log('⚠️ video-playerウィンドウが見つかりません');
+  }
+});

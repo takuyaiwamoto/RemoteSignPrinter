@@ -1,21 +1,59 @@
+// ===========================
+// 📦 RENDERER.JS - メインレンダリングシステム
+// ===========================
+// このファイルは将来的に以下のファイルに分割予定:
+// - rendering-core.js: コア描画機能
+// - rendering-effects.js: エフェクト処理
+// - rendering-video.js: ビデオ処理  
+// - rendering-writer.js: Writer管理
+// - rendering-utils.js: ユーティリティ
+// - rendering-print.js: 印刷処理
+// ===========================
+
 const { ipcRenderer } = require("electron");
 const path = require("path");
 const crypto = require("crypto");
 
-// 🔸 拡大率を設定 (デフォルト4.0倍、ポスター時は2.4倍=A4の60%)
-let SCALE_FACTOR = 4.0;
+// ===========================
+// 🎛️ RENDERING CONFIGURATION - レンダリング設定統一管理
+// ===========================
 
-// 🎬 背景5用動画再生システム
-let videoZIndex = 5;          // 動画のz-index（文字の下）
-let textZIndex = 10;          // 文字のz-index（動画の上）
-let currentVideoElement = null; // 現在再生中の動画要素
-let videoPattern = 1;         // 動画パターン（1:回転, 2:フェード）
-let currentMusicElement = null; // 現在再生中の音楽要素
-let musicVolume = 0.5;        // 音楽のボリューム（0.0〜1.0）
-let printDelayTime = 5.0;     // 印刷遅延時間（秒）
-let currentVideoIndex = 1;    // 現在の動画番号（1〜4を順番に使用）
+const RENDERING_CONFIG = {
+  // スケール設定
+  SCALE_FACTOR: 4.0,                    // 拡大率（デフォルト4.0倍、ポスター時は2.4倍=A4の60%）
+  
+  // 動画設定  
+  videoZIndex: 5,                       // 動画のz-index（文字の下）
+  textZIndex: 10,                       // 文字のz-index（動画の上）
+  videoPattern: 1,                      // 動画パターン（1:回転, 2:フェード）
+  currentVideoIndex: 1,                 // 現在の動画番号（1〜4を順番に使用）
+  
+  // 音楽設定
+  musicVolume: 0.5,                     // 音楽のボリューム（0.0〜1.0）
+  
+  // 印刷設定
+  printDelayTime: 5.0                   // 印刷遅延時間（秒）
+};
 
-// 🎵 背景5用音楽再生
+// ===========================
+// 🎬 VIDEO SYSTEM STATE - 動画システム状態管理
+// ===========================
+let currentVideoElement = null;         // 現在再生中の動画要素
+let currentMusicElement = null;          // 現在再生中の音楽要素
+
+// 後方互換性のための参照（段階的削除予定）
+let SCALE_FACTOR = RENDERING_CONFIG.SCALE_FACTOR;
+let videoZIndex = RENDERING_CONFIG.videoZIndex;
+let textZIndex = RENDERING_CONFIG.textZIndex;
+let videoPattern = RENDERING_CONFIG.videoPattern;
+let musicVolume = RENDERING_CONFIG.musicVolume;
+let printDelayTime = RENDERING_CONFIG.printDelayTime;
+let currentVideoIndex = RENDERING_CONFIG.currentVideoIndex;
+
+// ===========================
+// 🎵 AUDIO FUNCTIONS - 音楽再生処理
+// ===========================
+
 function playBackgroundMusic() {
   if (!window.isDevWhiteBackground) {
     console.log('🎵 背景5以外では音楽再生しません');
@@ -52,7 +90,10 @@ function playBackgroundMusic() {
   return music;
 }
 
-// 🎬 背景5用動画要素を作成
+// ===========================
+// 🎬 VIDEO FUNCTIONS - 動画処理
+// ===========================
+
 function createVideoElement() {
   // 既存の動画要素があれば削除
   if (currentVideoElement) {
@@ -481,30 +522,74 @@ async function executeSwitchBotSequence() {
 }
 
 // 初期化時にcanvasが存在しない場合の対処
-let canvas = document.getElementById("drawCanvas");
-let ctx = null;
+// ===========================
+// 🎨 CANVAS MANAGER - Canvas管理システム
+// ===========================
 
-if (!canvas) {
-  console.log("⚠️ 初期化時にdrawCanvasが見つかりません - 動的作成待ち");
-  // 一時的なダミーcanvasを作成（後で置き換えられる）
-  canvas = document.createElement('canvas');
-  canvas.id = 'drawCanvas-temp';
-  canvas.style.display = 'none';
-  document.body.appendChild(canvas);
+class CanvasManager {
+  constructor() {
+    this.canvas = null;
+    this.ctx = null;
+    this.initialized = false;
+    this.initializeCanvas();
+  }
+  
+  // Canvas初期化
+  initializeCanvas() {
+    this.canvas = document.getElementById("drawCanvas");
+    
+    if (!this.canvas) {
+      console.log("⚠️ 初期化時にdrawCanvasが見つかりません - 動的作成待ち");
+      // 一時的なダミーcanvasを作成（後で置き換えられる）
+      this.canvas = document.createElement('canvas');
+      this.canvas.id = 'drawCanvas-temp';
+      this.canvas.style.display = 'none';
+      document.body.appendChild(this.canvas);
+    }
+    
+    this.ctx = this.canvas.getContext("2d");
+    this.initialized = true;
+  }
+  
+  // Canvas要素を取得
+  getCanvas() {
+    return this.canvas;
+  }
+  
+  // Canvas contextを取得  
+  getContext() {
+    return this.ctx;
+  }
+  
+  // Canvas更新（実際のdrawCanvasが作成されたとき）
+  updateCanvas() {
+    const actualCanvas = document.getElementById("drawCanvas");
+    if (actualCanvas && actualCanvas !== this.canvas) {
+      console.log("🎨 実際のdrawCanvasに切り替え");
+      this.canvas = actualCanvas;
+      this.ctx = this.canvas.getContext("2d");
+    }
+  }
 }
 
-ctx = canvas.getContext("2d");
+// CanvasManagerインスタンス作成
+const canvasManager = new CanvasManager();
 
-// 実際のキャンバスが作成されたときにctxを更新する関数
+// 後方互換性のための参照（段階的削除予定）
+let canvas = canvasManager.getCanvas();
+let ctx = canvasManager.getContext();
+
+// ===========================
+// 🛠️ UTILITY FUNCTIONS - ユーティリティ関数
+// ===========================
+
 function updateCanvasContext() {
-  const actualCanvas = document.getElementById("drawCanvas");
-  if (actualCanvas && actualCanvas !== canvas) {
-    console.log("🎨 実際のdrawCanvasに切り替え");
-    canvas = actualCanvas;
-    ctx = canvas.getContext("2d");
-    return true;
-  }
-  return false;
+  // 新しいCanvasManagerを使用（段階的移行）
+  canvasManager.updateCanvas();
+  // グローバル参照も更新（後方互換性）
+  canvas = canvasManager.getCanvas();
+  ctx = canvasManager.getContext();
+  return true;
 }
 
 // 色補間関数（送信側と同じ）
@@ -650,7 +735,38 @@ function drawNeonPathComplete(writerId) {
   // 再描画処理は削除済み
 }
 
-// 妖精の粉エフェクト関数（送信側と完全に同じ）
+// ===========================
+// ✨ EFFECTS MANAGER - エフェクト処理クラス
+// ===========================
+
+class EffectManager {
+  constructor() {
+    this.activeEffects = new Set();
+  }
+  
+  // アクティブなエフェクトを追加
+  addActiveEffect(effectId) {
+    this.activeEffects.add(effectId);
+  }
+  
+  // アクティブなエフェクトを削除
+  removeActiveEffect(effectId) {
+    this.activeEffects.delete(effectId);
+  }
+  
+  // 全エフェクトをクリア
+  clearAllEffects() {
+    this.activeEffects.clear();
+  }
+}
+
+// EffectManagerインスタンス作成
+const effectManager = new EffectManager();
+
+// ===========================
+// ✨ LEGACY EFFECTS FUNCTIONS - 既存エフェクト関数（段階的移行用）
+// ===========================
+
 function createReceiverFairyDust(x, y) {
   // //console.log(`✨ 受信側に妖精の粉を生成開始: (${x}, ${y})`);
   
@@ -1506,27 +1622,61 @@ function drawRotatedCurve(x0, y0, x1, y1, x2, y2, color, thickness) {
   drawCtx.restore();
 }
 
-// 受信側Writer別曲線描画状態管理ヘルパー関数
-function getReceiverWriterState(writerId) {
-  if (!writerId) writerId = 'unknown';
-  
-  if (!receiverWriterStates[writerId]) {
-    receiverWriterStates[writerId] = {
-      lastPosition: null,
-      currentPath: [],
-      isDrawing: false
-    };
+// ===========================
+// 📝 RENDERING WRITER MANAGER - レンダリング用Writer管理
+// ===========================
+
+class RenderingWriterManager {
+  constructor() {
+    this.writerStates = {};
   }
-  return receiverWriterStates[writerId];
+  
+  // Writer状態を取得
+  getWriterState(writerId) {
+    if (!writerId) writerId = 'unknown';
+    
+    if (!this.writerStates[writerId]) {
+      this.writerStates[writerId] = {
+        lastPosition: null,
+        currentPath: [],
+        isDrawing: false
+      };
+    }
+    return this.writerStates[writerId];
+  }
+  
+  // Writer状態をリセット
+  resetWriterState(writerId) {
+    if (this.writerStates[writerId]) {
+      this.writerStates[writerId] = {
+        lastPosition: null,
+        currentPath: [],
+        isDrawing: false
+      };
+    }
+  }
+  
+  // 全Writerをクリア
+  clearAllWriters() {
+    this.writerStates = {};
+  }
+}
+
+// RenderingWriterManagerインスタンス作成
+const renderingWriterManager = new RenderingWriterManager();
+
+// ===========================
+// 📝 LEGACY WRITER FUNCTIONS - 既存Writer関数（段階的移行用）
+// ===========================
+
+function getReceiverWriterState(writerId) {
+  // 新しいマネージャーを使用（段階的移行）
+  return renderingWriterManager.getWriterState(writerId);
 }
 
 function resetReceiverWriterState(writerId) {
-  if (!writerId) writerId = 'unknown';
-  receiverWriterStates[writerId] = {
-    lastPosition: null,
-    currentPath: [],
-    isDrawing: false
-  };
+  // 新しいマネージャーを使用（段階的移行）
+  renderingWriterManager.resetWriterState(writerId);
   console.log(`🔄 受信側Writer状態リセット完了: ${writerId}`);
 }
 
