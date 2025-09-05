@@ -332,6 +332,31 @@ const elements = domCache.getElements([
 - **拡張性向上**: 新機能追加が容易な構造に改善
 - **後方互換性**: 段階的移行のため一部旧コードも維持
 
+## リファクタリング履歴
+
+### Phase 1 完了 (2025年)
+- カウントダウンシステムの統一化と同期修正
+- `COUNTDOWN_CONSTANTS` による設定値統一管理
+- `getCountdownElements()` と `createCountdownNew()` による汎用実装
+- クロスファイル依存性解決とコード重複除去
+
+### Phase 2 完了 (2025年)
+- **renderer.js (8845行) を6つのファイルに分割**
+  - `rendering-core.js` - コア描画機能、Canvas管理、設定値統一管理
+  - `rendering-video.js` - 動画・音楽処理、動画ウィンドウ管理、SwitchBot連携  
+  - `rendering-effects.js` - エフェクト処理（ハート、星、妖精の粉、扉演出、回転アニメーション）
+  - `rendering-writer.js` - Writer管理、描画データ管理、滑らかな曲線描画、座標変換
+  - `rendering-utils.js` - ユーティリティ関数（色変換、座標変換、イージング、Canvas操作）
+  - `rendering-print.js` - 印刷・ダウンロード処理、データ統合、Canvas出力
+- **管理クラス作成**
+  - `CanvasManager` - Canvas状態管理とライフサイクル管理
+  - `EffectManager` - エフェクト状態管理とアクティブエフェクト追跡
+  - `RenderingWriterManager` - Writer状態管理と複数Writer対応
+- **後方互換性維持**
+  - 既存の関数名とグローバル変数を維持
+  - 段階的移行方式で既存コードとの互換性保持
+  - レガシー互換関数による透明な移行
+
 ## ファイル構成と機能マッピング
 
 ### 📁 プロジェクト構造
