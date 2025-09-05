@@ -1778,6 +1778,9 @@ function drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, writerId) {
       // 通常色の曲線描画（連続描画）
       drawCtx.strokeStyle = color || '#000000';
       drawCtx.lineWidth = thickness || 2;
+      // 🔧【バグ修正】通常色でもPath分離必要
+      drawCtx.beginPath();
+      drawCtx.moveTo(x1, y1);
       drawCtx.quadraticCurveTo(prev1.x, prev1.y, midX, midY);
       drawCtx.stroke();
     }
@@ -1806,6 +1809,9 @@ function drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, writerId) {
     } else {
       drawCtx.strokeStyle = color || '#000000';
       drawCtx.lineWidth = thickness || 2;
+      // 🔧【バグ修正】通常色でもPath分離必要
+      drawCtx.beginPath();
+      drawCtx.moveTo(x1, y1);
       drawCtx.lineTo(x2, y2);
       drawCtx.stroke();
     }
