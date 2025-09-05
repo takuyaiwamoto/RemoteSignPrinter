@@ -4442,6 +4442,14 @@ function handleMessage(data) {
       console.error('❌ 受信側: open.wav読み込みエラー:', error);
     }
     
+    // 音声再生と同時に透明ウィンドウのテキストを非表示
+    try {
+      ipcRenderer.send('hide-waiting-text');
+      console.log('📡 受信側: 透明ウィンドウのテキスト非表示指示を送信');
+    } catch (error) {
+      console.error('❌ 受信側からのテキスト非表示指示送信失敗:', error);
+    }
+    
     // 3秒後に透明ウィンドウにスライドアニメーション指示を送信
     setTimeout(() => {
       try {
@@ -8820,3 +8828,19 @@ function executePrint(filePath) {
     console.log('⚠️ ブラウザ環境のため印刷処理をスキップ');
   }
 }
+
+// closeDoor.mp3再生のIPCハンドラー
+ipcRenderer.on('play-close-door-audio', () => {
+  console.log('🔊 closeDoor.mp3再生指示を受信');
+  try {
+    const closeDoorAudio = new Audio('./closeDoor.mp3');
+    closeDoorAudio.volume = 0.7;
+    closeDoorAudio.play().then(() => {
+      console.log('🔊 受信側: closeDoor.mp3再生開始');
+    }).catch(error => {
+      console.error('❌ closeDoor.mp3再生エラー:', error);
+    });
+  } catch (error) {
+    console.error('❌ closeDoor.mp3オーディオ作成エラー:', error);
+  }
+});

@@ -439,7 +439,7 @@ function createWriterStatusDiv() {
   statusDiv.id = 'writerStatus';
   statusDiv.style.cssText = `
     position: fixed;
-    top: 10px;
+    bottom: 10px;
     right: 10px;
     background: rgba(0,0,0,0.8);
     color: white;

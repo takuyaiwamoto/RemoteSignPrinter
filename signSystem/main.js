@@ -582,6 +582,31 @@ async function createTransparentOverlayWindow() {
           transition: all 0.3s ease;
         }
         
+        /* しばらくお待ちくださいテキスト */
+        #waitingText {
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          background: rgba(255, 255, 255, 0.95);
+          color: #333;
+          padding: 20px 40px;
+          border-radius: 10px;
+          font-size: 24px;
+          font-weight: bold;
+          font-family: 'Arial', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+          z-index: 1500;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          border: 2px solid #ddd;
+          display: block;
+        }
+        
+        body.transparent #waitingText {
+          display: block;
+          opacity: 1;
+          pointer-events: none;
+        }
+        
         /* ラスト3秒の穏やかな注意モード */
         #countdown.danger {
           color: #ff6b6b;
@@ -619,6 +644,9 @@ async function createTransparentOverlayWindow() {
         <button id="transparentBtn">透明化</button>
         <button id="fullscreenBtn">最大化</button>
       </div>
+      
+      <!-- しばらくお待ちくださいテキスト -->
+      <div id="waitingText">しばらくお待ちください</div>
       
       <!-- ネオンサイバータイマー -->
       <div id="countdown">5</div>
@@ -687,9 +715,20 @@ async function createTransparentOverlayWindow() {
           }, 1000);
         });
         
+        // テキスト非表示要求を受信
+        ipcRenderer.on('hide-waiting-text', () => {
+          console.log('📤 透明ウィンドウでテキスト非表示要求を受信');
+          const waitingText = document.getElementById('waitingText');
+          if (waitingText) {
+            waitingText.style.display = 'none';
+            console.log('📤 しばらくお待ちくださいテキストを非表示');
+          }
+        });
+        
         // スライドアニメーション要求を受信（ハート機能と同じ仕組み）
         ipcRenderer.on('add-slide-to-transparent', (event, data) => {
           console.log('📤 透明ウィンドウでスライドアニメーション要求を受信:', data);
+          
           const waitingImage = document.getElementById('waitingImage');
           if (waitingImage) {
             // 既存のクラスをクリアしてスライドアップ
@@ -743,6 +782,21 @@ async function createTransparentOverlayWindow() {
                 waitingImage.className = '';
                 waitingImage.classList.add('slide-down');
                 console.log('📤 待機画像を下部（元の位置）にスライド開始');
+                
+                // 3秒後（スライドダウンアニメーション完了後）にしばらくお待ちくださいテキストを再表示
+                setTimeout(() => {
+                  const waitingText = document.getElementById('waitingText');
+                  if (waitingText) {
+                    waitingText.style.display = 'block';
+                    console.log('📤 しばらくお待ちくださいテキストを再表示');
+                  }
+                }, 3000);
+              }
+              
+              // メインプロセスにcloseDoor.mp3再生を指示
+              if (typeof ipcRenderer !== 'undefined') {
+                ipcRenderer.send('play-close-door-audio');
+                console.log('🔊 メインプロセスにcloseDoor.mp3再生指示送信');
               }
               
               clearInterval(countdownInterval);
@@ -1004,6 +1058,34 @@ setInterval(() => {
     globalTransparentWindow.setIgnoreMouseEvents(true);
   }
 }, 200);
+
+// テキスト非表示のIPCハンドラー
+ipcMain.on('hide-waiting-text', () => {
+  console.log('📨 テキスト非表示要求を受信');
+  
+  if (globalTransparentWindow && !globalTransparentWindow.isDestroyed()) {
+    globalTransparentWindow.webContents.send('hide-waiting-text');
+    console.log('👻 透明ウィンドウにテキスト非表示指示送信');
+  } else {
+    console.log('❌ 透明ウィンドウが存在しません');
+  }
+});
+
+// closeDoor.mp3再生のIPCハンドラー
+ipcMain.on('play-close-door-audio', () => {
+  console.log('📨 closeDoor.mp3再生要求を受信');
+  
+  // メインウィンドウにcloseDoor.mp3再生指示を送信
+  const allWindows = BrowserWindow.getAllWindows();
+  const mainWindow = allWindows.find(win => !win.isDestroyed() && win.webContents.getURL().includes('index.html'));
+  
+  if (mainWindow) {
+    mainWindow.webContents.send('play-close-door-audio');
+    console.log('🔊 メインウィンドウにcloseDoor.mp3再生指示送信');
+  } else {
+    console.log('❌ メインウィンドウが見つかりません');
+  }
+});
 
 // 透過画像印刷処理（ダイアログなし）
 ipcMain.on("print-transparent-image", (event, data) => {

@@ -822,10 +822,10 @@ body.classic .background-controls {
     font-size: 12px;
   }
   
-  /* Writer IDステータスを上部に固定 */
+  /* Writer IDステータスを右下に固定 */
   #writerStatus {
     position: fixed;
-    top: 5px;
+    bottom: 5px;
     right: 5px;
     z-index: 1001;
     font-size: 12px;
