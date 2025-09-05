@@ -242,6 +242,24 @@
 
 <div id="countdown"></div>
 
+<!-- バージョン情報表示 (左下固定) -->
+<div id="versionInfo" style="
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: monospace;
+  z-index: 9999;
+  pointer-events: none;
+">
+  <div>Canvas Drawing Fix v2.1.0</div>
+  <div id="writerStatus">Writer ID: 未割り当て</div>
+</div>
+
 <script>
 // ===========================
 // 🏗️ DOM CACHE SYSTEM - DOM要素キャッシュシステム

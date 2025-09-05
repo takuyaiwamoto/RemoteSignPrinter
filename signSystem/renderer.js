@@ -1505,6 +1505,12 @@ function createBack2Display() {
   
   drawCtx = drawCanvas.getContext('2d');
   
+  // 🔧【根本修正】180度回転を初期化時に1回だけ適用
+  drawCtx.translate(drawCanvas.width / 2, drawCanvas.height / 2);
+  drawCtx.rotate(Math.PI);
+  drawCtx.translate(-drawCanvas.width / 2, -drawCanvas.height / 2);
+  console.log(`🔄 Canvas初期化: 180度回転を適用完了`);
+  
   // 構造を組み立て
   back2Wrapper.appendChild(backgroundElement);
   back2Wrapper.appendChild(drawCanvas);
@@ -1530,9 +1536,19 @@ function updateBack2Size(newScale) {
   back2Wrapper.style.height = `${displayHeight}px`;
   back2Wrapper.style.left = `${leftPosition}px`;
   
+  // 🔧【根本修正】Canvasサイズ変更後、180度回転を再適用
+  const oldWidth = drawCanvas.width;
+  const oldHeight = drawCanvas.height;
+  
   // 描画キャンバスの論理サイズもスケールに合わせて更新
   drawCanvas.width = displayWidth;
   drawCanvas.height = displayHeight;
+  
+  // 🔧【重要】Canvasサイズ変更によりコンテキストがリセットされるため、180度回転を再適用
+  drawCtx.translate(drawCanvas.width / 2, drawCanvas.height / 2);
+  drawCtx.rotate(Math.PI);
+  drawCtx.translate(-drawCanvas.width / 2, -drawCanvas.height / 2);
+  console.log(`🔄 Canvasサイズ変更後180度回転を再適用: ${oldWidth}x${oldHeight} → ${displayWidth}x${displayHeight}`);
   
   // 描画キャンバスの表示サイズは100%のまま（ラッパーに合わせる）
   drawCanvas.style.width = '100%';
@@ -1682,10 +1698,15 @@ function resetReceiverWriterState(writerId) {
 
 function drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, writerId) {
   if (!drawCtx) {
+    console.log(`❌ drawRotatedSmoothStroke: drawCtx が null - 描画停止`);
     return;
   }
   
   const writerState = getReceiverWriterState(writerId);
+  
+  // 🔍【詳細調査】Canvas状態とWriter状態をすべて確認
+  console.log(`🔍 描画関数呼び出し: Writer:${writerId}, isDrawing:${writerState.isDrawing}, Canvas状態:有効`);
+  console.log(`🔍 座標: (${x1.toFixed(1)},${y1.toFixed(1)}) → (${x2.toFixed(1)},${y2.toFixed(1)})`);
   
   // 🔍【調査用】座標間距離の計算
   const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
@@ -1695,24 +1716,21 @@ function drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, writerId) {
     console.log(`📏距離調査: ${distance.toFixed(1)}px | (${x1.toFixed(1)},${y1.toFixed(1)}) → (${x2.toFixed(1)},${y2.toFixed(1)}) | Writer:${writerId}`);
   }
   
-  drawCtx.save();
-  
-  // キャンバスの中心に移動して180度回転
-  drawCtx.translate(drawCanvas.width / 2, drawCanvas.height / 2);
-  drawCtx.rotate(Math.PI);
-  drawCtx.translate(-drawCanvas.width / 2, -drawCanvas.height / 2);
-  
-  // 基本設定
-  drawCtx.lineCap = 'round';
-  drawCtx.lineJoin = 'round';
-  
-  // 🔧【バグ修正】Writer別Path状態分離 + 同一Writer内連続線維持
+  // 🔧【根本修正】Canvas状態スタック蓄積バグを解決：save()を完全削除
   if (!writerState.isDrawing) {
-    // 新しい描画開始時のみbeginPath
+    // 180度回転はグローバルに1回だけ適用（Canvasは既に回転済み）
+    // save/restoreによるスタック蓄積を回避
+    
+    // 基本設定
+    drawCtx.lineCap = 'round';
+    drawCtx.lineJoin = 'round';
+    
+    // 新しい描画開始時のみbeginPath + 初期moveTo
     writerState.isDrawing = true;
     writerState.currentPath = [{ x: x1, y: y1 }];
     drawCtx.beginPath();
-    console.log(`🎨 Writer ${writerId}: 新しい描画開始`);
+    drawCtx.moveTo(x1, y1);
+    console.log(`🎨 Writer ${writerId}: 新しい描画開始（save/restore廃止版）`);
   }
   
   // 🔴 white-red-border特別処理
@@ -1735,7 +1753,7 @@ function drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, writerId) {
   } else {
     drawCtx.strokeStyle = color || '#000000';
     drawCtx.lineWidth = thickness || 2;
-    drawCtx.moveTo(x1, y1);
+    // 連続線のためmoveToは初回のみ（beginPath時に実行済み）
   }
   
   // 現在の点をパスに追加
@@ -1777,7 +1795,7 @@ function drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, writerId) {
       drawCtx.strokeStyle = color || '#000000';
       drawCtx.lineWidth = thickness || 2;
       drawCtx.quadraticCurveTo(prev1.x, prev1.y, midX, midY);
-      drawCtx.stroke();
+      // 🔧【破線修正】連続線のため途中ではstrokeしない
     }
   } else {
     // 最初の数点は直線描画（連続描画）
@@ -1805,16 +1823,23 @@ function drawRotatedSmoothStroke(x1, y1, x2, y2, color, thickness, writerId) {
       drawCtx.strokeStyle = color || '#000000';
       drawCtx.lineWidth = thickness || 2;
       drawCtx.lineTo(x2, y2);
-      drawCtx.stroke();
+      // 🔧【破線修正】連続線のため途中ではstrokeしない
     }
   }
   
+  // 🔧【破線修正】頻繁にstrokeして描画を更新（連続線維持）
+  if (writerState.currentPath.length % 3 === 0) {
+    drawCtx.stroke();
+    console.log(`🎨 Writer ${writerId}: 中間stroke実行 (${writerState.currentPath.length}点)`);
+  }
+  
   // パスの長さを制限（メモリ効率化）
-  if (writerState.currentPath.length > 3) {
+  if (writerState.currentPath.length > 20) {
     writerState.currentPath.shift();
   }
   
-  drawCtx.restore();
+  // 🔧【重要修正】Canvas状態スタック蓄積を防ぐため、save/restoreを廃止
+  // 180度回転は1回だけ適用し、その後は維持する
 }
 
 // レガシー互換用の関数
@@ -1895,8 +1920,12 @@ function processDrawingForBack2(data, writerId) {
   // endイベント時もWriter状態をリセット
   if (data.type === 'end') {
     const writerState = getReceiverWriterState(writerId);
-    writerState.isDrawing = false;
-    console.log(`🎨 受信側Writer描画終了: ${writerId}`);
+    if (writerState.isDrawing) {
+      // 🔧【根本修正】描画終了時は最終strokeのみ実行（restore削除）
+      drawCtx.stroke();
+      writerState.isDrawing = false;
+      console.log(`🎨 受信側Writer描画終了（最終stroke実行）: ${writerId}`);
+    }
   }
   
   // Writer別配列に追加
@@ -1919,7 +1948,9 @@ function processDrawingForBack2(data, writerId) {
   drawingData.push(data);
   
   // 連続描画の場合のみ線を引く - Writer別データで判定
+  console.log(`🔍 processDrawingForBack2: type=${data.type}, prevData=${prevData ? prevData.type : 'null'}, writerId=${writerId}`);
   if (data.type === 'draw' && prevData && (prevData.type === 'start' || prevData.type === 'draw')) {
+    console.log(`✅ 描画条件クリア: drawRotatedSmoothStroke呼び出し開始`);
     
     // 🔍【原因調査】座標変換前の距離計算
     const originalDistance = Math.sqrt((data.x - prevData.x) ** 2 + (data.y - prevData.y) ** 2);
@@ -1959,6 +1990,7 @@ function processDrawingForBack2(data, writerId) {
     }
     
     // 🎨 滑らかな曲線描画に変更（Writer別状態管理対応）
+    console.log(`🎨 drawRotatedSmoothStroke呼び出し直前: writerId=${writerId}`);
     drawRotatedSmoothStroke(
       rotatedPrevX, rotatedPrevY,
       rotatedCurrX, rotatedCurrY,
@@ -1966,6 +1998,9 @@ function processDrawingForBack2(data, writerId) {
       data.thickness || 2,
       writerId
     );
+    console.log(`✅ drawRotatedSmoothStroke呼び出し完了: writerId=${writerId}`);
+  } else {
+    console.log(`❌ 描画条件不一致: type=${data.type}, prevData=${prevData ? 'exists' : 'null'}`);
   }
 }
 function removeDrawRealtimeWriterPath(writerId, currentCmd, prevCmd) {
