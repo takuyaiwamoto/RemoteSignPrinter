@@ -779,6 +779,20 @@ function startWaitingAnimation() {
       };
       sendWebSocketMessage(slideMessage);
       console.log('📡 WebSocket: 受信側経由で透明ウィンドウにスライド指示を送信');
+      
+      // 全書き手にカウントダウン開始を通知（drawing形式で送信してサーバーにブロードキャストさせる）
+      const globalCountdownMessage = {
+        type: 'draw', // サーバーがブロードキャストするメッセージタイプを使用
+        action: 'global-countdown-start', // 実際のアクションをactionフィールドに
+        timestamp: Date.now(),
+        delay: 6000, // 6秒後にカウントダウン開始
+        writerId: myWriterId, // 送信者のWriter ID
+        x: 0, y: 0, // drawタイプに必要なダミー座標
+        color: 'transparent' // ダミーカラー
+      };
+      sendWebSocketMessage(globalCountdownMessage);
+      console.log('📡 WebSocket: 全書き手にカウントダウン開始を通知（draw形式）');
+      
       ipcSent = true;
       
       // 書き手側では6秒後にカウントダウン開始（3秒待機 + 3秒アニメーション）
@@ -800,6 +814,20 @@ function startWaitingAnimation() {
       };
       socket.send(JSON.stringify(slideMessage));
       console.log('📡 WebSocket (直接): 受信側経由で透明ウィンドウにスライド指示を送信');
+      
+      // 全書き手にカウントダウン開始を通知（drawing形式で送信してサーバーにブロードキャストさせる）
+      const globalCountdownMessage = {
+        type: 'draw', // サーバーがブロードキャストするメッセージタイプを使用
+        action: 'global-countdown-start', // 実際のアクションをactionフィールドに
+        timestamp: Date.now(),
+        delay: 6000, // 6秒後にカウントダウン開始
+        writerId: myWriterId, // 送信者のWriter ID
+        x: 0, y: 0, // drawタイプに必要なダミー座標
+        color: 'transparent' // ダミーカラー
+      };
+      socket.send(JSON.stringify(globalCountdownMessage));
+      console.log('📡 WebSocket (直接): 全書き手にカウントダウン開始を通知（draw形式）');
+      
       ipcSent = true;
       
       // 書き手側では6秒後にカウントダウン開始（3秒待機 + 3秒アニメーション）
@@ -864,6 +892,8 @@ function showCurtainCountdown() {
 // 書き手側のカウントダウン機能
 function startSyncCountdown() {
   const countdownElement = document.getElementById('syncCountdown');
+  const curtainClosedElement = document.getElementById('curtainClosedDisplay');
+  
   if (!countdownElement) {
     console.log('❌ syncCountdown要素が見つかりません');
     return;
@@ -871,6 +901,10 @@ function startSyncCountdown() {
   
   let count = 5;
   
+  // 幕が閉じています表示を非表示にしてカウントダウンを表示
+  if (curtainClosedElement) {
+    curtainClosedElement.style.display = 'none';
+  }
   countdownElement.style.display = 'block';
   countdownElement.textContent = count;
   console.log('⏱️ 書き手側カウントダウン開始: 5秒');
@@ -882,6 +916,10 @@ function startSyncCountdown() {
       console.log(`⏱️ 書き手側カウントダウン: ${count}`);
     } else {
       countdownElement.style.display = 'none';
+      // カウントダウン終了後に幕が閉じています表示を再表示
+      if (curtainClosedElement) {
+        curtainClosedElement.style.display = 'block';
+      }
       console.log('⏱️ 書き手側カウントダウン終了');
       clearInterval(countdownInterval);
     }

@@ -32,7 +32,7 @@
 <div id="syncCountdown" style="
   position: fixed;
   top: 20px;
-  right: 200px;
+  right: 50px;
   background: rgba(0, 0, 0, 0.8);
   color: white;
   padding: 15px 20px;
@@ -42,6 +42,21 @@
   z-index: 9999;
   display: none;
 ">5</div>
+
+<!-- 幕が閉じています表示 -->
+<div id="curtainClosedDisplay" style="
+  position: fixed;
+  top: 20px;
+  right: 50px;
+  background: rgba(200, 50, 50, 0.9);
+  color: white;
+  padding: 15px 20px;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: bold;
+  z-index: 9998;
+  display: block;
+">幕が閉じています</div>
 
 <!-- スタートボタン上の「幕が上るまで」カウントダウン -->
 <div id="curtainCountdown" style="
@@ -392,6 +407,51 @@ socket.onmessage = (event) => {
     console.error('❌ メッセージ処理エラー:', error);
   }
 };
+
+// WebSocketメッセージ処理関数
+function processMessage(data) {
+  // draw形式で送信された全体カウントダウン指示を処理
+  if (data.type === 'draw' && data.action === 'global-countdown-start') {
+    console.log('📡 全体カウントダウン開始指示を受信:', data);
+    
+    // 自分が送信したメッセージは無視（自分は既にカウントダウン開始済み）
+    if (data.writerId === myWriterId) {
+      console.log('📡 自分が送信したメッセージのため無視');
+      return;
+    }
+    
+    // 「幕が閉じています」を非表示にしてカウントダウンを開始
+    const curtainClosedElement = document.getElementById('curtainClosedDisplay');
+    if (curtainClosedElement) {
+      curtainClosedElement.style.display = 'none';
+    }
+    
+    // 指定された遅延後にカウントダウン開始
+    setTimeout(() => {
+      startSyncCountdown();
+    }, data.delay || 6000);
+    
+    console.log(`📡 ${data.delay || 6000}ms後にカウントダウン開始予定`);
+  }
+  
+  // 従来の形式も念のため残しておく
+  if (data.type === 'global-countdown-start') {
+    console.log('📡 全体カウントダウン開始指示を受信（従来形式）:', data);
+    
+    const curtainClosedElement = document.getElementById('curtainClosedDisplay');
+    if (curtainClosedElement) {
+      curtainClosedElement.style.display = 'none';
+    }
+    
+    setTimeout(() => {
+      startSyncCountdown();
+    }, data.delay || 6000);
+    
+    console.log(`📡 ${data.delay || 6000}ms後にカウントダウン開始予定`);
+  }
+  
+  // 他のメッセージタイプの処理もここに追加可能
+}
 
 // 不要なコントロール表示機能を削除 - シンプルなUIに統一
 
