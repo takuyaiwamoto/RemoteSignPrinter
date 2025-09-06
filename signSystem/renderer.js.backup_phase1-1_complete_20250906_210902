@@ -30,7 +30,7 @@ const RENDERING_CONFIG = {
   videoPattern: 1,                      // 動画パターン（1:回転, 2:フェード）
   currentVideoIndex: 1,                 // 現在の動画番号（1〜4を順番に使用）
   
-  // 音楽設定（AudioManagerに移行済み）
+  // 音楽設定
   musicVolume: 0.5,                     // 音楽のボリューム（0.0〜1.0）
   
   // 印刷設定
@@ -40,29 +40,191 @@ const RENDERING_CONFIG = {
 // ===========================
 // 🎬 VIDEO SYSTEM STATE - 動画システム状態管理
 // ===========================
-// let currentVideoElement = null;         // VideoManagerに移行済み
-// let currentMusicElement = null;          // AudioManagerに移行済み
+let currentVideoElement = null;         // 現在再生中の動画要素
+let currentMusicElement = null;          // 現在再生中の音楽要素
 
 // 後方互換性のための参照（段階的削除予定）
-// let videoZIndex = RENDERING_CONFIG.videoZIndex;  // VideoManagerに移行済み
+let videoZIndex = RENDERING_CONFIG.videoZIndex;
 let textZIndex = RENDERING_CONFIG.textZIndex;
-// let videoPattern = RENDERING_CONFIG.videoPattern;  // VideoManagerに移行済み
-// let musicVolume = RENDERING_CONFIG.musicVolume;  // AudioManagerに移行済み
+let videoPattern = RENDERING_CONFIG.videoPattern;
+let musicVolume = RENDERING_CONFIG.musicVolume;
 // let printDelayTime = RENDERING_CONFIG.printDelayTime; // TimingManagerで管理
 let currentVideoIndex = RENDERING_CONFIG.currentVideoIndex;
 
 // ===========================
-// 🎵 AUDIO FUNCTIONS - 音楽再生処理（AudioManagerに移行済み）
+// 🎵 AUDIO FUNCTIONS - 音楽再生処理
 // ===========================
-// playBackgroundMusic関数はrendering-audio.jsのAudioManagerに移行済み
+
+function playBackgroundMusic() {
+  if (!window.isDevWhiteBackground) {
+    console.log('🎵 背景5以外では音楽再生しません');
+    return;
+  }
+  
+  // 既存の音楽要素があれば削除
+  if (currentMusicElement) {
+    currentMusicElement.pause();
+    currentMusicElement.remove();
+    currentMusicElement = null;
+  }
+  
+  // 音楽要素を作成
+  const music = document.createElement('audio');
+  music.src = './signMusic.mp3';
+  music.volume = musicVolume;
+  music.loop = false; // 1回のみ再生
+  
+  console.log(`🎵 音楽再生開始: signMusic.mp3, 音量: ${musicVolume}`);
+  
+  // 音楽再生開始
+  music.play().catch(error => {
+    console.error('🎵 音楽再生失敗:', error);
+  });
+  
+  currentMusicElement = music;
+  
+  // 音楽終了時のログ
+  music.addEventListener('ended', () => {
+    console.log('🎵 音楽再生終了');
+  });
+  
+  return music;
+}
 
 // ===========================
 // 🎬 VIDEO FUNCTIONS - 動画処理
 // ===========================
 
-// createVideoElement関数はrendering-video.jsのVideoManagerに移行済み
+function createVideoElement() {
+  // 既存の動画要素があれば削除
+  if (currentVideoElement) {
+    currentVideoElement.remove();
+    currentVideoElement = null;
+  }
+  
+  // 白背景キャンバスが表示されているかチェック
+  if (!window.isDevWhiteBackground || !back2Wrapper || !drawCanvas) {
+    console.log('🎬 背景5以外では動画を作成しません');
+    return null;
+  }
+  
+  // 動画要素を作成
+  const video = document.createElement('video');
+  
+  // 1〜4の動画を順番に選択
+  video.src = `./backVideo${currentVideoIndex}.mp4`;
+  console.log(`🎬 動画選択: backVideo${currentVideoIndex}.mp4 (${currentVideoIndex}/4)`);
+  
+  // 次回のために番号を進める（1→2→3→4→1...）
+  currentVideoIndex = (currentVideoIndex % 4) + 1;
+  
+  video.muted = true; // 音声なしで自動再生を許可
+  video.loop = false; // 1回のみ再生
+  video.preload = 'auto';
+  
+  // 動画のサイズを白背景キャンバスに合わせる
+  const canvasRect = drawCanvas.getBoundingClientRect();
+  video.style.cssText = `
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    z-index: ${videoZIndex} !important;
+    pointer-events: none !important;
+  `;
+  
+  console.log(`🎬 動画要素作成: サイズ${canvasRect.width}x${canvasRect.height}, z-index=${videoZIndex}`);
+  
+  // back2Wrapperに追加（文字の下、背景の上）
+  back2Wrapper.appendChild(video);
+  currentVideoElement = video;
+  
+  // 描画キャンバスのz-indexを最上位に設定
+  if (drawCanvas) {
+    drawCanvas.style.zIndex = textZIndex + 5; // 確実に最上位
+    console.log(`🎬 描画キャンバスz-index調整: ${textZIndex + 5} (最上位)`);
+  }
+  
+  return video;
+}
 
-// startVideoPlayback関数はrendering-video.jsのVideoManagerに移行済み
+// 🎬 動画再生を開始
+function startVideoPlayback() {
+  if (!window.isDevWhiteBackground) {
+    console.log('🎬 背景5以外では動画再生しません');
+    return Promise.resolve();
+  }
+  
+  const video = createVideoElement();
+  if (!video) {
+    console.log('🎬 動画要素作成失敗');
+    return Promise.resolve();
+  }
+  
+  console.log('🎬 動画再生開始');
+  
+  return new Promise((resolve) => {
+    // 🔧【フェードイン完了イベント】動画終了時にイベント発火（パターン1）
+    let fadeInCompleteEventFired = false;
+    video.addEventListener('timeupdate', () => {
+      if (video.duration && video.currentTime && !fadeInCompleteEventFired) {
+        const remainingTime = video.duration - video.currentTime;
+        // パターン1は動画終了時にフェードイン完了とする
+        if (remainingTime <= 0.5 && remainingTime > 0.1) {
+          fadeInCompleteEventFired = true;
+          console.log(`🎬【パターン1】フェードイン完了 - スライドアニメーション待機時間開始`);
+          console.log(`⏰ フェードイン完了時の動画残り時間: ${remainingTime.toFixed(2)}秒`);
+          
+          
+          window.dispatchEvent(new CustomEvent('fadeInComplete', {
+            detail: { 
+              timestamp: Date.now(),
+              pattern: 1,
+              remainingTime: remainingTime
+            }
+          }));
+        }
+      }
+    });
+
+    // 動画終了時の処理
+    video.addEventListener('ended', () => {
+      console.log('🎬 動画再生終了検出 - 0.5秒待機後に次の処理へ');
+      
+      // 動画の最後のフレームが確実に表示されるよう少し待機
+      setTimeout(() => {
+        console.log('🎬 動画再生完全終了 - 最後のフレームで静止');
+        
+        // 🔧【パターン1】動画終了時の処理
+        if (!fadeInCompleteEventFired) {
+          console.log('🎬 パターン1動画終了 - フェードイン完了イベント発火（バックアップ）');
+          window.dispatchEvent(new CustomEvent('fadeInComplete', {
+            detail: { timestamp: Date.now(), pattern: 1 }
+          }));
+        } else {
+          console.log('🎬 パターン1動画終了 - フェードイン完了イベントは既に発火済み');
+        }
+        
+        // 動画は削除せず、最後のフレームで静止
+        resolve();
+      }, 500); // 0.5秒の遅延を追加
+    });
+    
+    // 動画再生エラー時の処理
+    video.addEventListener('error', (e) => {
+      console.error('🎬 動画再生エラー:', e);
+      resolve();
+    });
+    
+    // 動画再生開始
+    video.play().catch(error => {
+      console.error('🎬 動画再生失敗:', error);
+      resolve();
+    });
+  });
+}
 
 // 🎬 パターン2: 描画フェードアウト + 動画フェードイン処理
 function startPattern2FadeInOut() {
@@ -380,38 +542,6 @@ function initializeTimingManager() {
   }
 }
 
-// AudioManagerの初期化関数
-function initializeAudioManager() {
-  if (typeof AudioManager !== 'undefined') {
-    window.audioManager = new AudioManager({
-      musicVolume: RENDERING_CONFIG.musicVolume
-    });
-    console.log('✅ AudioManager初期化完了');
-  }
-}
-
-// EffectsManagerの初期化関数
-function initializeEffectsManager() {
-  if (typeof EffectsManager !== 'undefined') {
-    window.effectsManager = new EffectsManager({
-      fireworksCooldown: 3000
-    });
-    console.log('✅ EffectsManager初期化完了');
-  }
-}
-
-// VideoManagerの初期化関数
-function initializeVideoManager() {
-  if (typeof VideoManager !== 'undefined') {
-    window.videoManager = new VideoManager({
-      videoZIndex: RENDERING_CONFIG.videoZIndex,
-      videoPattern: RENDERING_CONFIG.videoPattern,
-      videoTop: 100
-    });
-    console.log('✅ VideoManager初期化完了');
-  }
-}
-
 class CanvasManager {
   constructor() {
     this.canvas = null;
@@ -478,10 +608,83 @@ function updateCanvasContext() {
   return true;
 }
 
-// ===========================
-// 🛠️ UTILITY FUNCTIONS - ユーティリティ関数（rendering-utils.js に移行済み）
-// ===========================
-// 注意: これらの関数はrendering-utils.jsで管理されています
+// 色補間関数（送信側と同じ）
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return { r, g, b };
+}
+
+function rgbToHex(r, g, b) {
+  return "#" + ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
+}
+
+// イージング関数（滑らかな変化のため）
+function easeInOutSine(x) {
+  return -(Math.cos(Math.PI * x) - 1) / 2;
+}
+
+// アスペクト比を保持した座標変換関数
+function transformCoordinatesWithAspectRatio(x, y, senderSize, drawingAreaSize) {
+  const senderAspect = senderSize.width / senderSize.height;
+  const drawingAreaAspect = drawingAreaSize.width / drawingAreaSize.height;
+  
+  let actualDrawingWidth, actualDrawingHeight, offsetX = 0, offsetY = 0;
+  
+  if (senderAspect > drawingAreaAspect) {
+    // 送信側の方が横長 → 描画エリアの幅に合わせて、高さを調整
+    actualDrawingWidth = drawingAreaSize.width;
+    actualDrawingHeight = drawingAreaSize.width / senderAspect;
+    offsetY = (drawingAreaSize.height - actualDrawingHeight) / 2;
+  } else {
+    // 送信側の方が縦長 → 描画エリアの高さに合わせて、幅を調整
+    actualDrawingHeight = drawingAreaSize.height;
+    actualDrawingWidth = drawingAreaSize.height * senderAspect;
+    offsetX = (drawingAreaSize.width - actualDrawingWidth) / 2;
+  }
+  
+  // 座標変換: 送信側の座標を実際の描画サイズに変換してからオフセットを追加
+  const scaledX = (x / senderSize.width) * actualDrawingWidth + offsetX;
+  const scaledY = (y / senderSize.height) * actualDrawingHeight + offsetY;
+  
+  // デバッグ: 変換結果が範囲内にあるかチェック
+  // console.log(`  座標変換詳細: 送信(${x.toFixed(1)}, ${y.toFixed(1)}) → 実際サイズでスケール(${((x / senderSize.width) * actualDrawingWidth).toFixed(1)}, ${((y / senderSize.height) * actualDrawingHeight).toFixed(1)}) → オフセット後(${scaledX.toFixed(1)}, ${scaledY.toFixed(1)})`);
+  
+  return { x: scaledX, y: scaledY, actualWidth: actualDrawingWidth, actualHeight: actualDrawingHeight };
+}
+
+function interpolateColor(color1, color2, factor) {
+  // イージング関数を適用してより滑らかな変化
+  const easedFactor = easeInOutSine(factor);
+  
+  const rgb1 = hexToRgb(color1);
+  const rgb2 = hexToRgb(color2);
+  
+  const r = rgb1.r + easedFactor * (rgb2.r - rgb1.r);
+  const g = rgb1.g + easedFactor * (rgb2.g - rgb1.g);
+  const b = rgb1.b + easedFactor * (rgb2.b - rgb1.b);
+  
+  return rgbToHex(r, g, b);
+}
+
+function getNeonColorFromIndex(neonIndex) {
+  const colors = [
+    '#ff0000', '#ff4000', '#ff8000', '#ffb000', '#ffff00', '#b0ff00',
+    '#80ff00', '#40ff00', '#00ff00', '#00ff40', '#00ff80', '#00ffb0',
+    '#00ffff', '#00b0ff', '#0080ff', '#0040ff', '#0000ff', '#4000ff',
+    '#8000ff', '#b000ff', '#ff00ff', '#ff00b0', '#ff0080', '#ff0040'
+  ];
+  
+  const position = (neonIndex % colors.length);
+  const colorIndex1 = Math.floor(position);
+  const colorIndex2 = (colorIndex1 + 1) % colors.length;
+  const factor = position - colorIndex1;
+  
+  const color1 = colors[colorIndex1];
+  const color2 = colors[colorIndex2];
+  return interpolateColor(color1, color2, factor);
+}
 
 // ネオンパス完了時にピンクの枠を描画する関数（削除済み）
 function drawNeonPathComplete(writerId) {
@@ -627,9 +830,122 @@ function createReceiverFairyDust(x, y) {
   }
 }
 
-// ハートエフェクト関数（受信側用）- rendering-effects.jsに移行済み
+// ハートエフェクト関数（受信側用）
+function createReceiverHeart(x, y) {
+  // //console.log(`💖 受信側にハートを生成開始: (${x}, ${y})`);
+  
+  // ハートを少数生成（1-3個）
+  const heartCount = Math.floor(Math.random() * 3) + 1;
+  // //console.log(`💖 生成するハートの数: ${heartCount}`);
+  
+  for (let i = 0; i < heartCount; i++) {
+    const heart = document.createElement('div');
+    heart.className = 'receiver-drawing-heart';
+    
+    // ペン先により近い範囲にランダム配置（18px範囲）
+    const offsetX = (Math.random() - 0.5) * 18;
+    const offsetY = (Math.random() - 0.5) * 18;
+    
+    const finalX = x + offsetX;
+    const finalY = y + offsetY;
+    
+    heart.style.left = finalX + 'px';
+    heart.style.top = finalY + 'px';
+    
+    // ランダムなピンク系の色
+    const colors = ['#ff1493', '#ff69b4', '#ff6347', '#ff1493', '#db7093', '#c71585'];
+    const heartColor = colors[Math.floor(Math.random() * colors.length)];
+    
+    heart.style.background = heartColor;
+    heart.style.boxShadow = `0 0 8px ${heartColor}, 0 0 16px ${heartColor}`;
+    
+    // ランダムな飛び散り方向とアニメーション遅延
+    const randomDirection = (Math.random() - 0.5) * 60; // -30度から30度
+    heart.style.setProperty('--float-direction', randomDirection + 'deg');
+    heart.style.animationDelay = (Math.random() * 0.3) + 's';
+    
+    // 疑似要素の色も更新
+    heart.style.setProperty('--heart-color', heartColor);
+    
+    // 位置を固定
+    heart.style.position = 'fixed';
+    heart.style.zIndex = '9998';
+    
+    document.body.appendChild(heart);
+    // //console.log(`💖 ハート${i+1}をDOMに追加:`, heart);
+    // //console.log(`💖 ハート${i+1}の位置: left=${finalX}px, top=${finalY}px`);
+    
+    // アニメーション終了後にハートを削除
+    setTimeout(() => {
+      if (heart.parentNode) {
+        heart.parentNode.removeChild(heart);
+        // //console.log('💖 受信側のハートを削除');
+      }
+    }, 1500);
+  }
+}
 
-// 星エフェクト関数（送信側と完全に同じ飛び散る効果）- rendering-effects.jsに移行済み
+// 星エフェクト関数（送信側と完全に同じ飛び散る効果）
+function createReceiverStar(x, y) {
+  console.log(`🌟 createReceiverStar関数開始: (${x}, ${y})`);
+  console.log(`⭐ 受信側に星を生成: (${x}, ${y})`);
+  
+  // 星の数をさらに減らす（1個、たまに2個）
+  const starCount = Math.random() < 0.3 ? 2 : 1;
+  console.log(`🌟 生成する星の数: ${starCount}`);
+  
+  for (let i = 0; i < starCount; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    
+    // より広範囲にランダム配置（50px範囲）
+    const offsetX = (Math.random() - 0.5) * 50;
+    const offsetY = (Math.random() - 0.5) * 50;
+    
+    const finalX = x + offsetX;
+    const finalY = y + offsetY;
+    
+    star.style.left = finalX + 'px';
+    star.style.top = finalY + 'px';
+    
+    console.log(`⭐ 星${i+1}の最終位置: left=${finalX}px, top=${finalY}px`);
+    
+    // 🔍 詳細デバッグ情報
+    console.log(`⭐ 星${i+1}のCSS設定詳細:`);
+    console.log(`   - position: fixed`);
+    console.log(`   - left: ${finalX}px`);
+    console.log(`   - top: ${finalY}px`);
+    console.log(`   - z-index: 20000`);
+    console.log(`   - 画面サイズ: ${window.innerWidth}x${window.innerHeight}`);
+    
+    // ランダムな色（金色系）
+    const colors = ['gold', '#FFD700', '#FFA500', '#FFFF00', '#FFE4B5', '#FFFACD'];
+    star.style.background = colors[Math.floor(Math.random() * colors.length)];
+    
+    // ランダムな飛び散り方向
+    const direction = Math.random() * 360;
+    star.style.setProperty('--fly-direction', direction + 'deg');
+    
+    // ランダムな遅延でアニメーション開始
+    star.style.animationDelay = (Math.random() * 0.3) + 's';
+    
+    // 可視性を確認するため（位置を固定）
+    star.style.position = 'fixed';
+    star.style.zIndex = '20000';
+    
+    document.body.appendChild(star);
+    // //console.log(`⭐ 星${i+1}をDOMに追加: `, star);
+    
+    // アニメーション終了後に星を削除
+    setTimeout(() => {
+      if (star.parentNode) {
+        star.parentNode.removeChild(star);
+        // //console.log('⭐ 受信側の星を削除');
+      }
+    }, 1000);
+  }
+  console.log(`🌟 createReceiverStar関数完了: ${starCount}個の星を作成しました`);
+}
 
 
 // CSSアニメーションをスタイルシートに追加（送信側と完全に同じ）
@@ -787,13 +1103,90 @@ function addHeartStyles() {
 }
 
 // ハートエフェクト生成関数
-// ハートエフェクト生成関数 - rendering-effects.jsに移行済み
+function createHeart() {
+  // //console.log('💖 ハート生成開始（受信側）');
+  const heart = document.createElement('div');
+  heart.className = 'heart';
+  
+  // ランダムなゆらゆら効果を生成
+  const randomAnimationName = `heartFloat_${Math.random().toString(36).substr(2, 9)}`;
+  const randomMoves = [];
+  for (let i = 0; i <= 5; i++) {
+    const randomX = (Math.random() - 0.5) * 30; // -15px to 15px
+    randomMoves.push(randomX);
+  }
+  
+  //console.log(`💖 ランダム移動値: [${randomMoves.join(', ')}]`);
+  
+  // ランダムなキーフレームを動的に生成
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes ${randomAnimationName} {
+      0% {
+        opacity: 1;
+        transform: rotate(45deg) translateX(${randomMoves[0]}px);
+        bottom: 20px;
+      }
+      20% {
+        opacity: 1;
+        transform: rotate(45deg) translateX(${randomMoves[1]}px);
+        bottom: 80px;
+      }
+      40% {
+        opacity: 0.9;
+        transform: rotate(45deg) translateX(${randomMoves[2]}px);
+        bottom: 140px;
+      }
+      60% {
+        opacity: 0.8;
+        transform: rotate(45deg) translateX(${randomMoves[3]}px);
+        bottom: 200px;
+      }
+      80% {
+        opacity: 0.5;
+        transform: rotate(45deg) translateX(${randomMoves[4]}px);
+        bottom: 260px;
+      }
+      100% {
+        opacity: 0;
+        transform: rotate(45deg) translateX(${randomMoves[5]}px);
+        bottom: 320px;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+  //console.log(`💖 スタイル追加: ${randomAnimationName}`);
+  
+  // ランダムアニメーションを適用
+  heart.style.animation = `${randomAnimationName} 3s linear forwards`;
+  
+  document.body.appendChild(heart);
+  // //console.log('💖 ハートをDOMに追加（受信側）:', heart);
+  
+  // 音楽再生（受信側では無効化して重複を防ぐ）
+  // const audio = new Audio('./poyo.mp3');
+  // audio.play().catch(e => {
+  //   console.log('音楽再生エラー:', e);
+  // });
+  
+  // アニメーション終了後削除（スタイルも削除）
+  setTimeout(() => {
+    if (heart.parentNode) {
+      heart.parentNode.removeChild(heart);
+      // //console.log('💖 ハート削除（受信側）');
+    }
+    if (style.parentNode) {
+      style.parentNode.removeChild(style);
+      // //console.log('💖 スタイル削除（受信側）');
+    }
+  }, 3000);
+}
 
 // lキー連続押下の管理
 let lKeyPressCount = 0;
 let lKeyPressTimer = null;
 let specialWindow = null;
-// doorAnimationInProgress変数はEffectsManagerに移行済み
+let doorAnimationInProgress = false; // 扉演出中フラグ
 
 // Electron透明ウィンドウ作成関数
 async function createTransparentWindow() {
@@ -807,13 +1200,46 @@ async function createTransparentWindow() {
   }
 }
 
-// createVideoWindow → VideoManager.createVideoWindow()に移行
+// 動画ウィンドウ作成関数
+let videoWindowCreated = false;
+async function createVideoWindow() {
+  if (videoWindowCreated) {
+    console.log('🎬 動画ウィンドウは既に作成済みです');
+    return;
+  }
+  
+  if (typeof ipcRenderer === 'undefined') {
+    console.error('❌ 動画ウィンドウ作成失敗: ipcRendererが利用できません');
+    return;
+  }
+  
+  try {
+    const result = await ipcRenderer.invoke('create-video-window');
+    if (result.success) {
+      videoWindowCreated = !result.exists;
+      console.log('🎬 動画ウィンドウ作成成功');
+    }
+  } catch (error) {
+    console.error('❌ 動画ウィンドウ作成エラー:', error);
+  }
+}
 
 // 動画制御コマンド送信関数
-// sendVideoCommand → VideoManager.sendVideoCommand()に移行
+function sendVideoCommand(command, data = {}) {
+  if (typeof ipcRenderer !== 'undefined') {
+    ipcRenderer.send('video-control', { command, ...data });
+    console.log(`🎬 動画コマンド送信: ${command}`);
+  } else {
+    console.error(`🎬 動画コマンド送信失敗: ipcRendererが利用できません (${command})`);
+  }
+}
 
 // Electron透明ウィンドウにハートを追加する関数
-// Electron透明ウィンドウハート関数 - rendering-effects.jsに移行済み
+function createSpecialHeartInOverlay(x) {
+  const heartData = { x, timestamp: Date.now() };
+  ipcRenderer.send('add-heart-to-transparent-window', heartData);
+  //console.log(`👻 Electron透明ウィンドウにハート追加指示:`, heartData);
+}
 
 // 特別演出用の大きなハート生成関数
 function createSpecialHeart() {
@@ -854,7 +1280,11 @@ function createSpecialHeart() {
   document.body.appendChild(heart);
   // //console.log(`✨ 特別ハートをDOMに追加: x=${randomX}px`);
   
-  // 音楽再生は受信側では無効化して重複を防ぐ（AudioManagerに移行済み）
+  // 音楽再生（受信側では無効化して重複を防ぐ）
+  // const audio = new Audio('./poyo.mp3');
+  // audio.play().catch(e => {
+  //   console.log('音楽再生エラー:', e);
+  // });
   
   // 0.8秒後（画面上部到達時）に透明ウィンドウにハートを追加
   setTimeout(() => {
@@ -877,13 +1307,13 @@ function createSpecialHeart() {
 async function triggerSpecialEffect() {
   // //console.log('🎉 特別演出開始！30個の大きなハートを生成');
   
-  // renzoku.mp3を再生（AudioManager使用）
-  if (window.audioManager) {
-    window.audioManager.playRenzokuSound().catch(e => {
-      console.log('renzoku.mp3再生エラー:', e);
-    });
-    console.log('🔊 特別演出でrenzoku.mp3再生開始');
-  }
+  // renzoku.mp3を再生
+  const audio = new Audio('./renzoku.mp3');
+  audio.volume = 0.7;
+  audio.play().catch(e => {
+    //console.log('renzoku.mp3再生エラー:', e);
+  });
+  //console.log('🔊 特別演出でrenzoku.mp3再生開始');
   
   // 送信側にも特別演出開始を通知
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -941,14 +1371,14 @@ document.addEventListener('keydown', function(event) {
         createHeart();
       }
       
-      // 🎵 poyo.mp3を再生（AudioManager使用）
-      if (window.audioManager) {
-        window.audioManager.playPoyoSound().then(() => {
-          console.log('🎵 poyo.mp3再生開始');
-        }).catch(e => {
-          console.log('🎵 poyo.mp3再生エラー:', e);
-        });
-      }
+      // 🎵 poyo.mp3を再生
+      const poyoAudio = new Audio('./poyo.mp3');
+      poyoAudio.volume = 0.8; // ボリュームを80%に設定
+      poyoAudio.play().then(() => {
+        //console.log('🎵 poyo.mp3再生開始');
+      }).catch(e => {
+        //console.log('🎵 poyo.mp3再生エラー:', e);
+      });
       
       // 書き手側にもハート表示指示を送信
       if (socket && socket.readyState === WebSocket.OPEN) {
@@ -2149,7 +2579,27 @@ const UNIFIED_SETTINGS = {
 };
 
 // 統一位置計算関数（動画とPNGの同一位置を保証）
-// calculateUnifiedPosition → VideoManager.calculateUnifiedPosition()に移行
+function calculateUnifiedPosition(element, videoWidth, videoHeight) {
+  const canvas = document.getElementById('drawCanvas');
+  const canvasRect = canvas.getBoundingClientRect();
+  
+  // 中央配置計算
+  const centerX = (window.innerWidth - videoWidth) / 2;
+  const fixedY = UNIFIED_SETTINGS.videoTop;
+  
+  // 絶対座標で位置設定
+  const positionStyle = `
+    position: fixed;
+    left: ${centerX}px;
+    top: ${fixedY}px;
+    width: ${videoWidth}px;
+    height: ${videoHeight}px;
+    z-index: -1;
+  `;
+  
+  //console.log(`🔧 統一位置計算: center=${centerX.toFixed(1)}, top=${fixedY}, size=${videoWidth.toFixed(1)}x${videoHeight.toFixed(1)}`);
+  return positionStyle;
+}
 
 let drawingAreaOffset = { x: 0, y: 0 }; // 描画エリアのオフセット
 let drawingAreaSize = { width: 630, height: 450 }; // 描画エリアのサイズ（デフォルト）
@@ -2194,9 +2644,9 @@ let dragStartAreaPos = { x: 0, y: 0 };
 let dragStartAreaSize = { width: 0, height: 0 };
 let resizeDirection = null;
 
-// 🎬 動画背景関連変数 → VideoManagerに移行
-// let videoBackgroundElement = null;
-// let isVideoBackgroundActive = false;
+// 🎬 動画背景関連変数
+let videoBackgroundElement = null;
+let isVideoBackgroundActive = false;
 let isCanvasRotated = false; // キャンバスが180度回転しているかのフラグ
 let sendAnimationTimer = null; // 送信アニメーション後の扉タイマー
 
@@ -2375,13 +2825,10 @@ document.addEventListener('DOMContentLoaded', () => {
   //console.log('🔧 初期化: 横長キャンバスサイズを適用');
   //console.log(`🔧 初期化後の描画エリアサイズ: ${drawingAreaSize.width} x ${drawingAreaSize.height}`);
   
-  // TimingManager・AudioManager・EffectsManager・VideoManager初期化
+  // TimingManager初期化
   setTimeout(() => {
     initializeTimingManager();
-    initializeAudioManager();
-    initializeEffectsManager();
-    initializeVideoManager();
-    console.log('✅ DOMContentLoaded: 全Manager初期化完了');
+    console.log('✅ DOMContentLoaded: TimingManager初期化完了');
   }, 100);
   
   // PrintManager初期化
@@ -2710,7 +3157,43 @@ function endVideoBackground() {
   }
 }
 
-// hideVideoBackground → VideoManager.hideVideoBackground()に移行
+function hideVideoBackground() {
+  if (videoBackgroundElement) {
+    //console.log('🎬 動画背景を非表示にする');
+    
+    // 動画を停止
+    if (videoBackgroundElement.tagName === 'VIDEO') {
+      videoBackgroundElement.pause();
+      videoBackgroundElement.src = '';
+    }
+    
+    // 動画要素を削除
+    const container = document.getElementById('container');
+    if (container.contains(videoBackgroundElement)) {
+      container.removeChild(videoBackgroundElement);
+    }
+    
+    // 扉要素も削除
+    const leftDoor = document.getElementById('videoDoorLeft');
+    const rightDoor = document.getElementById('videoDoorRight');
+    if (leftDoor) leftDoor.remove();
+    if (rightDoor) rightDoor.remove();
+    
+    // 動画背景状態をクリア
+    videoBackgroundElement = null;
+    isVideoBackgroundActive = false;
+    
+    // キャンバスを通常状態に戻す
+    canvas.style.backgroundColor = '#f0f0f0';
+    canvas.style.mixBlendMode = 'normal';
+    
+    // キャンバスをクリアして再描画
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // 再描画処理は削除済み;
+    
+    //console.log('🎬 動画背景完全終了 - 通常モードに戻る');
+  }
+}
 
 // PNG要素を動画と同じ位置に作成
 function createPngOverlay() {
@@ -2772,7 +3255,38 @@ function updateVideoBackgroundSize() {
   }
 }
 
-// clearVideoBackground → VideoManager.clearVideoBackground()に移行
+function clearVideoBackground() {
+  if (videoBackgroundElement) {
+    //console.log('🎬 動画背景をクリア');
+    
+    // 動画要素の場合は停止してから削除
+    if (videoBackgroundElement.tagName === 'VIDEO') {
+      videoBackgroundElement.pause();
+      videoBackgroundElement.src = '';
+    }
+    
+    // DOM から削除
+    if (videoBackgroundElement.parentNode) {
+      videoBackgroundElement.parentNode.removeChild(videoBackgroundElement);
+    }
+    
+    videoBackgroundElement = null;
+    isVideoBackgroundActive = false;
+    
+    // キャンバスの背景を元に戻す
+    canvas.style.backgroundColor = '#f0f0f0';
+    canvas.style.mixBlendMode = 'normal';
+    
+    //console.log('🎬 動画背景要素を完全に削除');
+  }
+  
+  // PNG要素も削除
+  const existingPng = document.getElementById('pngOverlay');
+  if (existingPng) {
+    existingPng.remove();
+    //console.log('🖼️ PNG要素も削除');
+  }
+}
 
 // 🚪 動画用の扉作成（閉じた状態）
 function createDoorForVideo() {
@@ -4062,14 +4576,14 @@ function handleMessage(data) {
         // 🔸 背景画像とピンクエリアを動的に作成
         // 背景画像設置処理は削除済み
         
-        // 🔸 通常背景画像（background 1, 2, 3）が設定された時にDJ.mp3を再生（AudioManager使用）
+        // 🔸 通常背景画像（background 1, 2, 3）が設定された時にDJ.mp3を再生
         if (data.src.includes('back2.png') || data.src.includes('back3.png') || data.src.includes('back4.png')) {
-          if (window.audioManager) {
-            window.audioManager.playDJSound().catch(e => {
-              console.log('DJ.mp3再生エラー:', e);
-            });
-            console.log('🔊 背景画像設定時にDJ.mp3再生開始（ボリューム0.8）');
-          }
+          const audio = new Audio('./DJ.mp3');
+          audio.volume = 0.8; // ボリュームを2割下げる（1.0 → 0.8）
+          audio.play().catch(e => {
+    //console.log('DJ.mp3再生エラー:', e);
+  });
+          //console.log('🔊 背景画像設定時にDJ.mp3再生開始（ボリューム0.8）');
         }
         
         // 🔸 受信側キャンバスサイズを送信側に合わせて設定
@@ -4177,13 +4691,17 @@ function handleMessage(data) {
     // 書き手からのスライドアニメーション指示
     console.log(`📤 書き手(${data.writerId || 'unknown'})からスライドアニメーション指示受信:`, data);
     
-    // open.wav音声を再生（受信側で、AudioManager使用）
-    if (window.audioManager) {
-      window.audioManager.playOpenSound().then(() => {
+    // open.wav音声を再生（受信側で）
+    try {
+      const openAudio = new Audio('./open.wav');
+      openAudio.volume = 0.7; // 音量設定（70%）
+      openAudio.play().then(() => {
         console.log('🔊 受信側: open.wav再生開始');
       }).catch(error => {
         console.error('❌ 受信側: open.wav再生エラー:', error);
       });
+    } catch (error) {
+      console.error('❌ 受信側: open.wav読み込みエラー:', error);
     }
     
     // 音声再生と同時に透明ウィンドウのテキストを非表示
@@ -4344,10 +4862,10 @@ function handleMessage(data) {
     sendVideoCommand('sendButtonPressed');
     console.log('🎬 渡すボタン押下を動画に通知');
     
-    // 音楽ボリューム設定を受信（AudioManager使用）
-    if (data.musicVolume !== undefined && window.audioManager) {
-      window.audioManager.setMusicVolume(data.musicVolume);
-      console.log(`🎵 音楽ボリューム設定: ${data.musicVolume}`);
+    // 音楽ボリューム設定を受信
+    if (data.musicVolume !== undefined) {
+      musicVolume = data.musicVolume;
+      console.log(`🎵 音楽ボリューム設定: ${musicVolume}`);
     }
     
     // 印刷遅延時間設定を受信
@@ -4356,9 +4874,9 @@ function handleMessage(data) {
       console.log(`🖨️ 印刷遅延時間設定: ${printDelayTime}秒`);
     }
     
-    // 背景5の時に音楽再生開始（AudioManager使用）
-    if (window.isDevWhiteBackground && window.audioManager) {
-      window.audioManager.playBackgroundMusic();
+    // 背景5の時に音楽再生開始
+    if (window.isDevWhiteBackground) {
+      playBackgroundMusic();
     }
     
     // 送信前に描画データを保存
@@ -5711,13 +6229,13 @@ function runAnimationSequence(waitTime = null, fireworksEnabled = true, confetti
       }, 1500);
     }
 
-    // 🔸 回転アニメーションと同時にrotate.mp3を再生（AudioManager使用）
-    if (window.audioManager) {
-      window.audioManager.playRotateSound().catch(e => {
-        console.log('rotate.mp3再生エラー:', e);
-      });
-      console.log('🔊 回転アニメーション開始と同時にrotate.mp3再生');
-    }
+    // 🔸 回転アニメーションと同時にrotate.mp3を再生
+    const rotateAudio = new Audio('./rotate.mp3');
+    rotateAudio.volume = 0.7;
+    rotateAudio.play().catch(e => {
+    //console.log('rotate.mp3再生エラー:', e);
+  });
+    //console.log('🔊 回転アニメーション開始と同時にrotate.mp3再生');
 
     // 🔸 回転完了後の待機時間（書き手側の設定またはDev Tool設定を使用）
     let rotationWaitTime;
@@ -5916,13 +6434,158 @@ function startCountdown() {
   updateCountdown();
 }
 
-// 🔸 紙吹雪エフェクト関数 - rendering-effects.jsに移行済み
+// 🔸 紙吹雪エフェクト関数（より派手に）
+function createConfettiEffect(playAudio = true) {
+  // //console.log('🎊 紙吹雪エフェクト開始');
+  
+  // より多彩な色
+  const colors = [
+    '#ff1493', '#00ff00', '#0000ff', '#ffff00', '#ff8000', '#8000ff', '#ff0000', '#00ffff',
+    '#ff69b4', '#ffd700', '#ff00ff', '#00ff7f', '#ff4500', '#1e90ff', '#dc143c', '#ffa500'
+  ];
+  const windowWidth = window.innerWidth;
+  const windowHeight = window.innerHeight;
+  
+  // 効果音を再生（playAudioフラグが真の場合のみ）
+  if (playAudio) {
+    const audio = new Audio('./renzoku.mp3');
+    audio.volume = 0.7;
+    audio.play().catch(e => {
+    //console.log('クラッカー音再生エラー:', e);
+  });
+  }
+  
+  // 紙吹雪エフェクトを実行
+  executeConfettiEffect(colors, windowWidth, windowHeight);
+}
 
-// エフェクト実行関数 - rendering-effects.jsに移行済み
+// 🔸 clack.mp3付きの紙吹雪エフェクト関数
+function createConfettiEffectWithClack() {
+  // //console.log('🎊 紙吹雪エフェクト開始（clack1.mp3再生）');
+  
+  // より多彩な色
+  const colors = [
+    '#ff1493', '#00ff00', '#0000ff', '#ffff00', '#ff8000', '#8000ff', '#ff0000', '#00ffff',
+    '#ff69b4', '#ffd700', '#ff00ff', '#00ff7f', '#ff4500', '#1e90ff', '#dc143c', '#ffa500'
+  ];
+  const windowWidth = window.innerWidth;
+  const windowHeight = window.innerHeight;
+  
+  // clack1.mp3を再生
+  const audio = new Audio('./clack1.mp3');
+  audio.volume = 0.7;
+  audio.play().catch(e => {
+    //console.log('clack1.mp3再生エラー:', e);
+  });
+  //console.log('🔊 clack1.mp3再生開始');
+  
+  // 紙吹雪エフェクトを実行
+  executeConfettiEffect(colors, windowWidth, windowHeight);
+}
 
-// エフェクト関数群 - rendering-effects.jsに移行済み
+// 🔸 紙吹雪エフェクト実行関数（共通処理）
+function executeConfettiEffect(colors, windowWidth, windowHeight) {
+  // 左サイドから紙吹雪
+  createSideConfetti('left', colors, windowWidth, windowHeight);
+  
+  // 右サイドから紙吹雪
+  createSideConfetti('right', colors, windowWidth, windowHeight);
+  
+  // 追加：上部からも紙吹雪を降らせる
+  createTopConfetti(colors, windowWidth, windowHeight);
+  
+  // 追加：キラキラエフェクト
+  createSparkleEffect(windowWidth, windowHeight);
+}
 
-// エフェクト関数群はrendering-effects.jsに移行済み
+function createSideConfetti(side, colors, windowWidth, windowHeight) {
+  const confettiCount = 50; // 各サイドから50個の紙吹雪（増量）
+  
+  for (let i = 0; i < confettiCount; i++) {
+    const confetti = document.createElement('div');
+    confetti.className = 'confetti';
+    
+    // 紙吹雪のスタイル（よりバリエーション豊かに）
+    const size = Math.random() * 12 + 6; // 6-18px
+    const shape = Math.random();
+    let borderRadius = '0%';
+    if (shape < 0.3) borderRadius = '50%'; // 円形
+    else if (shape < 0.6) borderRadius = '25%'; // 角丸四角
+    
+    confetti.style.cssText = `
+      position: fixed;
+      width: ${size}px;
+      height: ${size * (Math.random() * 0.5 + 0.5)}px;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      pointer-events: none;
+      z-index: 9998;
+      border-radius: ${borderRadius};
+      opacity: ${Math.random() * 0.3 + 0.7};
+      box-shadow: 0 0 ${Math.random() * 10 + 5}px rgba(255,255,255,0.8);
+    `;
+    
+    // 開始位置を設定（下部から）
+    if (side === 'left') {
+      confetti.style.left = '0px';
+      confetti.style.bottom = Math.random() * 100 + 'px'; // 底部から0-100pxの範囲
+    } else {
+      confetti.style.right = '0px';
+      confetti.style.bottom = Math.random() * 100 + 'px'; // 底部から0-100pxの範囲
+    }
+    
+    document.body.appendChild(confetti);
+    
+    // アニメーション用の動的スタイル作成
+    const animationName = `confetti_${side}_${i}_${Date.now()}`;
+    const style = document.createElement('style');
+    
+    // 飛び散る方向と距離を計算（下から上へ噴出）
+    const horizontalDistance = Math.random() * 600 + 300; // 300-900px
+    const verticalDistance = -(Math.random() * 600 + 400); // -400から-1000px（上方向へ）
+    const rotation = Math.random() * 1440 + 720; // 720-2160度回転
+    
+    const keyframes = `
+      @keyframes ${animationName} {
+        0% {
+          transform: translate(0, 0) rotate(0deg);
+          opacity: 0.8;
+        }
+        50% {
+          opacity: 1;
+        }
+        100% {
+          transform: translate(${side === 'left' ? horizontalDistance : -horizontalDistance}px, ${verticalDistance}px) rotate(${rotation}deg);
+          opacity: 0;
+        }
+      }
+    `;
+    
+    style.textContent = keyframes;
+    document.head.appendChild(style);
+    
+    // アニメーションを適用（より長く）
+    const duration = Math.random() * 1500 + 2000; // 2-3.5秒
+    const delay = Math.random() * 300; // 0-300ms遅延
+    
+    confetti.style.animation = `${animationName} ${duration}ms ease-out ${delay}ms forwards`;
+    
+    // アニメーション完了後にクリーンアップ
+    setTimeout(() => {
+      if (confetti.parentNode) {
+        confetti.parentNode.removeChild(confetti);
+      }
+      if (style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
+    }, duration + delay + 100);
+  }
+  
+  // //console.log(`🎊 ${side}サイドから${confettiCount}個の紙吹雪を発射`);
+}
+
+// 🔸 上部からの紙吹雪（追加演出）
+function createTopConfetti(colors, windowWidth, windowHeight) {
+  const confettiCount = 40; // 上部から40個
   
   for (let i = 0; i < confettiCount; i++) {
     const confetti = document.createElement('div');
@@ -5999,8 +6662,92 @@ function startCountdown() {
   }
   
   // //console.log(`🎊 上部から${confettiCount}個の紙吹雪を降らせる`);
-// エフェクト関数群はrendering-effects.jsに移行済み
-// createSparkleEffect関数はrendering-effects.jsに移行済み
+}
+
+// 🔸 キラキラエフェクト関数
+function createSparkleEffect(windowWidth, windowHeight) {
+  const sparkleCount = 60; // 60個のキラキラ
+  
+  for (let i = 0; i < sparkleCount; i++) {
+    const sparkle = document.createElement('div');
+    sparkle.className = 'sparkle';
+    
+    // キラキラのスタイル
+    const size = Math.random() * 6 + 2; // 2-8px
+    const startX = Math.random() * windowWidth;
+    const startY = windowHeight - Math.random() * 200; // 下部200pxの範囲から
+    
+    sparkle.style.cssText = `
+      position: fixed;
+      width: ${size}px;
+      height: ${size}px;
+      background: radial-gradient(circle, #ffffff 0%, rgba(255,255,255,0) 70%);
+      pointer-events: none;
+      z-index: 9999;
+      left: ${startX}px;
+      top: ${startY}px;
+      border-radius: 50%;
+      box-shadow: 0 0 ${size * 2}px #fff, 0 0 ${size * 4}px #fff, 0 0 ${size * 6}px #fff;
+    `;
+    
+    document.body.appendChild(sparkle);
+    
+    // キラキラアニメーション
+    const animationName = `sparkle_${i}_${Date.now()}`;
+    const style = document.createElement('style');
+    
+    // ランダムな動き
+    const moveX = (Math.random() - 0.5) * 800; // -400 to 400px
+    const moveY = -(Math.random() * 600 + 200); // -200 to -800px（上方向）
+    const duration = Math.random() * 2000 + 1000; // 1-3秒
+    
+    const keyframes = `
+      @keyframes ${animationName} {
+        0% {
+          transform: translate(0, 0) scale(0);
+          opacity: 0;
+        }
+        20% {
+          transform: translate(${moveX * 0.2}px, ${moveY * 0.2}px) scale(1.5);
+          opacity: 1;
+        }
+        50% {
+          transform: translate(${moveX * 0.5}px, ${moveY * 0.5}px) scale(1);
+          opacity: 0.8;
+        }
+        100% {
+          transform: translate(${moveX}px, ${moveY}px) scale(0);
+          opacity: 0;
+        }
+      }
+    `;
+    
+    style.textContent = keyframes;
+    document.head.appendChild(style);
+    
+    // アニメーションを適用
+    const delay = Math.random() * 500; // 0-500ms遅延
+    sparkle.style.animation = `${animationName} ${duration}ms ease-out ${delay}ms forwards`;
+    
+    // 点滅エフェクトを追加
+    const blinkInterval = setInterval(() => {
+      sparkle.style.opacity = Math.random() > 0.5 ? '1' : '0.3';
+    }, 100);
+    
+    // アニメーション完了後にクリーンアップ
+    setTimeout(() => {
+      clearInterval(blinkInterval);
+      if (sparkle.parentNode) {
+        sparkle.parentNode.removeChild(sparkle);
+      }
+      if (style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
+    }, duration + delay + 100);
+  }
+  
+  // //console.log(`✨ ${sparkleCount}個のキラキラエフェクトを追加`);
+}
 
 // 🔸 花火重複実行防止のための変数
 let fireworksInProgress = false;
@@ -6073,13 +6820,13 @@ function createReceiverFireworks() {
   
   // //console.log('🎆 受け手側打ち上げ花火演出を開始（リッチバージョン）');
   
-  // fire.wavを再生（AudioManager使用）
-  if (window.audioManager) {
-    window.audioManager.playFireSound().catch(e => {
-      console.log('fire.wav再生エラー:', e);
-    });
-    console.log('🔊 fire.wav再生開始');
-  }
+  // fire.wavを再生
+  const audio = new Audio('./fire.wav');
+  audio.volume = 0.7;
+  audio.play().catch(e => {
+    //console.log('fire.wav再生エラー:', e);
+  });
+  //console.log('🔊 fire.wav再生開始');
   
   // 複数の打ち上げ花火を生成（超派手に改良）
   for (let i = 0; i < 18; i++) {
@@ -6425,13 +7172,13 @@ function startDoorAnimationPhase2(imageSrc) {
     //console.log('🚪 背景画像を180度回転してキャンバスに描画');
   }
   
-  // 2. open.wavを再生（AudioManager使用）
-  if (window.audioManager) {
-    window.audioManager.playOpenSound().catch(e => {
-      console.log('open.wav再生エラー:', e);
-    });
-    console.log('🔊 open.wav再生開始');
-  }
+  // 2. open.wavを再生
+  const audio = new Audio('./open.wav');
+  audio.volume = 0.6;
+  audio.play().catch(e => {
+    //console.log('open.wav再生エラー:', e);
+  });
+  //console.log('🔊 open.wav再生開始');
   
   // 3. 青色LEDを表示（削除）
   // createBlueLEDLightingWithFadeOut();
@@ -6456,13 +7203,13 @@ function startDoorAnimationPhase2(imageSrc) {
       doorAnimationInProgress = false; // 扉演出中フラグを下げる
       //console.log('🚪 扉演出完了');
       
-      // 扉が開き切ったらopen2.mp3を再生（AudioManager使用）
-      if (window.audioManager) {
-        window.audioManager.playOpen2Sound().catch(e => {
-          console.log('open2.mp3再生エラー:', e);
-        });
-        console.log('🔊 open2.mp3再生開始');
-      }
+      // 扉が開き切ったらopen2.mp3を再生
+      const audio2 = new Audio('./open2.mp3');
+      audio2.volume = 0.6;
+      audio2.play().catch(e => {
+    //console.log('open2.mp3再生エラー:', e);
+  });
+      //console.log('🔊 open2.mp3再生開始');
       
       // 心臓鼓動演出を開始
       createHeartbeatEffect();
@@ -6472,7 +7219,47 @@ function startDoorAnimationPhase2(imageSrc) {
 }
 
 // 🔸 特殊背景設定（180度回転表示）- 背景を表示し続ける
-// setSpecialBackgroundWithRiseEffect → VideoManager.setSpecialBackgroundWithRiseEffect()に移行
+function setSpecialBackgroundWithRiseEffect(src, canvasSize) {
+  //console.log('🚪 特殊背景を180度回転で設定:', src);
+  
+  const img = new Image();
+  img.src = src;
+  
+  img.onload = () => {
+    // キャンバスサイズを調整
+    if (canvasSize) {
+      const oldWidth = canvas.width;
+      const oldHeight = canvas.height;
+      canvas.width = canvasSize.width;
+      canvas.height = canvasSize.height;
+      
+      // キャンバスサイズ変更後に描画エリアサイズを背景サイズに完全一致させる
+      drawingAreaSize.width = canvas.width;
+      drawingAreaSize.height = canvas.height;
+      console.log(`📐 描画エリアサイズを背景に完全同期: ${oldWidth}x${oldHeight} → ${drawingAreaSize.width}x${drawingAreaSize.height}`);
+      
+      console.log(`📐 特殊背景でキャンバスサイズ変更: ${oldWidth}x${oldHeight} → ${canvas.width}x${canvas.height}`);
+    }
+    
+    // 背景画像を保存
+    // 背景画像設定処理は削除済み
+    lastBackgroundSrc = src;
+    
+    // 即座に180度回転した画像を表示（背景を消さない）
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(Math.PI); // 180度回転
+    ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+    ctx.restore();
+    // 再描画処理は削除済み;
+    
+    //console.log('🚪 特殊背景設定完了（180度回転）- 背景を表示し続ける');
+  };
+  
+  img.onerror = () => {
+    //console.error('❌ 特殊背景画像の読み込みに失敗:', src);
+  };
+}
 
 // 🔸 青色LED間接照明効果を削除
 // function createBlueLEDLighting() { ... }
@@ -7584,7 +8371,7 @@ function startRotationAnimation(rotationWaitTime) {
     return window.timingManager.startRotationAnimation(rotationWaitTime, {
       setAnimationFlag: (flag) => isAnimationInProgress = flag,
       isDevWhiteBackground: window.isDevWhiteBackground,
-      playBackgroundMusic: window.audioManager ? () => window.audioManager.playBackgroundMusic() : () => console.log('AudioManager not available'),
+      playBackgroundMusic,
       executeAnimation: executeRotationAnimation
     });
   }
@@ -7594,8 +8381,8 @@ function startRotationAnimation(rotationWaitTime) {
   console.log(`🔍 startRotationAnimation受信: rotationWaitTime = ${rotationWaitTime}ms (${rotationWaitTime/1000}秒)`);
   isAnimationInProgress = true;
   
-  if (window.isDevWhiteBackground && window.audioManager) {
-    window.audioManager.playBackgroundMusic();
+  if (window.isDevWhiteBackground) {
+    playBackgroundMusic();
     console.log('🎵 背景5: アニメーション開始時に音楽再生開始');
   }
   
@@ -7820,7 +8607,7 @@ function performWaitAndSlide(rotationWaitTime) {
     console.log(`⏱️ transition設定時間: ${(transitionSetComplete - transitionSetTime).toFixed(2)}ms`);
     
     // 背景5の場合は動画も一緒に移動
-    if (window.isDevWhiteBackground && window.videoManager && window.videoManager.currentVideoElement) {
+    if (window.isDevWhiteBackground && currentVideoElement) {
       console.log('🎬 背景5: 動画も一緒に下移動');
       // 動画は既にback2Wrapper内にあるので、親要素と一緒に移動する
     }
@@ -7858,9 +8645,10 @@ function performWaitAndSlide(rotationWaitTime) {
         console.log('🔄 Step 4: 描画クリア処理開始（スライド完了直後）');
         
         // 背景5の場合は動画要素も削除
-        if (window.isDevWhiteBackground && window.videoManager) {
+        if (window.isDevWhiteBackground && currentVideoElement) {
           console.log('🎬 背景5: 動画要素を削除');
-          window.videoManager.stopVideoPlayback();
+          currentVideoElement.remove();
+          currentVideoElement = null;
         }
         
         // 描画データをクリア
@@ -7929,36 +8717,8 @@ function performWaitAndSlide(rotationWaitTime) {
 }
 
 async function downloadAndPrintDrawing() {
-  console.log('📥 downloadAndPrintDrawing: ダウンロード即座実行、印刷遅延実行開始');
-  
   if (window.printManager) {
-    // PrintManagerのgeneratePrintImageを使用して画像生成し、ダウンロード・印刷を実行
-    try {
-      const imageData = await window.printManager.generatePrintImage();
-      if (imageData && imageData.dataURL) {
-        // ダウンロード処理
-        const savedPath = window.printManager.downloadImage(imageData.dataURL, imageData.fileName);
-        
-        // 印刷処理（遅延実行）
-        const printDelayTime = window.timingManager ? window.timingManager.printDelayTime : 5.0;
-        const delayMs = printDelayTime * 1000;
-        
-        console.log(`🖨️ ${printDelayTime}秒後に印刷を実行`);
-        setTimeout(() => {
-          console.log(`🖨️ ${printDelayTime}秒遅延完了 - 印刷処理を開始`);
-          
-          const printPath = savedPath || imageData.printPath;
-          if (printPath) {
-            console.log('✅ 印刷パスが確認できました - executePrint実行');
-            window.printManager.executePrint(printPath);
-          } else {
-            console.log('⚠️ 印刷パスがないため印刷をスキップ（ブラウザ環境）');
-          }
-        }, delayMs);
-      }
-    } catch (error) {
-      console.error('❌ downloadAndPrintDrawing: エラー:', error);
-    }
+    return await window.printManager.generatePrintImage();
   } else {
     console.error('❌ PrintManager が初期化されていません');
   }
@@ -7974,7 +8734,7 @@ async function generatePrintImage() {
 
 function downloadImage(dataURL, fileName) {
   if (window.printManager) {
-    return window.printManager.downloadImage(dataURL, fileName);
+    return window.printManager._downloadImage(dataURL, fileName);
   } else {
     console.error('❌ PrintManager が初期化されていません');
   }
@@ -7990,7 +8750,7 @@ function downloadInBrowser(dataURL, fileName) {
 
 function executePrint(filePath) {
   if (window.printManager) {
-    return window.printManager.executePrint(filePath);
+    return window.printManager._executePrint(filePath);
   } else {
     console.error('❌ PrintManager が初期化されていません');
   }
